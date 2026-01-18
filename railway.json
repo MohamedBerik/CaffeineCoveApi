@@ -1,6 +1,22 @@
+@"
 {
   "build": {
     "builder": "NIXPACKS",
-    "buildCommand": "composer install --no-dev --prefer-dist --no-progress"
+    "buildCommand": "composer install --no-dev --prefer-dist --no-progress --ignore-platform-reqs",
+    "nixpacksConfig": {
+      "phases": {
+        "setup": {
+          "aptPkgs": ["php8.1", "php8.1-common", "php8.1-mysql", "php8.1-mbstring", "php8.1-xml", "php8.1-zip"]
+        },
+        "install": {
+          "cmds": [
+            "composer install --no-dev --prefer-dist --no-progress --ignore-platform-reqs",
+            "rm -rf node_modules || true"
+          ]
+        }
+      },
+      "startCmd": "vendor/bin/heroku-php-nginx public/"
+    }
   }
 }
+"@ | Set-Content railway.json -Encoding UTF8
