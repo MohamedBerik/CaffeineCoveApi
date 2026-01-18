@@ -1,3 +1,6 @@
-@'
-{"build":{"builder":"NIXPACKS","buildCommand":"composer install --no-dev --prefer-dist --no-progress --ignore-platform-reqs"}}
-'@ | Set-Content railway.json -Encoding UTF8
+{
+    "build": {
+        "builder": "NIXPACKS",
+        "buildCommand": "composer install --no-dev --prefer-dist --no-progress --ignore-platform-reqs"
+    }
+}
