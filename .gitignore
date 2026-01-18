@@ -13,3 +13,9 @@ npm-debug.log
 yarn-error.log
 /.idea
 /.vscode
+
+# أضف هذه السطور لملف .gitignore الموجود
+echo ".railway" >> .gitignore
+echo "storage/framework/cache/*" >> .gitignore
+echo "storage/framework/sessions/*" >> .gitignore
+echo "storage/framework/views/*" >> .gitignore

@@ -1,0 +1,8 @@
+@'
+{
+  "build": {
+    "builder": "NIXPACKS",
+    "buildCommand": "composer install --no-dev --ignore-platform-reqs"
+  }
+}
+'@ | Out-File -FilePath railway.json -Encoding UTF8
