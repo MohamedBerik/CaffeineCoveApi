@@ -1,3 +1,4 @@
+# 2. عدل railway.json لمنع npm
 @"
 {
   "build": {
@@ -6,16 +7,15 @@
     "nixpacksConfig": {
       "phases": {
         "setup": {
-          "aptPkgs": ["php8.1", "php8.1-common", "php8.1-mysql", "php8.1-mbstring", "php8.1-xml", "php8.1-zip"]
+          "aptPkgs": ["php8.1", "php8.1-common", "php8.1-mysql", "php8.1-mbstring"]
         },
         "install": {
           "cmds": [
             "composer install --no-dev --prefer-dist --no-progress --ignore-platform-reqs",
-            "rm -rf node_modules || true"
+            "rm -rf node_modules 2>/dev/null || true"
           ]
         }
-      },
-      "startCmd": "vendor/bin/heroku-php-nginx public/"
+      }
     }
   }
 }
