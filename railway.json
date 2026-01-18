@@ -1,22 +1,6 @@
-# 2. عدل railway.json لمنع npm
-@"
 {
-  "build": {
-    "builder": "NIXPACKS",
-    "buildCommand": "composer install --no-dev --prefer-dist --no-progress --ignore-platform-reqs",
-    "nixpacksConfig": {
-      "phases": {
-        "setup": {
-          "aptPkgs": ["php8.1", "php8.1-common", "php8.1-mysql", "php8.1-mbstring"]
-        },
-        "install": {
-          "cmds": [
-            "composer install --no-dev --prefer-dist --no-progress --ignore-platform-reqs",
-            "rm -rf node_modules 2>/dev/null || true"
-          ]
-        }
-      }
+    "build": {
+        "builder": "NIXPACKS",
+        "buildCommand": "composer install --no-dev --prefer-dist --no-progress --ignore-platform-reqs"
     }
-  }
 }
-"@ | Set-Content railway.json -Encoding UTF8
