@@ -22,11 +22,11 @@ Route::get('/', function () {
 });
 
 // لو هتجرب من المتصفح
-Route::get('/check-env', function () {
-    return [
-        'app_key' => env('APP_KEY'),
-        'db_host' => env('DB_HOST'),
-        'db_database' => env('DB_DATABASE'),
-        'db_user' => env('DB_USERNAME')
-    ];
-});
+// Route::get('/check-env', function () {
+//     return [
+//         'app_key' => env('APP_KEY'),
+//         'db_host' => env('DB_HOST'),
+//         'db_database' => env('DB_DATABASE'),
+//         'db_user' => env('DB_USERNAME')
+//     ];
+// });
