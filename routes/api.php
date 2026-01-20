@@ -14,6 +14,7 @@ use App\Http\Controllers\API\SaleController;
 use App\Http\Controllers\API\ReservationController;
 use App\Http\Controllers\API\AdminDashboardController;
 use App\Http\Controllers\API\AdminCrudController;
+use Illuminate\Support\Facades\DB;
 
 
 /*
@@ -98,10 +99,18 @@ Route::middleware([
         Route::delete('{table}/{id}', [AdminCrudController::class, 'destroy']);
     });
 
-Route::get('/check-env', function () {
+// Route::get('/check-env', function () {
+//     return response()->json([
+//         'app_key' => config('app.key'),
+//         'env' => config('app.env'),
+//         'debug' => config('app.debug'),
+//     ]);
+// });
+
+
+Route::get('/health', function () {
     return response()->json([
-        'app_key' => config('app.key'),
-        'env' => config('app.env'),
-        'debug' => config('app.debug'),
+        'status' => 'ok',
+        'env' => app()->environment(),
     ]);
 });
