@@ -99,13 +99,6 @@ Route::middleware([
         Route::delete('{table}/{id}', [AdminCrudController::class, 'destroy']);
     });
 
-// Route::get('/check-env', function () {
-//     return response()->json([
-//         'app_key' => config('app.key'),
-//         'env' => config('app.env'),
-//         'debug' => config('app.debug'),
-//     ]);
-// });
 
 
 
