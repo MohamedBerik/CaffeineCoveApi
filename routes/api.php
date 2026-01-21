@@ -108,17 +108,17 @@ Route::middleware([
 // });
 
 
-// Route::get('/db-test', function () {
-//     try {
-//         DB::connection()->getPdo();
-//         return response()->json([
-//             'status' => 'Database connection OK',
-//             'database' => env('DB_DATABASE')
-//         ]);
-//     } catch (\Exception $e) {
-//         return response()->json([
-//             'status' => 'Database connection FAILED',
-//             'error' => $e->getMessage()
-//         ], 500);
-//     }
-// });
+Route::get('/db-test', function () {
+    try {
+        DB::connection()->getPdo();
+        return response()->json([
+            'status' => 'Database connection OK',
+            'database' => env('DB_DATABASE')
+        ]);
+    } catch (\Exception $e) {
+        return response()->json([
+            'status' => 'Database connection FAILED',
+            'error' => $e->getMessage()
+        ], 500);
+    }
+});
