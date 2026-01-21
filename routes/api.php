@@ -103,7 +103,7 @@ Route::middleware([
 
 
 Route::get('/db-test', function () {
-    DB::connection()->getPdo();
+    DB::User()->getPdo();
     return response()->json([
         'status' => 'DB Connected ✅'
     ]);
