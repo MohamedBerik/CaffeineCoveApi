@@ -14,7 +14,7 @@ use App\Http\Controllers\API\SaleController;
 use App\Http\Controllers\API\ReservationController;
 use App\Http\Controllers\API\AdminDashboardController;
 use App\Http\Controllers\API\AdminCrudController;
-// use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\DB;
 
 
 /*
@@ -108,17 +108,10 @@ Route::middleware([
 // });
 
 
+
 Route::get('/db-test', function () {
-    try {
-        DB::connection()->getPdo();
-        return response()->json([
-            'status' => 'Database connection OK',
-            'database' => env('DB_DATABASE')
-        ]);
-    } catch (\Exception $e) {
-        return response()->json([
-            'status' => 'Database connection FAILED',
-            'error' => $e->getMessage()
-        ], 500);
-    }
+    DB::connection()->getPdo();
+    return response()->json([
+        'status' => 'DB Connected ✅'
+    ]);
 });
