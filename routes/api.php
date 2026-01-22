@@ -102,9 +102,24 @@ Route::middleware([
 
 
 
+
 Route::get('/db-test', function () {
-    DB::User()->getPdo();
-    return response()->json([
-        'status' => 'DB Connected ✅'
-    ]);
+    try {
+        // Test connection
+        DB::connection()->getPdo();
+
+        // Get tables
+        $tables = DB::select('SHOW TABLES');
+
+        return response()->json([
+            'status' => 'DB Connected ✅',
+            'tables_count' => count($tables),
+            'tables' => $tables
+        ]);
+    } catch (\Exception $e) {
+        return response()->json([
+            'status' => 'DB Connection Failed ❌',
+            'error' => $e->getMessage()
+        ], 500);
+    }
 });
