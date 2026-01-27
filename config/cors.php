@@ -2,13 +2,13 @@
 
 return [
 
-    'paths' => ['api/*'],
+    'paths' => ['api/*', 'sanctum/csrf-cookie', 'login', 'logout', 'register'],
 
     'allowed_methods' => ['*'],
 
     'allowed_origins' => ['https://caffeine-cove-cafe.vercel.app'],
 
-    // 'allowed_origins_patterns' => [],
+    'allowed_origins_patterns' => [],
 
     'allowed_headers' => ['*'],
 
