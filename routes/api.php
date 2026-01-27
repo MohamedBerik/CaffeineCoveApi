@@ -98,28 +98,3 @@ Route::middleware([
         Route::put('{table}/{id}',    [AdminCrudController::class, 'update']);
         Route::delete('{table}/{id}', [AdminCrudController::class, 'destroy']);
     });
-
-
-
-
-
-Route::get('/db-test', function () {
-    try {
-        // Test connection
-        DB::connection()->getPdo();
-
-        // Get tables
-        $tables = DB::select('SHOW TABLES');
-
-        return response()->json([
-            'status' => 'DB Connected ✅',
-            'tables_count' => count($tables),
-            'tables' => $tables
-        ]);
-    } catch (\Exception $e) {
-        return response()->json([
-            'status' => 'DB Connection Failed ❌',
-            'error' => $e->getMessage()
-        ], 500);
-    }
-});
