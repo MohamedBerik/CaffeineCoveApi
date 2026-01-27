@@ -6,7 +6,7 @@ return [
 
     'allowed_methods' => ['*'],
 
-    'allowed_origins' => ['http://localhost:3000', 'https://caffeinecoveapi-production-a107.up.railway.app'],
+    'allowed_origins' => ['https://caffeine-cove-cafe.vercel.app', 'https://caffeinecoveapi-production-a107.up.railway.app'],
 
     'allowed_origins_patterns' => [],
 

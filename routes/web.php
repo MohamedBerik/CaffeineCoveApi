@@ -16,17 +16,7 @@ use Illuminate\Support\Facades\Route;
 // Route افتراضي اختياري (للتأكد إن Laravel شغال)
 Route::get('/', function () {
     return response()->json([
-        'status' => 'Laravel API is running',
+        'status' => 'Laravel API is running 🚀',
         'version' => app()->version(),
     ]);
 });
-
-
-// routes/web.php
-// Route::get('/check-key', function () {
-//     return [
-//         'env' => env('APP_ENV'),
-//         'app_key_env' => env('APP_KEY'),
-//         'app_key_config' => config('app.key'),
-//     ];
-// });
