@@ -26,8 +26,10 @@ class AuthController extends Controller
         $token = $user->createToken('API Token')->plainTextToken;
 
         return response()->json([
-            'user' => $user,
-            'token' => $token
+            // 'user' => $user,
+            // 'token' => $token
+            'host' => config('database.connections.mysql.host'),
+            'env'  => app()->environment(),
         ], 201);
     }
 
