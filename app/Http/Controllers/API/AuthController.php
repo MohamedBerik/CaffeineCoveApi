@@ -23,7 +23,7 @@ class AuthController extends Controller
             'password' => bcrypt($request->password),
         ]);
 
-        $token = $user->createToken('API Token')->plainTextToken;
+        // $token = $user->createToken('API Token')->plainTextToken;
 
         return response()->json([
             // 'user' => $user,
