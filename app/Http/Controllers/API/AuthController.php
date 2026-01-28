@@ -23,13 +23,13 @@ class AuthController extends Controller
             'password' => bcrypt($request->password),
         ]);
 
-        // $token = $user->createToken('API Token')->plainTextToken;
+        $token = $user->createToken('API Token')->plainTextToken;
 
         return response()->json([
-            // 'user' => $user,
-            // 'token' => $token
-            'host' => config('database.connections.mysql.host'),
-            'env'  => app()->environment(),
+            'user' => $user,
+            'token' => $token
+            // 'host' => config('database.connections.mysql.host'),
+            // 'env'  => app()->environment(),
         ], 201);
     }
 
