@@ -9,7 +9,6 @@ use App\Models\User;
 
 class AuthController extends Controller
 {
-    // تسجيل مستخدم جديد
     public function register(Request $request)
     {
         $request->validate([
