@@ -2,6 +2,9 @@
 
 namespace App\Http\Controllers\API;
 
+use App\Models\OrderItem;
+use App\Models\Product;
+use Illuminate\Support\Facades\DB;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\OrderResource;
 use App\Models\Order;
@@ -46,7 +49,7 @@ class OrderController extends Controller
     {
         $id = $request->id;
         $order = Order::find($id);
-        if($order){
+        if ($order) {
             $order->delete();
             $data = [
                 "msg" => "Deleted Successfully",
@@ -67,7 +70,7 @@ class OrderController extends Controller
     {
 
         $validate = Validator::make($request->all(), [
-            'id' => 'required|unique:categories|max:20',
+            'id' => 'required|unique:orders|max:20',
             'title_en' => 'required|min:3|max:255',
             'title_ar' => 'required|min:3|max:255',
             'description_en' => 'required|min:3|max:255',
@@ -159,5 +162,53 @@ class OrderController extends Controller
             ];
             return response()->json($data);
         }
+    }
+    public function storeErp(Request $request)
+    {
+        $data = $request->validate([
+            'customer_id' => ['required', 'exists:users,id'],
+            'items' => ['required', 'array', 'min:1'],
+            'items.*.product_id' => ['required', 'exists:products,id'],
+            'items.*.quantity' => ['required', 'integer', 'min:1'],
+        ]);
+
+        return DB::transaction(function () use ($data, $request) {
+
+            $order = Order::create([
+                'customer_id' => $data['customer_id'],
+                'status'      => 'pending',
+                'total'       => 0,
+                'created_by'  => $request->user()->id,
+            ]);
+
+            $total = 0;
+
+            foreach ($data['items'] as $item) {
+
+                $product = Product::lockForUpdate()
+                    ->findOrFail($item['product_id']);
+
+                $lineTotal = $product->price * $item['quantity'];
+
+                OrderItem::create([
+                    'order_id'    => $order->id,
+                    'product_id'  => $product->id,
+                    'quantity'    => $item['quantity'],
+                    'unit_price'  => $product->price,
+                    'total'       => $lineTotal,
+                ]);
+
+                $total += $lineTotal;
+            }
+
+            $order->update([
+                'total' => $total
+            ]);
+
+            return response()->json([
+                'msg' => 'Order created (ERP)',
+                'data' => $order->load('items.product')
+            ], 201);
+        });
     }
 }

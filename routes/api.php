@@ -98,3 +98,6 @@ Route::middleware([
         Route::put('{table}/{id}',    [AdminCrudController::class, 'update']);
         Route::delete('{table}/{id}', [AdminCrudController::class, 'destroy']);
     });
+
+Route::middleware('auth:sanctum')
+    ->post('/erp/orders', [OrderController::class, 'storeErp']);
