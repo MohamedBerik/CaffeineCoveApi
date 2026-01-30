@@ -4,6 +4,7 @@ namespace App\Http\Controllers\API;
 
 use App\Models\OrderItem;
 use App\Models\Product;
+use App\Models\StockMovement;
 use Illuminate\Support\Facades\DB;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\OrderResource;
@@ -188,6 +189,11 @@ class OrderController extends Controller
                 $product = Product::lockForUpdate()
                     ->findOrFail($item['product_id']);
 
+                // ✅ منع البيع لو المخزون لا يكفي
+                if ($product->stock_quantity < $item['quantity']) {
+                    abort(422, "Insufficient stock for product {$product->id}");
+                }
+
                 $lineTotal = $product->price * $item['quantity'];
 
                 OrderItem::create([
@@ -198,8 +204,22 @@ class OrderController extends Controller
                     'total'       => $lineTotal,
                 ]);
 
+                // ✅ خصم من المخزون
+                $product->decrement('stock_quantity', $item['quantity']);
+
+                // ✅ تسجيل حركة مخزون
+                StockMovement::create([
+                    'product_id'   => $product->id,
+                    'type'         => 'out',
+                    'quantity'     => $item['quantity'],
+                    'reference_type' => Order::class,
+                    'reference_id' => $order->id,
+                    'created_by'   => $request->user()->id,
+                ]);
+
                 $total += $lineTotal;
             }
+
 
             $order->update([
                 'total' => $total
