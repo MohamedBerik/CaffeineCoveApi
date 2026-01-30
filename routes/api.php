@@ -101,3 +101,9 @@ Route::middleware([
 
 Route::middleware('auth:sanctum')
     ->post('/erp/orders', [OrderController::class, 'storeErp']);
+
+Route::middleware('auth:sanctum')->prefix('erp')->group(function () {
+
+    Route::post('/orders/{id}/confirm', [OrderController::class, 'confirm']);
+    Route::post('/orders/{id}/cancel', [OrderController::class, 'cancel']);
+});

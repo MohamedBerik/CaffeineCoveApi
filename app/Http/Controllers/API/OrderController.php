@@ -5,6 +5,7 @@ namespace App\Http\Controllers\API;
 use App\Models\OrderItem;
 use App\Models\Product;
 use App\Models\StockMovement;
+
 use Illuminate\Support\Facades\DB;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\OrderResource;
@@ -229,6 +230,65 @@ class OrderController extends Controller
                 'msg' => 'Order created (ERP)',
                 'data' => $order->load('items.product')
             ], 201);
+        });
+    }
+    public function confirm($id)
+    {
+        $order = Order::with('items')->findOrFail($id);
+
+        if ($order->status === 'confirmed') {
+            return response()->json([
+                'msg' => 'Order already confirmed'
+            ], 422);
+        }
+
+        $order->update([
+            'status' => 'confirmed'
+        ]);
+
+        return response()->json([
+            'msg' => 'Order confirmed',
+            'data' => $order
+        ]);
+    }
+    public function cancel(Request $request, $id)
+    {
+        $order = Order::with('items')->findOrFail($id);
+
+        if ($order->status === 'cancelled') {
+            return response()->json([
+                'msg' => 'Order already cancelled'
+            ], 422);
+        }
+
+        return DB::transaction(function () use ($order, $request) {
+
+            foreach ($order->items as $item) {
+
+                $product = Product::lockForUpdate()
+                    ->findOrFail($item->product_id);
+
+                // إعادة الكمية
+                $product->increment('stock_quantity', $item->quantity);
+
+                // حركة مخزون
+                StockMovement::create([
+                    'product_id'   => $product->id,
+                    'type'         => 'in',
+                    'quantity'     => $item->quantity,
+                    'reference_type' => Order::class,
+                    'reference_id' => $order->id,
+                    'created_by'   => $request->user()->id,
+                ]);
+            }
+
+            $order->update([
+                'status' => 'cancelled'
+            ]);
+
+            return response()->json([
+                'msg' => 'Order cancelled and stock restored'
+            ]);
         });
     }
 }
