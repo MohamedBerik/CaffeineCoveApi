@@ -28,8 +28,6 @@ class AuthController extends Controller
         return response()->json([
             'user' => $user,
             'token' => $token
-            // 'host' => config('database.connections.mysql.host'),
-            // 'env'  => app()->environment(),
         ], 201);
     }
 
