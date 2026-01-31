@@ -250,6 +250,7 @@ class OrderController extends Controller
             $order->update([
                 'status' => 'confirmed'
             ]);
+            activity('order.confirmed', $order);
 
             $invoice = Invoice::create([
                 'number'      => 'INV-' . now()->format('YmdHis') . '-' . $order->id,
@@ -312,6 +313,7 @@ class OrderController extends Controller
             $order->update([
                 'status' => 'cancelled'
             ]);
+            activity('order.cancelled', $order);
 
             return response()->json([
                 'msg' => 'Order cancelled and stock restored'

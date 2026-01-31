@@ -45,7 +45,7 @@ class InvoicePaymentController extends Controller
                 'received_by' => $request->user()->id ?? null
             ]);
 
-            $newPaid = $invoice->payments()->sum('amount') + $request->amount;
+            $newPaid = $invoice->payments()->sum('amount');
 
             if ($newPaid >= $invoice->total) {
 
@@ -58,6 +58,10 @@ class InvoicePaymentController extends Controller
                     'status' => 'partial'
                 ]);
             }
+
+            activity('invoice.paid', $invoice, [
+                'amount' => $request->amount
+            ]);
 
             return response()->json([
                 'msg' => 'Payment recorded',

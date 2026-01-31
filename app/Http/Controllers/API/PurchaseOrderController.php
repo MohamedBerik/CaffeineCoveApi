@@ -86,6 +86,7 @@ class PurchaseOrderController extends Controller
             $po->update([
                 'status' => 'received'
             ]);
+            activity('purchase.received', $po);
 
             return response()->json([
                 'msg' => 'Stock received successfully'
@@ -127,6 +128,10 @@ class PurchaseOrderController extends Controller
             if ($newPaid >= $po->total) {
                 $po->update(['status' => 'paid']);
             }
+
+            activity('supplier.paid', $po, [
+                'amount' => $request->amount
+            ]);
 
             return response()->json([
                 'msg' => 'Supplier payment recorded',

@@ -102,16 +102,22 @@ Route::middleware([
         Route::delete('{table}/{id}', [AdminCrudController::class, 'destroy']);
     });
 
-Route::middleware('auth:sanctum')
-    ->post('/erp/orders', [OrderController::class, 'storeErp']);
 
-Route::middleware('auth:sanctum')->prefix('erp')->group(function () {
+Route::prefix('erp')->middleware('auth:sanctum')->group(function () {
 
-    Route::post('/orders/{id}/confirm', [OrderController::class, 'confirm']);
-    Route::post('/orders/{id}/cancel', [OrderController::class, 'cancel']);
-    Route::post('/invoices/{id}/pay', [InvoicePaymentController::class, 'pay']);
-    Route::post('/purchase-orders', [PurchaseOrderController::class, 'store']);
-    Route::post('/purchase-orders/{id}/receive', [PurchaseOrderController::class, 'receive']);
-    Route::post('/purchase-orders/{id}/pay', [PurchaseOrderController::class, 'pay']);
-    Route::get('/dashboard/finance', [FinanceDashboardController::class, 'index']);
+    // Orders
+    Route::middleware('permission:orders.manage')->post('/orders', [OrderController::class, 'storeErp']);
+    Route::middleware('permission:orders.confirm')->post('/orders/{id}/confirm', [OrderController::class, 'confirm']);
+    Route::middleware('permission:orders.cancel')->post('/orders/{id}/cancel', [OrderController::class, 'cancel']);
+
+    // Invoices
+    Route::middleware('permission:finance.view')->post('/invoices/{id}/pay', [InvoicePaymentController::class, 'pay']);
+
+    // Purchase Orders
+    Route::middleware('permission:purchases.manage')->post('/purchase-orders', [PurchaseOrderController::class, 'store']);
+    Route::middleware('permission:purchases.receive')->post('/purchase-orders/{id}/receive', [PurchaseOrderController::class, 'receive']);
+    Route::middleware('permission:finance.view')->post('/purchase-orders/{id}/pay', [PurchaseOrderController::class, 'pay']);
+
+    // Dashboard
+    Route::middleware('permission:finance.view')->get('/dashboard/finance', [FinanceDashboardController::class, 'index']);
 });
