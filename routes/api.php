@@ -18,6 +18,7 @@ use App\Http\Controllers\API\AdminCrudController;
 use App\Http\Controllers\API\InvoicePaymentController;
 use App\Http\Controllers\API\PurchaseOrderController;
 use App\Http\Controllers\API\FinanceDashboardController;
+use App\Http\Controllers\API\ActivityLogController;
 
 
 /*
@@ -120,4 +121,6 @@ Route::prefix('erp')->middleware('auth:sanctum')->group(function () {
 
     // Dashboard
     Route::middleware('permission:finance.view')->get('/dashboard/finance', [FinanceDashboardController::class, 'index']);
+
+    Route::get('activity-logs', [\App\Http\Controllers\API\ActivityLogController::class, 'index']);
 });
