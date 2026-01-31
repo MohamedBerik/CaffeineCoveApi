@@ -5,6 +5,9 @@ namespace App\Http\Controllers\API;
 use App\Models\OrderItem;
 use App\Models\Product;
 use App\Models\StockMovement;
+use App\Models\Invoice;
+use App\Models\InvoiceItem;
+use Illuminate\Support\Str;
 
 use Illuminate\Support\Facades\DB;
 use App\Http\Controllers\Controller;
@@ -242,15 +245,39 @@ class OrderController extends Controller
             ], 422);
         }
 
-        $order->update([
-            'status' => 'confirmed'
-        ]);
+        return DB::transaction(function () use ($order) {
 
-        return response()->json([
-            'msg' => 'Order confirmed',
-            'data' => $order
-        ]);
+            $order->update([
+                'status' => 'confirmed'
+            ]);
+
+            $invoice = Invoice::create([
+                'number'      => 'INV-' . now()->format('YmdHis') . '-' . $order->id,
+                'order_id'    => $order->id,
+                'customer_id' => $order->customer_id,
+                'total'       => $order->total,
+                'status'      => 'unpaid',
+                'issued_at'   => now(),
+            ]);
+
+            foreach ($order->items as $item) {
+
+                InvoiceItem::create([
+                    'invoice_id' => $invoice->id,
+                    'product_id' => $item->product_id,
+                    'quantity'   => $item->quantity,
+                    'unit_price' => $item->unit_price,
+                    'total'      => $item->total,
+                ]);
+            }
+
+            return response()->json([
+                'msg' => 'Order confirmed and invoice created',
+                'invoice_id' => $invoice->id
+            ]);
+        });
     }
+
     public function cancel(Request $request, $id)
     {
         $order = Order::with('items')->findOrFail($id);

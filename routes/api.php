@@ -2,6 +2,7 @@
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Facades\DB;
 
 use App\Http\Controllers\API\AuthController;
 use App\Http\Controllers\API\CategoryController;
@@ -14,7 +15,9 @@ use App\Http\Controllers\API\SaleController;
 use App\Http\Controllers\API\ReservationController;
 use App\Http\Controllers\API\AdminDashboardController;
 use App\Http\Controllers\API\AdminCrudController;
-use Illuminate\Support\Facades\DB;
+use App\Http\Controllers\API\InvoicePaymentController;
+use App\Http\Controllers\API\PurchaseOrderController;
+use App\Http\Controllers\API\FinanceDashboardController;
 
 
 /*
@@ -106,4 +109,9 @@ Route::middleware('auth:sanctum')->prefix('erp')->group(function () {
 
     Route::post('/orders/{id}/confirm', [OrderController::class, 'confirm']);
     Route::post('/orders/{id}/cancel', [OrderController::class, 'cancel']);
+    Route::post('/invoices/{id}/pay', [InvoicePaymentController::class, 'pay']);
+    Route::post('/purchase-orders', [PurchaseOrderController::class, 'store']);
+    Route::post('/purchase-orders/{id}/receive', [PurchaseOrderController::class, 'receive']);
+    Route::post('/purchase-orders/{id}/pay', [PurchaseOrderController::class, 'pay']);
+    Route::get('/dashboard/finance', [FinanceDashboardController::class, 'index']);
 });
