@@ -368,3 +368,7 @@
 #22 C:\\Laravel\\Api\\CaffeineCove\\artisan(35): Illuminate\\Foundation\\Console\\Kernel->handle(Object(Symfony\\Component\\Console\\Input\\ArgvInput), Object(Symfony\\Component\\Console\\Output\\ConsoleOutput))
 #23 {main}
 "} 
+[2026-01-31 12:20:51] production.ERROR: Trait "Spatie\Permission\Traits\HasRoles" not found {"exception":"[object] (Symfony\\Component\\ErrorHandler\\Error\\FatalError(code: 0): Trait \"Spatie\\Permission\\Traits\\HasRoles\" not found at C:\\Laravel\\Api\\CaffeineCove\\app\\Models\\User.php:12)
+[stacktrace]
+#0 {main}
+"} 
