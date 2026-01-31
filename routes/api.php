@@ -122,5 +122,5 @@ Route::prefix('erp')->middleware('auth:sanctum')->group(function () {
     // Dashboard
     Route::middleware('permission:finance.view')->get('/dashboard/finance', [FinanceDashboardController::class, 'index']);
 
-    Route::get('activity-logs', [\App\Http\Controllers\API\ActivityLogController::class, 'index']);
+    Route::middleware('permission:finance.view')->get('/activity-logs', [ActivityLogController::class, 'index']);
 });
