@@ -1,22 +1,15 @@
 <?php
 
-namespace Database\Seeders;
-
 use App\Models\Permission;
 use App\Models\Role;
 use Illuminate\Database\Seeder;
 
 class RbacSeeder extends Seeder
 {
-    /**
-     * Run the database seeds.
-     *
-     * @return void
-     */
     public function run()
     {
-        $admin = Role::create(['name' => 'admin']);
-        $cashier = Role::create(['name' => 'cashier']);
+        $admin = Role::firstOrCreate(['name' => 'admin']);
+        $cashier = Role::firstOrCreate(['name' => 'cashier']);
 
         $perms = [
             'sales.manage',
@@ -27,14 +20,21 @@ class RbacSeeder extends Seeder
         ];
 
         foreach ($perms as $p) {
-            $perm = Permission::create(['name' => $p]);
-            $admin->permissions()->attach($perm);
+
+            $perm = Permission::firstOrCreate([
+                'name' => $p
+            ]);
+
+            // اربط الصلاحية بالـ admin لو مش مربوطة
+            if (! $admin->permissions->contains($perm->id)) {
+                $admin->permissions()->attach($perm->id);
+            }
         }
 
-        $cashier->permissions()->attach(
-            Permission::whereIn('name', [
-                'sales.manage'
-            ])->pluck('id')
-        );
+        $cashierPerms = Permission::whereIn('name', [
+            'sales.manage'
+        ])->pluck('id');
+
+        $cashier->permissions()->syncWithoutDetaching($cashierPerms);
     }
 }
