@@ -40,12 +40,22 @@ class User extends Authenticatable
     /**
      * هل لدى المستخدم صلاحية معيّنة؟
      */
-    public function hasPermission(string $permission): bool
+    // public function hasPermission(string $permission): bool
+    // {
+    //     return $this->roles()
+    //         ->whereHas('permissions', function ($q) use ($permission) {
+    //             $q->where('name', $permission);
+    //         })
+    //         ->exists();
+    // }
+
+
+    public function hasPermission($permission)
     {
-        return $this->roles()
-            ->whereHas('permissions', function ($q) use ($permission) {
-                $q->where('name', $permission);
-            })
-            ->exists();
+        if ($this->role === 'admin') {
+            return true; // Admin عنده كل الصلاحيات
+        }
+
+        return false;
     }
 }
