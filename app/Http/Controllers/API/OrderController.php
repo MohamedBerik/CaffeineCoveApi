@@ -278,7 +278,6 @@ class OrderController extends Controller
             ]);
         });
     }
-
     public function cancel(Request $request, $id)
     {
         $order = Order::with('items')->findOrFail($id);
@@ -319,5 +318,29 @@ class OrderController extends Controller
                 'msg' => 'Order cancelled and stock restored'
             ]);
         });
+    }
+    public function createInvoice($id)
+    {
+        $order = Order::with('items')->findOrFail($id);
+
+        if ($order->invoice) {
+            return response()->json([
+                'message' => 'Invoice already exists'
+            ], 422);
+        }
+
+        $invoice = Invoice::create([
+            'number'      => 'INV-' . now()->format('Ymd') . '-' . str_pad($order->id, 5, '0', STR_PAD_LEFT),
+            'order_id'    => $order->id,
+            'customer_id' => $order->customer_id,
+            'total'       => $order->total,
+            'status'      => 'unpaid',
+            'issued_at'   => now(),
+        ]);
+
+        return response()->json([
+            'message' => 'Invoice created',
+            'invoice' => $invoice
+        ]);
     }
 }

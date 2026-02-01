@@ -43,4 +43,9 @@ class Order extends Model
     {
         return $this->belongsTo(User::class, 'created_by');
     }
+
+    public function invoice()
+    {
+        return $this->hasOne(Invoice::class);
+    }
 }
