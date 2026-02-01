@@ -125,6 +125,6 @@ Route::prefix('erp')->middleware('auth:sanctum')->group(function () {
     Route::middleware('permission:finance.view')->get('/activity-logs', [ActivityLogController::class, 'index']);
 });
 
-Route::middleware(['auth:sanctum', 'admin'])->get('/admin/invoices', function () {
-    return \App\Models\Invoice::latest()->paginate(6);
-});
+// Route::middleware(['auth:sanctum', 'admin'])->get('/admin/invoices', function () {
+//     return \App\Models\Invoice::latest()->paginate(6);
+// });

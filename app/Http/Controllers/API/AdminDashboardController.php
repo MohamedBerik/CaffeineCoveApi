@@ -32,6 +32,7 @@ class AdminDashboardController extends Controller
                 'employees'     => Employee::count(),
                 'sales'         => Sale::count(),
                 'reservations'  => Reservation::count(),
+                'invoices'  => Invoice::count(),
             ],
 
             /* ========= LATEST DATA ========= */

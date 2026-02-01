@@ -21,6 +21,7 @@ class AdminCrudController extends Controller
         'employees',
         'sales',
         'reservations',
+        'invoices'
     ];
 
     private function checkTable(string $table)
