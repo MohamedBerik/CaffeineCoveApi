@@ -78,7 +78,7 @@ class AdminCrudController extends Controller
     // =====================
     // GET ONE
     // =====================
-    public function show(string $table, int $id)
+    public function show(Request $request, string $table, int $id)
     {
         $this->checkTable($table);
 
@@ -160,7 +160,7 @@ class AdminCrudController extends Controller
     // =====================
     // DELETE
     // =====================
-    public function destroy(string $table, int $id)
+    public function destroy(Request $request, string $table, int $id)
     {
         $this->checkTable($table);
 
