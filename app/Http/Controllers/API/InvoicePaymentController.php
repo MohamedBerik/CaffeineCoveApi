@@ -7,6 +7,8 @@ use App\Models\Invoice;
 use App\Models\Payment;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use App\Services\AccountingService;
+use App\Models\Account;
 
 class InvoicePaymentController extends Controller
 {
@@ -58,6 +60,28 @@ class InvoicePaymentController extends Controller
                     'status' => 'partial'
                 ]);
             }
+
+            $cashAccount = Account::where('code', '1000')->firstOrFail();
+            $salesAccount = Account::where('code', '4000')->firstOrFail();
+
+            AccountingService::createEntry(
+                $invoice,
+                'Invoice payment #' . $invoice->id,
+                [
+                    [
+                        'account_id' => $cashAccount->id,
+                        'debit'  => $request->amount,
+                        'credit' => 0
+                    ],
+                    [
+                        'account_id' => $salesAccount->id,
+                        'debit'  => 0,
+                        'credit' => $request->amount
+                    ],
+                ],
+                $request->user()->id ?? null
+            );
+
 
             activity('invoice.paid', $invoice, [
                 'amount' => $request->amount

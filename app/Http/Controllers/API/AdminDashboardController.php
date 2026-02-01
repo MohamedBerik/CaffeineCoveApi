@@ -12,6 +12,7 @@ use App\Models\Sale;
 use App\Models\Customer;
 use App\Models\Category;
 use App\Models\Employee;
+use App\Models\Invoice;
 use App\Models\Reservation;
 
 class AdminDashboardController extends Controller
@@ -43,6 +44,8 @@ class AdminDashboardController extends Controller
                 'employees' => Employee::latest()->take(5)->get(),
                 'sales' => Sale::latest()->take(5)->get(),
                 'reservations' => Reservation::latest()->take(5)->get(),
+                'invoices' => Invoice::with('customer')->latest()->take(5)->get(),
+
             ]
         ]);
     }

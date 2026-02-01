@@ -26,15 +26,23 @@ class FinanceDashboardController extends Controller
 
         // فلوس لسه لك على العملاء
         $receivables = Invoice::whereIn('status', ['unpaid', 'partial'])
-            ->sum('total')
-            -
-            Payment::sum('amount');
+            ->with('payments')
+            ->get()
+            ->sum(function ($invoice) {
+                $paid = $invoice->payments->sum('amount');
+                return max($invoice->total - $paid, 0);
+            });
+
 
         // فلوس لسه عليك للموردين
         $payables = PurchaseOrder::whereNotIn('status', ['cancelled'])
-            ->sum('total')
-            -
-            SupplierPayment::sum('amount');
+            ->with('payments') // لو عندك علاقة SupplierPayment
+            ->get()
+            ->sum(function ($po) {
+                $paid = $po->payments->sum('amount'); // أو SupplierPayment حسب العلاقة
+                return max($po->total - $paid, 0);
+            });
+
 
         return response()->json([
             'total_sales' => $totalSales,
