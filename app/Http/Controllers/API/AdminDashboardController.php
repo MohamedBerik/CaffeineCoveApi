@@ -45,7 +45,6 @@ class AdminDashboardController extends Controller
                 'sales' => Sale::latest()->take(5)->get(),
                 'reservations' => Reservation::latest()->take(5)->get(),
                 'invoices' => Invoice::with('customer')->latest()->take(5)->get(),
-
             ]
         ]);
     }
