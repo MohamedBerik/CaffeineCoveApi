@@ -179,14 +179,24 @@ class OrderController extends Controller
 
         return DB::transaction(function () use ($data, $request) {
 
+            // $order = Order::create([
+            //     'customer_id' => $data['customer_id'],
+            //     'status'      => 'pending',
+            //     'total'       => 0,
+            //     'created_by'  => $request->user()->id,
+            // ]);
+            // $total = 0;
             $order = Order::create([
                 'customer_id' => $data['customer_id'],
                 'status'      => 'pending',
                 'total'       => 0,
                 'created_by'  => $request->user()->id,
+                'title_en'    => 'ERP Order',
+                'title_ar'    => 'ERP Order',
+                'description_en' => '',
+                'description_ar' => '',
             ]);
 
-            $total = 0;
 
             foreach ($data['items'] as $item) {
 
