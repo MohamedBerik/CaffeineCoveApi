@@ -179,37 +179,32 @@ class OrderController extends Controller
 
         return DB::transaction(function () use ($data, $request) {
 
-            // $order = Order::create([
-            //     'customer_id' => $data['customer_id'],
-            //     'status'      => 'pending',
-            //     'total'       => 0,
-            //     'created_by'  => $request->user()->id,
-            // ]);
-            // $total = 0;
+            // 👇 إنشاء الطلب مع قيم افتراضية للأعمدة المطلوبة
             $order = Order::create([
-                'customer_id' => $data['customer_id'],
-                'status'      => 'pending',
-                'total'       => 0,
-                'created_by'  => $request->user()->id,
-                'title_en'    => 'ERP Order',
-                'title_ar'    => 'ERP Order',
+                'customer_id'    => $data['customer_id'],
+                'status'         => 'pending',
+                'total'          => 0,
+                'created_by'     => $request->user()->id,
+                'title_en'       => 'ERP Order',
+                'title_ar'       => 'طلب ERP',
                 'description_en' => '',
                 'description_ar' => '',
             ]);
 
+            $total = 0;
 
             foreach ($data['items'] as $item) {
 
-                $product = Product::lockForUpdate()
-                    ->findOrFail($item['product_id']);
+                $product = Product::lockForUpdate()->findOrFail($item['product_id']);
 
-                // ✅ منع البيع لو المخزون لا يكفي
+                // منع البيع لو المخزون لا يكفي
                 if ($product->stock_quantity < $item['quantity']) {
                     abort(422, "Insufficient stock for product {$product->id}");
                 }
 
                 $lineTotal = $product->price * $item['quantity'];
 
+                // إنشاء OrderItem
                 OrderItem::create([
                     'order_id'    => $order->id,
                     'product_id'  => $product->id,
@@ -218,29 +213,27 @@ class OrderController extends Controller
                     'total'       => $lineTotal,
                 ]);
 
-                // ✅ خصم من المخزون
+                // خصم من المخزون
                 $product->decrement('stock_quantity', $item['quantity']);
 
-                // ✅ تسجيل حركة مخزون
+                // تسجيل حركة المخزون
                 StockMovement::create([
-                    'product_id'   => $product->id,
-                    'type'         => 'out',
-                    'quantity'     => $item['quantity'],
+                    'product_id'     => $product->id,
+                    'type'           => 'out',
+                    'quantity'       => $item['quantity'],
                     'reference_type' => Order::class,
-                    'reference_id' => $order->id,
-                    'created_by'   => $request->user()->id,
+                    'reference_id'   => $order->id,
+                    'created_by'     => $request->user()->id,
                 ]);
 
                 $total += $lineTotal;
             }
 
-
-            $order->update([
-                'total' => $total
-            ]);
+            // تحديث إجمالي الطلب
+            $order->update(['total' => $total]);
 
             return response()->json([
-                'msg' => 'Order created (ERP)',
+                'msg'  => 'Order created (ERP)',
                 'data' => $order->load('items.product')
             ], 201);
         });
