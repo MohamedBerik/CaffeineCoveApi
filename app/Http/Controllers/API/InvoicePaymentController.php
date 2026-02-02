@@ -79,8 +79,7 @@ class InvoicePaymentController extends Controller
                     ],
                 ],
                 $request->user()->id ?? null,
-                Invoice::class, // type of source
-                $invoice->id    // source id
+                now()->toDateString()   // ✅ date
             );
 
             activity('invoice.paid', $invoice, [
