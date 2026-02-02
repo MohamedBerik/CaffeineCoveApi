@@ -46,48 +46,42 @@ class InvoicePaymentController extends Controller
         return DB::transaction(function () use ($invoice, $request, $remaining) {
 
             $payment = Payment::create([
-                'invoice_id' => $invoice->id,
-                'amount'     => $request->amount,
-                'method'     => $request->method,
-                'paid_at'    => now(),
+                'invoice_id'  => $invoice->id,
+                'amount'      => $request->amount,
+                'method'      => $request->method,
+                'paid_at'     => now(),
                 'received_by' => $request->user()->id ?? null
             ]);
 
             $newPaid = $invoice->payments()->sum('amount');
 
-            if ($newPaid >= $invoice->total) {
+            $invoice->update([
+                'status' => $newPaid >= $invoice->total ? 'paid' : 'partial'
+            ]);
 
-                $invoice->update([
-                    'status' => 'paid'
-                ]);
-            } else {
-
-                $invoice->update([
-                    'status' => 'partial'
-                ]);
-            }
-
-            $cashAccount = Account::where('code', '1000')->firstOrFail();
+            $cashAccount  = Account::where('code', '1000')->firstOrFail();
             $salesAccount = Account::where('code', '4000')->firstOrFail();
 
+            // ✅ تمرير source_type و source_id لتجنب خطأ الـ journal_entries
             AccountingService::createEntry(
                 $invoice,
                 'Invoice payment #' . $invoice->id,
                 [
                     [
                         'account_id' => $cashAccount->id,
-                        'debit'  => $request->amount,
-                        'credit' => 0
+                        'debit'      => $request->amount,
+                        'credit'     => 0
                     ],
                     [
                         'account_id' => $salesAccount->id,
-                        'debit'  => 0,
-                        'credit' => $request->amount
+                        'debit'      => 0,
+                        'credit'     => $request->amount
                     ],
                 ],
-                $request->user()->id ?? null
+                $request->user()->id ?? null,
+                Invoice::class, // type of source
+                $invoice->id    // source id
             );
-
 
             activity('invoice.paid', $invoice, [
                 'amount' => $request->amount

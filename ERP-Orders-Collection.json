@@ -1,0 +1,110 @@
+{
+    "info": {
+        "name": "ERP Orders Flow",
+        "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+    },
+    "item": [
+        {
+            "name": "1 - Create ERP Order",
+            "request": {
+                "method": "POST",
+                "header": [
+                    {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                    },
+                    {
+                        "key": "Authorization",
+                        "value": "Bearer {{token}}"
+                    }
+                ],
+                "body": {
+                    "mode": "raw",
+                    "raw": "{\n  \"customer_id\": 1,\n  \"items\": [\n    { \"product_id\": 1, \"quantity\": 1 }\n  ]\n}"
+                },
+                "url": {
+                    "raw": "{{base_url}}/api/erp/orders",
+                    "host": ["{{base_url}}"],
+                    "path": ["api", "erp", "orders"]
+                }
+            }
+        },
+        {
+            "name": "2 - Confirm Order",
+            "request": {
+                "method": "POST",
+                "header": [
+                    {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                    },
+                    {
+                        "key": "Authorization",
+                        "value": "Bearer {{token}}"
+                    }
+                ],
+                "url": {
+                    "raw": "{{base_url}}/api/erp/orders/{{order_id}}/confirm",
+                    "host": ["{{base_url}}"],
+                    "path": ["api", "erp", "orders", "{{order_id}}", "confirm"]
+                }
+            }
+        },
+        {
+            "name": "3 - Cancel Order",
+            "request": {
+                "method": "POST",
+                "header": [
+                    {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                    },
+                    {
+                        "key": "Authorization",
+                        "value": "Bearer {{token}}"
+                    }
+                ],
+                "url": {
+                    "raw": "{{base_url}}/api/erp/orders/{{order_id}}/cancel",
+                    "host": ["{{base_url}}"],
+                    "path": ["api", "erp", "orders", "{{order_id}}", "cancel"]
+                }
+            }
+        },
+        {
+            "name": "4 - Create Invoice (Manual)",
+            "request": {
+                "method": "POST",
+                "header": [
+                    {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                    },
+                    {
+                        "key": "Authorization",
+                        "value": "Bearer {{token}}"
+                    }
+                ],
+                "url": {
+                    "raw": "{{base_url}}/api/erp/orders/{{order_id}}/invoice",
+                    "host": ["{{base_url}}"],
+                    "path": ["api", "erp", "orders", "{{order_id}}", "invoice"]
+                }
+            }
+        }
+    ],
+    "variable": [
+        {
+            "key": "base_url",
+            "value": "https://caffeinecoveapi-production-a107.up.railway.app"
+        },
+        {
+            "key": "token",
+            "value": ""
+        },
+        {
+            "key": "order_id",
+            "value": ""
+        }
+    ]
+}
