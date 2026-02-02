@@ -179,16 +179,16 @@ class OrderController extends Controller
 
         return DB::transaction(function () use ($data, $request) {
 
-            // 👇 إنشاء الطلب مع قيم افتراضية للأعمدة المطلوبة
             $order = Order::create([
-                'customer_id'    => $data['customer_id'],
-                'status'         => 'pending',
-                'total'          => 0,
-                'created_by'     => $request->user()->id,
-                'title_en'       => '',
-                'title_ar'       => '',
-                'description_en' => '',
-                'description_ar' => '',
+                'customer_id' => $data['customer_id'],
+                'status'      => 'pending',
+                'total'       => 0,
+                'created_by'  => $request->user()->id,
+                // Optional overrides, هياخد defaults لو مش موجود
+                'title_en'    => $request->input('title_en', null),
+                'title_ar'    => $request->input('title_ar', null),
+                'description_en' => $request->input('description_en', null),
+                'description_ar' => $request->input('description_ar', null),
             ]);
 
             $total = 0;
