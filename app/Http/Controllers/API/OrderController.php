@@ -198,7 +198,7 @@ class OrderController extends Controller
                 $product = Product::lockForUpdate()->findOrFail($item['product_id']);
 
                 // منع البيع لو المخزون لا يكفي
-                if ($product->stock_quantity < $item['quantity']) {
+                if ($product->quantity < $item['quantity']) {
                     abort(422, "Insufficient stock for product {$product->id}");
                 }
 
@@ -214,7 +214,7 @@ class OrderController extends Controller
                 ]);
 
                 // خصم من المخزون
-                $product->decrement('stock_quantity', $item['quantity']);
+                $product->decrement('quantity', $item['quantity']);
 
                 // تسجيل حركة المخزون
                 StockMovement::create([
@@ -299,7 +299,7 @@ class OrderController extends Controller
                     ->findOrFail($item->product_id);
 
                 // إعادة الكمية
-                $product->increment('stock_quantity', $item->quantity);
+                $product->increment('quantity', $item->quantity);
 
                 // حركة مخزون
                 StockMovement::create([
