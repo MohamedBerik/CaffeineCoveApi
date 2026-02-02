@@ -242,6 +242,14 @@ class OrderController extends Controller
     {
         $order = Order::with('items')->findOrFail($id);
 
+        // ✅ لا يمكن تأكيد طلب تم إلغاؤه
+        if ($order->status === 'cancelled') {
+            return response()->json([
+                'msg' => 'Cannot confirm a cancelled order'
+            ], 422);
+        }
+
+        // ✅ لا يمكن إعادة تأكيد الطلب
         if ($order->status === 'confirmed') {
             return response()->json([
                 'msg' => 'Order already confirmed'
