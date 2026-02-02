@@ -171,7 +171,7 @@ class OrderController extends Controller
     public function storeErp(Request $request)
     {
         $data = $request->validate([
-            'customer_id' => ['required', 'exists:users,id'],
+            'customer_id' => ['required', 'exists:customers,id'],
             'items' => ['required', 'array', 'min:1'],
             'items.*.product_id' => ['required', 'exists:products,id'],
             'items.*.quantity' => ['required', 'integer', 'min:1'],
@@ -329,11 +329,19 @@ class OrderController extends Controller
             ], 422);
         }
 
+        if ($order->items->isEmpty()) {
+            return response()->json([
+                'message' => 'Order has no items'
+            ], 422);
+        }
+
+        $total = $order->items->sum('total');
+
         $invoice = Invoice::create([
             'number'      => 'INV-' . now()->format('Ymd') . '-' . str_pad($order->id, 5, '0', STR_PAD_LEFT),
             'order_id'    => $order->id,
             'customer_id' => $order->customer_id,
-            'total'       => $order->total,
+            'total'       => $total,
             'status'      => 'unpaid',
             'issued_at'   => now(),
         ]);

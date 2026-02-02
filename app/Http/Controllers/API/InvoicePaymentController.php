@@ -30,6 +30,12 @@ class InvoicePaymentController extends Controller
         $alreadyPaid = $invoice->payments->sum('amount');
         $remaining   = $invoice->total - $alreadyPaid;
 
+        if ($remaining <= 0) {
+            return response()->json([
+                'msg' => 'No remaining amount for this invoice'
+            ], 422);
+        }
+
         if ($request->amount > $remaining) {
             return response()->json([
                 'msg' => 'Payment exceeds remaining amount',
