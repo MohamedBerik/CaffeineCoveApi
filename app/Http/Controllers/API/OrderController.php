@@ -185,8 +185,8 @@ class OrderController extends Controller
                 'status'         => 'pending',
                 'total'          => 0,
                 'created_by'     => $request->user()->id,
-                'title_en'       => 'ERP Order',
-                'title_ar'       => 'طلب ERP',
+                'title_en'       => '',
+                'title_ar'       => '',
                 'description_en' => '',
                 'description_ar' => '',
             ]);
