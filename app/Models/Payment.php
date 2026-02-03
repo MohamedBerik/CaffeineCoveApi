@@ -19,4 +19,8 @@ class Payment extends Model
     {
         return $this->belongsTo(Invoice::class);
     }
+    public function refunds()
+    {
+        return $this->hasMany(\App\Models\PaymentRefund::class);
+    }
 }

@@ -131,6 +131,10 @@ Route::prefix('erp')->middleware('auth:sanctum')->group(function () {
         [\App\Http\Controllers\API\InvoiceJournalController::class, 'index']
     );
 
+    Route::post(
+        '/payments/{payment}/refund',
+        [\App\Http\Controllers\API\PaymentRefundController::class, 'refund']
+    );
 
     //for testing
     Route::get('/journal-entries/latest', function () {
