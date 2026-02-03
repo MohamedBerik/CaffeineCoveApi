@@ -124,4 +124,13 @@ Route::prefix('erp')->middleware('auth:sanctum')->group(function () {
     Route::middleware('permission:finance.view')->get('/dashboard/finance', [FinanceDashboardController::class, 'index']);
 
     Route::middleware('permission:finance.view')->get('/activity-logs', [ActivityLogController::class, 'index']);
+
+
+    //for testing
+    Route::get('/journal-entries/latest', function () {
+
+        return \App\Models\JournalEntry::with('lines', 'source')
+            ->latest('id')
+            ->first();
+    });
 });
