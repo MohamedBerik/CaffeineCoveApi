@@ -18,7 +18,7 @@ class InvoicePaymentController extends Controller
 
         $request->validate([
             'amount' => ['required', 'numeric', 'min:0.01'],
-            'method' => ['nullable', 'string']
+            'method' => ['required', 'in:cash,card,bank']
         ]);
 
         if ($invoice->status === 'paid') {
@@ -55,11 +55,17 @@ class InvoicePaymentController extends Controller
                 'received_by' => $request->user()->id ?? null
             ]);
 
-            $newPaid = $invoice->payments()->sum('amount');
+            $totalPaid = $invoice->payments()->sum('amount');
+            $totalRefunded = $invoice->refunds()->sum('payment_refunds.amount');
+
+            $netPaid = $totalPaid - $totalRefunded;
 
             $invoice->update([
-                'status' => $newPaid >= $invoice->total ? 'paid' : 'partial'
+                'status' => $netPaid >= $invoice->total
+                    ? 'paid'
+                    : ($netPaid > 0 ? 'partial' : 'unpaid')
             ]);
+
 
             $cashAccount  = Account::where('code', '1000')->firstOrFail();
             $salesAccount = Account::where('code', '4000')->firstOrFail();
