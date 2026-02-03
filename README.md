@@ -1,64 +1,119 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400"></a></p>
+Caffeine Cove API – Laravel Backend & ERP
 
-<p align="center">
-<a href="https://travis-ci.org/laravel/framework"><img src="https://travis-ci.org/laravel/framework.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+RESTful API built with Laravel to manage Caffeine Cove café system. Supports Orders, Invoices, Payments, Refunds, and Accounting (Journal Entries). Integrated with React frontend.
 
-## About Laravel
+🚀 Features
+Authentication
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+Laravel Sanctum token-based authentication
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+Role-based access (Admin, Finance, User)
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+Protected routes for ERP operations
 
-## Learning Laravel
+Orders Management
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
+Create / Update / Delete / Confirm / Cancel orders
 
-If you don't feel like reading, [Laracasts](https://laracasts.com) can help. Laracasts contains over 1500 video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+Track status: pending, confirmed, cancelled
 
-## Laravel Sponsors
+Validate stock availability before confirming orders
 
-We would like to extend our thanks to the following sponsors for funding Laravel development. If you are interested in becoming a sponsor, please visit the Laravel [Patreon page](https://patreon.com/taylorotwell).
+Automatic stock movements logged
 
-### Premium Partners
+Invoices & Payments
 
-- **[Vehikl](https://vehikl.com/)**
-- **[Tighten Co.](https://tighten.co)**
-- **[Kirschbaum Development Group](https://kirschbaumdevelopment.com)**
-- **[64 Robots](https://64robots.com)**
-- **[Cubet Techno Labs](https://cubettech.com)**
-- **[Cyber-Duck](https://cyber-duck.co.uk)**
-- **[Many](https://www.many.co.uk)**
-- **[Webdock, Fast VPS Hosting](https://www.webdock.io/en)**
-- **[DevSquad](https://devsquad.com)**
-- **[Curotec](https://www.curotec.com/services/technologies/laravel/)**
-- **[OP.GG](https://op.gg)**
-- **[WebReinvent](https://webreinvent.com/?utm_source=laravel&utm_medium=github&utm_campaign=patreon-sponsors)**
-- **[Lendio](https://lendio.com)**
+Generate invoices from orders
 
-## Contributing
+Record partial or full payments
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+Automatic invoice status update: partial, paid
 
-## Code of Conduct
+Refund management for overpayments or cancellations
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+Linked journal entries for accounting
 
-## Security Vulnerabilities
+Accounting / Journal Entries
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+Double-entry accounting
 
-## License
+Create Journal Entries automatically for payments and refunds
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+Each entry has lines for debit/credit
+
+Prevent unbalanced entries
+
+Customers & Products
+
+CRUD for products
+
+Track stock quantities
+
+Link orders and invoices to customers
+
+API Structure
+
+RESTful routes with middleware protection
+
+Resource controllers with validation
+
+Transaction-safe operations using DB::transaction
+
+📂 Project Structure (Backend)
+app/
+├── Http/Controllers/API/
+│ ├── OrderController.php
+│ ├── InvoiceController.php
+│ ├── InvoicePaymentController.php
+│ └── PaymentRefundController.php
+├── Models/
+│ ├── Order.php
+│ ├── OrderItem.php
+│ ├── Invoice.php
+│ ├── Payment.php
+│ ├── Refund.php
+│ ├── JournalEntry.php
+│ ├── JournalLine.php
+│ └── Product.php
+├── Services/
+│ └── AccountingService.php
+
+🔧 Environment Setup
+DB_CONNECTION=mysql
+DB_HOST=<host>
+DB_PORT=3306
+DB_DATABASE=<database>
+DB_USERNAME=<user>
+DB_PASSWORD=<password>
+
+Run Migrations
+php artisan migrate
+
+Start Server
+php artisan serve
+
+🔒 Permissions & Roles
+
+Use Laravel permissions to restrict access to ERP features
+
+Example: permission:finance.view for finance routes
+
+📌 Testing API
+
+Use Postman to test endpoints
+
+Ensure you pass Authorization: Bearer <token> header
+
+⚙️ Future Improvements
+
+Export reports (Excel / PDF)
+
+Advanced filters on Orders/Invoices
+
+Real-time notifications for payments/refunds
+
+Multi-currency support
+
+👨‍💻 Author
+
+Mohamed Berik – Junior Full Stack Developer (Laravel | React | REST API | ERP)
