@@ -114,6 +114,7 @@ Route::prefix('erp')->middleware('auth:sanctum')->group(function () {
 
     // Invoices
     Route::middleware('permission:finance.view')->post('/invoices/{id}/pay', [InvoicePaymentController::class, 'pay']);
+    Route::middleware('permission:finance.view')->get('/invoices/{id}', [\App\Http\Controllers\API\InvoiceController::class, 'show']);
 
     // Purchase Orders
     Route::middleware('permission:purchases.manage')->post('/purchase-orders', [PurchaseOrderController::class, 'store']);
@@ -123,22 +124,17 @@ Route::prefix('erp')->middleware('auth:sanctum')->group(function () {
     // Dashboard
     Route::middleware('permission:finance.view')->get('/dashboard/finance', [FinanceDashboardController::class, 'index']);
 
+    //Activity log
     Route::middleware('permission:finance.view')->get('/activity-logs', [ActivityLogController::class, 'index']);
 
+    //Journal entries
+    Route::get('/invoices/{invoice}/journal-entries', [\App\Http\Controllers\API\InvoiceJournalController::class, 'index']);
 
-    Route::get(
-        '/invoices/{invoice}/journal-entries',
-        [\App\Http\Controllers\API\InvoiceJournalController::class, 'index']
-    );
-
-    Route::post(
-        '/payments/{payment}/refund',
-        [\App\Http\Controllers\API\PaymentRefundController::class, 'refund']
-    );
+    //Refund payment
+    Route::post('/payments/{payment}/refund', [\App\Http\Controllers\API\PaymentRefundController::class, 'refund']);
 
     //for testing
     Route::get('/journal-entries/latest', function () {
-
         return \App\Models\JournalEntry::with('lines', 'source')
             ->latest('id')
             ->first();
