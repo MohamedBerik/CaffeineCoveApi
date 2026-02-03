@@ -28,7 +28,9 @@ class InvoicePaymentController extends Controller
         }
 
         $alreadyPaid = $invoice->payments->sum('amount');
-        $remaining   = $invoice->total - $alreadyPaid;
+        $refunded = $invoice->refunds()->sum('payment_refunds.amount');
+        $netPaid = $alreadyPaid - $refunded;
+        $remaining = $invoice->total - $netPaid;
 
         if ($remaining <= 0) {
             return response()->json([
