@@ -30,11 +30,21 @@ class Invoice extends Model
     {
         return $this->hasMany(Payment::class);
     }
+
     public function refunds()
     {
         return $this->hasManyThrough(
-            \App\Models\PaymentRefund::class,
-            \App\Models\Payment::class
+            PaymentRefund::class,
+            Payment::class,
+            'invoice_id',   // Foreign key on Payment table
+            'payment_id',   // Foreign key on PaymentRefund table
+            'id',           // Local key on Invoice
+            'id'            // Local key on Payment
         );
+    }
+
+    public function journalEntries()
+    {
+        return $this->morphMany(JournalEntry::class, 'source');
     }
 }

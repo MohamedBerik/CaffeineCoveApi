@@ -17,4 +17,17 @@ class InvoiceController extends Controller
 
         return response()->json($invoice);
     }
+    public function showFullInvoice($id)
+    {
+        $invoice = Invoice::with([
+            'items.product',        // كل items مربوط بالـ product
+            'payments',             // كل الـ payments
+            'refunds',              // كل الـ refunds
+            'journalEntries.lines'  // كل القيود المحاسبية والخطوط
+        ])->findOrFail($id);
+
+        return response()->json([
+            'invoice' => $invoice
+        ]);
+    }
 }
