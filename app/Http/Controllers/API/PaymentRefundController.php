@@ -60,7 +60,7 @@ class PaymentRefundController extends Controller
             $invoice = $payment->invoice;
 
             $paid = $invoice->payments()->sum('amount')
-                - $invoice->refunds()->sum('amount');
+                - $invoice->refunds()->sum('payment_refunds.amount');
 
             if ($paid <= 0) {
                 $invoice->update(['status' => 'unpaid']);
