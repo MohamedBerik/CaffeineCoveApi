@@ -16,6 +16,7 @@ use App\Http\Controllers\API\ReservationController;
 use App\Http\Controllers\API\AdminDashboardController;
 use App\Http\Controllers\API\AdminCrudController;
 use App\Http\Controllers\API\InvoicePaymentController;
+use App\Http\Controllers\API\InvoiceController;
 use App\Http\Controllers\API\PurchaseOrderController;
 use App\Http\Controllers\API\FinanceDashboardController;
 use App\Http\Controllers\API\ActivityLogController;
@@ -115,6 +116,7 @@ Route::prefix('erp')->middleware('auth:sanctum')->group(function () {
     // Invoices
     Route::middleware('permission:finance.view')->post('/invoices/{id}/pay', [InvoicePaymentController::class, 'pay']);
     Route::middleware('permission:finance.view')->get('/invoices/{id}', [\App\Http\Controllers\API\InvoiceController::class, 'show']);
+    Route::middleware('permission:finance.view')->get('/invoices/{id}/full', [InvoiceController::class, 'showFullInvoice']);
 
     // Purchase Orders
     Route::middleware('permission:purchases.manage')->post('/purchase-orders', [PurchaseOrderController::class, 'store']);
