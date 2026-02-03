@@ -126,6 +126,12 @@ Route::prefix('erp')->middleware('auth:sanctum')->group(function () {
     Route::middleware('permission:finance.view')->get('/activity-logs', [ActivityLogController::class, 'index']);
 
 
+    Route::get(
+        '/invoices/{invoice}/journal-entries',
+        [\App\Http\Controllers\API\InvoiceJournalController::class, 'index']
+    );
+
+
     //for testing
     Route::get('/journal-entries/latest', function () {
 
