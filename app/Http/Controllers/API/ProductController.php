@@ -140,7 +140,6 @@ class ProductController extends Controller
             return response()->json($data);
         }
 
-
         if ($product) {
 
             $product->update([
