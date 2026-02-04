@@ -214,7 +214,13 @@ class OrderController extends Controller
     }
     public function confirm($id)
     {
-        $order = Order::with('items')->findOrFail($id);
+        $order = Order::with(['items', 'invoice'])->findOrFail($id);
+
+        if ($order->invoice) {
+            return response()->json([
+                'msg' => 'Invoice already exists for this order'
+            ], 422);
+        }
 
         // ✅ لا يمكن تأكيد طلب تم إلغاؤه
         if ($order->status === 'cancelled') {
