@@ -304,53 +304,53 @@ class OrderController extends Controller
             ]);
         });
     }
-    public function createInvoice($id)
-    {
-        $order = Order::with('items')->findOrFail($id);
+    // public function createInvoice($id)
+    // {
+    //     $order = Order::with('items')->findOrFail($id);
 
-        // تمنع إنشاء فاتورة إذا فاتورة موجودة بالفعل
-        if ($order->invoice) {
-            return response()->json([
-                'message' => 'Invoice already exists'
-            ], 422);
-        }
+    //     // تمنع إنشاء فاتورة إذا فاتورة موجودة بالفعل
+    //     if ($order->invoice) {
+    //         return response()->json([
+    //             'message' => 'Invoice already exists'
+    //         ], 422);
+    //     }
 
-        // تمنع إنشاء فاتورة على طلب فاضي
-        if ($order->items->isEmpty()) {
-            return response()->json([
-                'message' => 'Order has no items'
-            ], 422);
-        }
+    //     // تمنع إنشاء فاتورة على طلب فاضي
+    //     if ($order->items->isEmpty()) {
+    //         return response()->json([
+    //             'message' => 'Order has no items'
+    //         ], 422);
+    //     }
 
-        // حساب الإجمالي من الـ items
-        $total = $order->items->sum(function ($item) {
-            return $item->quantity * $item->unit_price;
-        });
+    //     // حساب الإجمالي من الـ items
+    //     $total = $order->items->sum(function ($item) {
+    //         return $item->quantity * $item->unit_price;
+    //     });
 
-        // إنشاء الفاتورة
-        $invoice = Invoice::create([
-            'number'      => 'INV-' . now()->format('Ymd') . '-' . str_pad($order->id, 5, '0', STR_PAD_LEFT),
-            'order_id'    => $order->id,
-            'customer_id' => $order->customer_id,
-            'total'       => $total,
-            'status'      => 'unpaid',
-            'issued_at'   => now(),
-        ]);
+    //     // إنشاء الفاتورة
+    //     $invoice = Invoice::create([
+    //         'number'      => 'INV-' . now()->format('Ymd') . '-' . str_pad($order->id, 5, '0', STR_PAD_LEFT),
+    //         'order_id'    => $order->id,
+    //         'customer_id' => $order->customer_id,
+    //         'total'       => $total,
+    //         'status'      => 'unpaid',
+    //         'issued_at'   => now(),
+    //     ]);
 
-        // نسخ الـ items إلى InvoiceItem
-        foreach ($order->items as $item) {
-            InvoiceItem::create([
-                'invoice_id' => $invoice->id,
-                'product_id' => $item->product_id,
-                'quantity'   => $item->quantity,
-                'unit_price' => $item->unit_price,
-                'total'      => $item->quantity * $item->unit_price,
-            ]);
-        }
+    //     // نسخ الـ items إلى InvoiceItem
+    //     foreach ($order->items as $item) {
+    //         InvoiceItem::create([
+    //             'invoice_id' => $invoice->id,
+    //             'product_id' => $item->product_id,
+    //             'quantity'   => $item->quantity,
+    //             'unit_price' => $item->unit_price,
+    //             'total'      => $item->quantity * $item->unit_price,
+    //         ]);
+    //     }
 
-        return response()->json([
-            'message' => 'Invoice created',
-            'invoice' => $invoice
-        ]);
-    }
+    //     return response()->json([
+    //         'message' => 'Invoice created',
+    //         'invoice' => $invoice
+    //     ]);
+    // }
 }

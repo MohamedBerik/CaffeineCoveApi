@@ -76,7 +76,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::apiResource('products', ProductController::class);
 
     // -------- Orders --------
-    Route::apiResource('orders', OrderController::class);
+    // Route::apiResource('orders', OrderController::class);
 
     // -------- Sales --------
     Route::apiResource('sales', SaleController::class);
@@ -111,13 +111,15 @@ Route::prefix('erp')->middleware('auth:sanctum')->group(function () {
     Route::middleware('permission:orders.manage')->post('/orders', [OrderController::class, 'storeErp']);
     Route::middleware('permission:orders.confirm')->post('/orders/{id}/confirm', [OrderController::class, 'confirm']);
     Route::middleware('permission:orders.cancel')->post('/orders/{id}/cancel', [OrderController::class, 'cancel']);
+
     Route::middleware('permission:finance.view')->post('/orders/{id}/invoice', [OrderController::class, 'createInvoice']);
 
     // Invoices
     Route::middleware('permission:finance.view')->post('/invoices/{id}/pay', [InvoicePaymentController::class, 'pay']);
     Route::middleware('permission:finance.view')->get('/invoices/{id}', [\App\Http\Controllers\API\InvoiceController::class, 'show']);
     Route::middleware('permission:finance.view')->get('/invoices/{id}/full', [InvoiceController::class, 'showFullInvoice']);
-    Route::post('/erp/orders/{order}/invoice', [OrderInvoiceController::class, 'store']);
+
+    // Route::post('/erp/orders/{order}/invoice', [OrderInvoiceController::class, 'store']);
 
     // Purchase Orders
     Route::middleware('permission:purchases.manage')->post('/purchase-orders', [PurchaseOrderController::class, 'store']);
