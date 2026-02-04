@@ -57,16 +57,18 @@ class PaymentRefundController extends Controller
                 $request->user()->id ?? null
             );
 
-            $invoice = $payment->invoice;
+            $invoice = $payment->invoice->fresh();
 
-            $paid = $invoice->payments()->sum('amount')
-                - $invoice->refunds()->sum('payment_refunds.amount');
-
-            if ($paid <= 0) {
+            if ($invoice->net_paid <= 0) {
                 $invoice->update(['status' => 'unpaid']);
-            } elseif ($paid < $invoice->total) {
+            } elseif ($invoice->net_paid < $invoice->total) {
                 $invoice->update(['status' => 'partial']);
+            } else {
+                $invoice->update(['status' => 'paid']);
             }
+            activity('payment.refunded', $payment, [
+                'amount' => $request->amount
+            ]);
 
             return response()->json([
                 'msg' => 'Refund recorded',

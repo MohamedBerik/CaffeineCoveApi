@@ -14,7 +14,7 @@ class InvoicePaymentController extends Controller
 {
     public function pay(Request $request, $id)
     {
-        $invoice = Invoice::with('payments')->findOrFail($id);
+        $invoice = Invoice::findOrFail($id);
 
         $request->validate([
             'amount' => ['required', 'numeric', 'min:0.01'],
@@ -28,7 +28,7 @@ class InvoicePaymentController extends Controller
         }
 
         $alreadyPaid = $invoice->payments->sum('amount');
-        $refunded = $invoice->refunds()->sum('payment_refunds.amount');
+        $refunded = $invoice->refunds()->sum('amount');
         $netPaid = $alreadyPaid - $refunded;
         $remaining = $invoice->total - $netPaid;
 
@@ -56,7 +56,7 @@ class InvoicePaymentController extends Controller
             ]);
 
             $totalPaid = $invoice->payments()->sum('amount');
-            $totalRefunded = $invoice->refunds()->sum('payment_refunds.amount');
+            $totalRefunded = $invoice->refunds()->sum('amount');
 
             $netPaid = $totalPaid - $totalRefunded;
 

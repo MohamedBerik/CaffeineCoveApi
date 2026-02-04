@@ -47,4 +47,24 @@ class Invoice extends Model
     {
         return $this->morphMany(JournalEntry::class, 'source');
     }
+
+    public function getTotalPaidAttribute()
+    {
+        return $this->payments()->sum('amount');
+    }
+
+    public function getTotalRefundedAttribute()
+    {
+        return $this->refunds()->sum('amount');
+    }
+
+    public function getNetPaidAttribute()
+    {
+        return $this->total_paid - $this->total_refunded;
+    }
+
+    public function getRemainingAttribute()
+    {
+        return max(0, $this->total - $this->net_paid);
+    }
 }
