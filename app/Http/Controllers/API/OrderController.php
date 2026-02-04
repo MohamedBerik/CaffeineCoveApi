@@ -183,7 +183,7 @@ class OrderController extends Controller
                     'order_id'    => $order->id,
                     'product_id'  => $product->id,
                     'quantity'    => $item['quantity'],
-                    'unit_price'  => $product->price,
+                    'unit_price'  => $product->unit_price,
                     'total'       => $lineTotal,
                 ]);
 
