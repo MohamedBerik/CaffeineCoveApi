@@ -76,7 +76,7 @@ class ProductController extends Controller
             'title_ar' => 'required|min:3|max:255',
             'description_en' => 'required|min:3|max:255',
             'description_ar' => 'required|min:3|max:255',
-            'price' => 'required',
+            'unit_price' => 'required',
             'quantity' => 'required',
             'category_id' => 'required',
         ]);
@@ -103,7 +103,7 @@ class ProductController extends Controller
             "title_ar" => $request->title_ar,
             "description_en" => $request->description_en,
             "description_ar" => $request->description_ar,
-            "price" => $request->price,
+            "unit_price" => $request->unit_price,
             "quantity" => $request->quantity,
             "category_id" => $request->category_id,
         ]);
@@ -126,7 +126,7 @@ class ProductController extends Controller
             "title_ar" => "required|min:3|max:255",
             "description_en" => "required|min:3|max:255",
             "description_ar" => "required|min:3|max:255",
-            "price" => "required",
+            "unit_price" => "required",
             "quantity" => "required",
             "category_id" => "required",
         ]);
@@ -149,7 +149,7 @@ class ProductController extends Controller
                 "title_ar" => $request->title_ar,
                 "description_en" => $request->description_en,
                 "description_ar" => $request->description_ar,
-                "price" => $request->price,
+                "unit_price" => $request->unit_price,
                 "quantity" => $request->quantity,
                 "category_id" => $request->category_id,
             ]);

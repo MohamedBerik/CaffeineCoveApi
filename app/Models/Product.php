@@ -16,7 +16,7 @@ class Product extends Model
         "title_ar",
         "description_en",
         "description_ar",
-        "price",
+        "unit_price",
         "quantity",
         "category_id"
     ];

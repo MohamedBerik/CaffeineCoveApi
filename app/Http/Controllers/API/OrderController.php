@@ -73,59 +73,43 @@ class OrderController extends Controller
     }
     public function store(Request $request)
     {
-
         $validate = Validator::make($request->all(), [
-            'id' => 'required|unique:orders|max:20',
-            'title_en' => 'required|min:3|max:255',
-            'title_ar' => 'required|min:3|max:255',
-            'description_en' => 'required|min:3|max:255',
-            'description_ar' => 'required|min:3|max:255',
-            'price' => 'required',
-            'quantity' => 'required',
-            'customer_id' => 'required',
+            'customer_id' => ['required', 'exists:customers,id'],
+            'status'      => ['nullable', 'in:pending,confirmed,cancelled'],
         ]);
 
         if ($validate->fails()) {
-            $data = [
+            return response()->json([
                 "msg" => "Validation required",
-                "status" => 201,
+                "status" => 422,
                 "data" => $validate->errors()
-            ];
-            return response()->json($data);
+            ], 422);
         }
 
         $order = Order::create([
-            "id" => $request->id,
-            "title_en" => $request->title_en,
-            "title_ar" => $request->title_ar,
-            "description_en" => $request->description_en,
-            "description_ar" => $request->description_ar,
-            "price" => $request->price,
-            "quantity" => $request->quantity,
-            "customer_id" => $request->customer_id,
+            'customer_id' => $request->customer_id,
+            'status'      => $request->status ?? 'pending',
+            'total'       => 0,
+            'created_by'  => $request->user()->id ?? null,
         ]);
-        $data = [
-            "msg" => "Created Successfully",
+
+        return response()->json([
+            "msg" => "Order created (simple)",
             "status" => 200,
             "data" => new OrderResource($order)
-        ];
-        return response()->json($data);
+        ]);
     }
+
     public function update(Request $request)
     {
         $old_id = $request->old_id;
         $order = Order::find($old_id);
 
         $validate = Validator::make($request->all(), [
-            "id" => ['required', Rule::unique('orders')->ignore($old_id)],
-            "title_en" => "required|min:3|max:255",
-            "title_ar" => "required|min:3|max:255",
-            "description_en" => "required|min:3|max:255",
-            "description_ar" => "required|min:3|max:255",
-            "price" => "required",
-            "quantity" => "required",
-            "customer_id" => "required",
+            'customer_id' => ['required', 'exists:customers,id'],
+            'status'      => ['required', 'in:pending,confirmed,cancelled'],
         ]);
+
 
         if ($validate->fails()) {
             $data = [
@@ -136,23 +120,13 @@ class OrderController extends Controller
             return response()->json($data);
         }
 
-
-
-
-
-
         if ($order) {
 
             $order->update([
-                "id" => $request->id,
-                "title_en" => $request->title_en,
-                "title_ar" => $request->title_ar,
-                "description_en" => $request->description_en,
-                "description_ar" => $request->description_ar,
-                "price" => $request->price,
-                "quantity" => $request->quantity,
-                "customer_id" => $request->customer_id,
+                'customer_id' => $request->customer_id,
+                'status'      => $request->status,
             ]);
+
             $data = [
                 "msg" => "Updated Successfully",
                 "status" => 200,
