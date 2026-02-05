@@ -16,6 +16,11 @@ class Invoice extends Model
         'issued_at'
     ];
 
+    public function customer()
+    {
+        return $this->belongsTo(\App\Models\Customer::class, 'customer_id');
+    }
+
     public function items()
     {
         return $this->hasMany(InvoiceItem::class);
