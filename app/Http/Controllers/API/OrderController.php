@@ -176,7 +176,7 @@ class OrderController extends Controller
                     abort(422, "Insufficient stock for product {$product->id}");
                 }
 
-                $lineTotal = $product->price * $item['quantity'];
+                $lineTotal = $product->unit_price * $item['quantity'];
 
                 // إنشاء OrderItem
                 OrderItem::create([
