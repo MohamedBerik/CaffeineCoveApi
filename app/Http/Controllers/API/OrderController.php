@@ -20,6 +20,14 @@ use Illuminate\Validation\Rule;
 
 class OrderController extends Controller
 {
+    public function indexErp()
+    {
+        $orders = Order::with(['customer', 'items.product', 'invoice'])
+            ->latest()
+            ->get();
+
+        return response()->json($orders);
+    }
     function index()
     {
         $order = OrderResource::collection(Order::all());
@@ -99,7 +107,6 @@ class OrderController extends Controller
             "data" => new OrderResource($order)
         ]);
     }
-
     public function update(Request $request)
     {
         $old_id = $request->old_id;
