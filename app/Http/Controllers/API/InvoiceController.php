@@ -7,6 +7,14 @@ use App\Models\Invoice;
 
 class InvoiceController extends Controller
 {
+    public function indexErp()
+    {
+        $invoices = Invoice::with(['customer']) // عشان نجيب اسم العميل
+            ->orderBy('issued_at', 'desc')
+            ->get();
+
+        return response()->json($invoices);
+    }
     public function show($id)
     {
         $invoice = Invoice::with([
