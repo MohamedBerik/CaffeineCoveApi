@@ -70,7 +70,7 @@ class ProductController extends Controller
     {
 
         $validate = Validator::make($request->all(), [
-            'product_image' => 'required|image|max:2048|mimes:png,jpeg',
+            'product_image' => 'required',
             'id' => 'required|unique:products|max:20',
             'title_en' => 'required|min:3|max:255',
             'title_ar' => 'required|min:3|max:255',
@@ -120,7 +120,7 @@ class ProductController extends Controller
         $product = Product::find($old_id);
 
         $validate = Validator::make($request->all(), [
-            "product_image" => "image|max:2048|mimes:png,jpeg",
+            "product_image" => "required",
             "id" => ['required', Rule::unique('products')->ignore($old_id)],
             "title_en" => "required|min:3|max:255",
             "title_ar" => "required|min:3|max:255",
