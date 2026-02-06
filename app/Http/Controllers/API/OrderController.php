@@ -27,6 +27,18 @@ class OrderController extends Controller
 
         return response()->json($orders);
     }
+    public function showErp($id)
+    {
+        $order = Order::with([
+            'customer',
+            'items.product',
+            'invoice.payments',
+            'invoice.refunds'
+        ])->findOrFail($id);
+
+        return response()->json($order);
+    }
+
     function index()
     {
         $order = OrderResource::collection(Order::all());
@@ -292,7 +304,6 @@ class OrderController extends Controller
             ]);
         });
     }
-
     public function cancel(Request $request, $id)
     {
         $order = Order::with('items')->findOrFail($id);
