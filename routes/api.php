@@ -21,6 +21,7 @@ use App\Http\Controllers\API\PurchaseOrderController;
 use App\Http\Controllers\API\FinanceDashboardController;
 use App\Http\Controllers\API\ActivityLogController;
 use App\Http\Controllers\API\OrderInvoiceController;
+use App\Http\Controllers\API\PaymentRefundController;
 
 /*
 |--------------------------------------------------------------------------
@@ -113,16 +114,14 @@ Route::prefix('erp')->middleware('auth:sanctum')->group(function () {
     Route::middleware('permission:orders.confirm')->post('/orders/{id}/confirm', [OrderController::class, 'confirm']);
     Route::middleware('permission:orders.cancel')->post('/orders/{id}/cancel', [OrderController::class, 'cancel']);
 
-    // Route::middleware('permission:finance.view')->post('/orders/{id}/invoice', [OrderController::class, 'createInvoice']);
-
     // Invoices
     Route::middleware('permission:finance.view')->post('/invoices/{id}/pay', [InvoicePaymentController::class, 'pay']);
-    Route::middleware('permission:finance.view')->post('/invoices/{id}/refund', [InvoicePaymentController::class, 'refund']);
     Route::middleware('permission:finance.view')->get('/invoices', [InvoiceController::class, 'indexErp']);
     Route::middleware('permission:finance.view')->get('/invoices/{id}', [InvoiceController::class, 'show']);
     Route::middleware('permission:finance.view')->get('/invoices/{id}/full', [InvoiceController::class, 'showFullInvoice']);
 
-    // Route::post('/erp/orders/{order}/invoice', [OrderInvoiceController::class, 'store']);
+    //Refund payment
+    Route::middleware('permission:payments.refund')->post('/payments/{payment}/refund', [PaymentRefundController::class, 'refund']);
 
     // Purchase Orders
     Route::middleware('permission:purchases.manage')->post('/purchase-orders', [PurchaseOrderController::class, 'store']);
@@ -137,7 +136,4 @@ Route::prefix('erp')->middleware('auth:sanctum')->group(function () {
 
     //Journal entries
     Route::get('/invoices/{invoice}/journal-entries', [\App\Http\Controllers\API\InvoiceJournalController::class, 'index']);
-
-    //Refund payment
-    Route::post('/payments/{payment}/refund', [\App\Http\Controllers\API\PaymentRefundController::class, 'refund']);
 });

@@ -2,17 +2,16 @@
 
 namespace App\Http\Controllers\API;
 
+use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\Product;
 use App\Models\StockMovement;
 use App\Models\Invoice;
 use App\Models\InvoiceItem;
 use Illuminate\Support\Str;
-
 use Illuminate\Support\Facades\DB;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\OrderResource;
-use App\Models\Order;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Validator;
@@ -223,42 +222,59 @@ class OrderController extends Controller
     {
         $order = Order::with(['items', 'invoice'])->findOrFail($id);
 
+        // لا يمكن إنشاء فاتورة مرتين لنفس الطلب
         if ($order->invoice) {
             return response()->json([
                 'msg' => 'Invoice already exists for this order'
             ], 422);
         }
 
-        // ✅ لا يمكن تأكيد طلب تم إلغاؤه
+        // لا يمكن تأكيد طلب تم إلغاؤه
         if ($order->status === 'cancelled') {
             return response()->json([
                 'msg' => 'Cannot confirm a cancelled order'
             ], 422);
         }
 
-        // ✅ لا يمكن إعادة تأكيد الطلب
+        // لا يمكن إعادة تأكيد الطلب
         if ($order->status === 'confirmed') {
             return response()->json([
                 'msg' => 'Order already confirmed'
             ], 422);
         }
 
+        // لا يمكن تأكيد طلب بدون أصناف
+        if ($order->items->isEmpty()) {
+            return response()->json([
+                'msg' => 'Order has no items'
+            ], 422);
+        }
+
         return DB::transaction(function () use ($order) {
 
+            // حساب الإجمالي من عناصر الطلب (من السيرفر فقط)
+            $total = $order->items->sum(function ($item) {
+                return $item->quantity * $item->unit_price;
+            });
+
+            // تحديث حالة الطلب
             $order->update([
                 'status' => 'confirmed'
             ]);
+
             activity('order.confirmed', $order);
 
+            // إنشاء الفاتورة
             $invoice = Invoice::create([
                 'number'      => 'INV-' . now()->format('YmdHis') . '-' . $order->id,
                 'order_id'    => $order->id,
                 'customer_id' => $order->customer_id,
-                'total'       => $order->total,
+                'total'       => $total, // ← لا نعتمد على order->total
                 'status'      => 'unpaid',
                 'issued_at'   => now(),
             ]);
 
+            // نسخ أصناف الطلب إلى أصناف الفاتورة
             foreach ($order->items as $item) {
 
                 InvoiceItem::create([
@@ -266,7 +282,7 @@ class OrderController extends Controller
                     'product_id' => $item->product_id,
                     'quantity'   => $item->quantity,
                     'unit_price' => $item->unit_price,
-                    'total'      => $item->total,
+                    'total'      => $item->quantity * $item->unit_price,
                 ]);
             }
 
@@ -276,6 +292,7 @@ class OrderController extends Controller
             ]);
         });
     }
+
     public function cancel(Request $request, $id)
     {
         $order = Order::with('items')->findOrFail($id);
@@ -317,53 +334,4 @@ class OrderController extends Controller
             ]);
         });
     }
-    // public function createInvoice($id)
-    // {
-    //     $order = Order::with('items')->findOrFail($id);
-
-    //     // تمنع إنشاء فاتورة إذا فاتورة موجودة بالفعل
-    //     if ($order->invoice) {
-    //         return response()->json([
-    //             'message' => 'Invoice already exists'
-    //         ], 422);
-    //     }
-
-    //     // تمنع إنشاء فاتورة على طلب فاضي
-    //     if ($order->items->isEmpty()) {
-    //         return response()->json([
-    //             'message' => 'Order has no items'
-    //         ], 422);
-    //     }
-
-    //     // حساب الإجمالي من الـ items
-    //     $total = $order->items->sum(function ($item) {
-    //         return $item->quantity * $item->unit_price;
-    //     });
-
-    //     // إنشاء الفاتورة
-    //     $invoice = Invoice::create([
-    //         'number'      => 'INV-' . now()->format('Ymd') . '-' . str_pad($order->id, 5, '0', STR_PAD_LEFT),
-    //         'order_id'    => $order->id,
-    //         'customer_id' => $order->customer_id,
-    //         'total'       => $total,
-    //         'status'      => 'unpaid',
-    //         'issued_at'   => now(),
-    //     ]);
-
-    //     // نسخ الـ items إلى InvoiceItem
-    //     foreach ($order->items as $item) {
-    //         InvoiceItem::create([
-    //             'invoice_id' => $invoice->id,
-    //             'product_id' => $item->product_id,
-    //             'quantity'   => $item->quantity,
-    //             'unit_price' => $item->unit_price,
-    //             'total'      => $item->quantity * $item->unit_price,
-    //         ]);
-    //     }
-
-    //     return response()->json([
-    //         'message' => 'Invoice created',
-    //         'invoice' => $invoice
-    //     ]);
-    // }
 }
