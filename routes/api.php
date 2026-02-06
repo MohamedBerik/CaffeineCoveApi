@@ -10,18 +10,21 @@ use App\Http\Controllers\API\CustomerController;
 use App\Http\Controllers\API\EmployeeController;
 use App\Http\Controllers\API\UserController;
 use App\Http\Controllers\API\ProductController;
-use App\Http\Controllers\API\OrderController;
 use App\Http\Controllers\API\SaleController;
 use App\Http\Controllers\API\ReservationController;
 use App\Http\Controllers\API\AdminDashboardController;
 use App\Http\Controllers\API\AdminCrudController;
-use App\Http\Controllers\API\InvoicePaymentController;
-use App\Http\Controllers\API\InvoiceController;
-use App\Http\Controllers\API\PurchaseOrderController;
-use App\Http\Controllers\API\FinanceDashboardController;
-use App\Http\Controllers\API\ActivityLogController;
-use App\Http\Controllers\API\OrderInvoiceController;
-use App\Http\Controllers\API\PaymentRefundController;
+//-----------------------------------------------------------------------
+//EPR ROUTES
+//-----------------------------------------------------------------------
+use App\Http\Controllers\API\Erp\OrderController;
+use App\Http\Controllers\API\Erp\InvoicePaymentController;
+use App\Http\Controllers\API\Erp\InvoiceController;
+use App\Http\Controllers\API\Erp\PurchaseOrderController;
+use App\Http\Controllers\API\Erp\FinanceDashboardController;
+use App\Http\Controllers\API\Erp\ActivityLogController;
+use App\Http\Controllers\API\Erp\OrderInvoiceController;
+use App\Http\Controllers\API\Erp\PaymentRefundController;
 
 /*
 |--------------------------------------------------------------------------
@@ -117,6 +120,7 @@ Route::prefix('erp')->middleware('auth:sanctum')->group(function () {
 
     // Invoices
     Route::middleware('permission:finance.view')->post('/invoices/{id}/pay', [InvoicePaymentController::class, 'pay']);
+    Route::middleware('permission:finance.create')->post('/invoices/{invoice}/payments', [InvoicePaymentController::class, 'store']);
     Route::middleware('permission:finance.view')->get('/invoices', [InvoiceController::class, 'indexErp']);
     Route::middleware('permission:finance.view')->get('/invoices/{id}', [InvoiceController::class, 'show']);
     Route::middleware('permission:finance.view')->get('/invoices/{id}/full', [InvoiceController::class, 'showFullInvoice']);
@@ -136,5 +140,5 @@ Route::prefix('erp')->middleware('auth:sanctum')->group(function () {
     Route::middleware('permission:finance.view')->get('/activity-logs', [ActivityLogController::class, 'index']);
 
     //Journal entries
-    Route::get('/invoices/{invoice}/journal-entries', [\App\Http\Controllers\API\InvoiceJournalController::class, 'index']);
+    Route::get('/invoices/{invoice}/journal-entries', [\App\Http\Controllers\API\Erp\InvoiceJournalController::class, 'index']);
 });
