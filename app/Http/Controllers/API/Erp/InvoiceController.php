@@ -9,9 +9,45 @@ class InvoiceController extends Controller
 {
     public function indexErp()
     {
-        $invoices = Invoice::with(['customer']) // عشان نجيب اسم العميل
+        $invoices = Invoice::with([
+            'customer',
+            'payments',
+            'refunds'
+        ])
             ->orderBy('issued_at', 'desc')
-            ->get();
+            ->get()
+            ->map(function ($invoice) {
+
+                $totalPaid = $invoice->payments->sum('amount');
+
+                // لو refunds مربوطة مباشرة بالـ invoice
+                // استخدم:
+                $totalRefunded = $invoice->refunds->sum('amount');
+
+                $remaining = $invoice->total - ($totalPaid - $totalRefunded);
+
+                if ($remaining < 0) {
+                    $remaining = 0;
+                }
+
+                return [
+                    'id' => $invoice->id,
+                    'number' => $invoice->number,
+                    'issued_at' => $invoice->issued_at,
+                    'total' => $invoice->total,
+                    'status' => $invoice->status,
+
+                    'customer' => $invoice->customer,
+
+                    // 👇 القيم المطلوبة في الواجهة
+                    'total_paid' => $totalPaid,
+                    'total_refunded' => $totalRefunded,
+                    'remaining' => $remaining,
+
+                    // 👇 مهم لزر refund لاحقًا
+                    'payments' => $invoice->payments,
+                ];
+            });
 
         return response()->json($invoices);
     }
