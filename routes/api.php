@@ -117,6 +117,7 @@ Route::prefix('erp')->middleware('auth:sanctum')->group(function () {
 
     // Invoices
     Route::middleware('permission:finance.view')->post('/invoices/{id}/pay', [InvoicePaymentController::class, 'pay']);
+    Route::middleware('permission:finance.view')->post('/invoices/{id}/refund', [InvoicePaymentController::class, 'refund']);
     Route::middleware('permission:finance.view')->get('/invoices', [InvoiceController::class, 'indexErp']);
     Route::middleware('permission:finance.view')->get('/invoices/{id}', [InvoiceController::class, 'show']);
     Route::middleware('permission:finance.view')->get('/invoices/{id}/full', [InvoiceController::class, 'showFullInvoice']);

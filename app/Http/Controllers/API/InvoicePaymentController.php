@@ -101,4 +101,82 @@ class InvoicePaymentController extends Controller
             ]);
         });
     }
+    public function refund(Request $request, $id)
+    {
+        $invoice = Invoice::findOrFail($id);
+
+        $request->validate([
+            'amount' => ['required', 'numeric', 'min:0.01'],
+            'method' => ['required', 'in:cash,card,bank']
+        ]);
+
+        $totalPaid = $invoice->payments->sum('amount');
+        $totalRefunded = $invoice->refunds()->sum('amount');
+        $remainingRefundable = $totalPaid - $totalRefunded;
+
+        if ($remainingRefundable <= 0) {
+            return response()->json([
+                'msg' => 'No refundable amount for this invoice'
+            ], 422);
+        }
+
+        if ($request->amount > $remainingRefundable) {
+            return response()->json([
+                'msg' => 'Refund exceeds paid amount',
+                'remaining' => $remainingRefundable
+            ], 422);
+        }
+
+        return DB::transaction(function () use ($invoice, $request) {
+
+            $refund = $invoice->refunds()->create([
+                'amount' => $request->amount,
+                'method' => $request->method,
+                'refunded_by' => $request->user()->id ?? null,
+                'refunded_at' => now()
+            ]);
+
+            // تحديث حالة الفاتورة
+            $netPaid = $totalPaid - ($totalRefunded + $request->amount);
+
+            $invoice->update([
+                'status' => $netPaid >= $invoice->total
+                    ? 'paid'
+                    : ($netPaid > 0 ? 'partial' : 'unpaid')
+            ]);
+
+            // قيود محاسبية عكسية
+            $cashAccount  = Account::where('code', '1000')->firstOrFail();
+            $salesAccount = Account::where('code', '4000')->firstOrFail();
+
+            AccountingService::createEntry(
+                $invoice,
+                'Invoice refund #' . $invoice->id,
+                [
+                    [
+                        'account_id' => $salesAccount->id,
+                        'debit'      => $request->amount,
+                        'credit'     => 0
+                    ],
+                    [
+                        'account_id' => $cashAccount->id,
+                        'debit'      => 0,
+                        'credit'     => $request->amount
+                    ],
+                ],
+                $request->user()->id ?? null,
+                now()->toDateString()
+            );
+
+            activity('invoice.refunded', $invoice, [
+                'amount' => $request->amount
+            ]);
+
+            return response()->json([
+                'msg' => 'Refund recorded',
+                'invoice_status' => $invoice->fresh()->status,
+                'refund_id' => $refund->id
+            ]);
+        });
+    }
 }
