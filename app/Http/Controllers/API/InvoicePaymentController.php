@@ -28,7 +28,7 @@ class InvoicePaymentController extends Controller
         }
 
         $alreadyPaid = $invoice->payments->sum('amount');
-        $refunded = $invoice->refunds()->sum('amount');
+        $refunded = $invoice->refunds()->sum('payment_refunds.amount');
         $netPaid = $alreadyPaid - $refunded;
         $remaining = $invoice->total - $netPaid;
 
@@ -56,7 +56,7 @@ class InvoicePaymentController extends Controller
             ]);
 
             $totalPaid = $invoice->payments()->sum('amount');
-            $totalRefunded = $invoice->refunds()->sum('amount');
+            $totalRefunded = $invoice->refunds()->sum('payment_refunds.amount');
 
             $netPaid = $totalPaid - $totalRefunded;
 
@@ -111,7 +111,7 @@ class InvoicePaymentController extends Controller
         ]);
 
         $totalPaid = $invoice->payments->sum('amount');
-        $totalRefunded = $invoice->refunds()->sum('amount');
+        $totalRefunded = $invoice->refunds()->sum('payment_refunds.amount');
         $remainingRefundable = $totalPaid - $totalRefunded;
 
         if ($remainingRefundable <= 0) {
