@@ -8,8 +8,10 @@ class JournalEntry extends Model
 {
     protected $fillable = [
         'entry_date',
+        'reference_type',
+        'reference_id',
         'description',
-        'created_by'
+        'created_by',
     ];
 
     public function lines()

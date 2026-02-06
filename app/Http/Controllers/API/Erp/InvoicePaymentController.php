@@ -48,7 +48,7 @@ class InvoicePaymentController extends Controller
              */
 
             $entry = JournalEntry::create([
-                'date'        => now(),
+                'entry_date'     => now()->toDateString(),
                 'reference_type' => Payment::class,
                 'reference_id'   => $payment->id,
                 'description' => 'Invoice payment #' . $invoice->number,
