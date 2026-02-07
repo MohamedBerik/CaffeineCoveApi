@@ -17,7 +17,7 @@ class PaymentRefundController extends Controller
             'amount' => ['required', 'numeric', 'min:0.01']
         ]);
 
-        $alreadyRefunded = $payment->refunds()->sum('amount');
+        $alreadyRefunded = $payment->refunds()->sum('payment_refunds.amount');
 
         $remaining = $payment->amount - $alreadyRefunded;
 
