@@ -72,4 +72,8 @@ class Invoice extends Model
     {
         return max(0, $this->total - $this->net_paid);
     }
+    public function customerLedgerEntries()
+    {
+        return $this->hasMany(CustomerLedgerEntry::class);
+    }
 }

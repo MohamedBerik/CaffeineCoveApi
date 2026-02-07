@@ -23,4 +23,8 @@ class Payment extends Model
     {
         return $this->hasMany(\App\Models\PaymentRefund::class);
     }
+    public function customerLedgerEntry()
+    {
+        return $this->hasOne(CustomerLedgerEntry::class);
+    }
 }

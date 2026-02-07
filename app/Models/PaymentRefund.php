@@ -18,4 +18,8 @@ class PaymentRefund extends Model
     {
         return $this->belongsTo(Payment::class);
     }
+    public function customerLedgerEntry()
+    {
+        return $this->hasOne(CustomerLedgerEntry::class);
+    }
 }

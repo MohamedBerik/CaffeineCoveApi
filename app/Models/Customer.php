@@ -14,4 +14,9 @@ class Customer extends Model
         "password",
         "status",
     ];
+
+    public function ledgerEntries()
+    {
+        return $this->hasMany(CustomerLedgerEntry::class);
+    }
 }
