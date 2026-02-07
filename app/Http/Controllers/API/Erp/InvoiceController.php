@@ -11,7 +11,7 @@ class InvoiceController extends Controller
     {
         $invoices = Invoice::with([
             'customer',
-            'payments',
+            'payments.refunds',
             'refunds'
         ])
             ->orderBy('issued_at', 'desc')
@@ -20,8 +20,6 @@ class InvoiceController extends Controller
 
                 $totalPaid = $invoice->payments->sum('amount');
 
-                // لو refunds مربوطة مباشرة بالـ invoice
-                // استخدم:
                 $totalRefunded = $invoice->refunds->sum('amount');
 
                 $remaining = $invoice->total - ($totalPaid - $totalRefunded);
@@ -29,6 +27,11 @@ class InvoiceController extends Controller
                 if ($remaining < 0) {
                     $remaining = 0;
                 }
+
+                // 👇 أضف refunded_amount لكل payment
+                $invoice->payments->each(function ($p) {
+                    $p->refunded_amount = $p->refunds->sum('amount');
+                });
 
                 return [
                     'id' => $invoice->id,
@@ -39,18 +42,17 @@ class InvoiceController extends Controller
 
                     'customer' => $invoice->customer,
 
-                    // 👇 القيم المطلوبة في الواجهة
                     'total_paid' => $totalPaid,
                     'total_refunded' => $totalRefunded,
                     'remaining' => $remaining,
 
-                    // 👇 مهم لزر refund لاحقًا
                     'payments' => $invoice->payments,
                 ];
             });
 
         return response()->json($invoices);
     }
+
     public function show($id)
     {
         $invoice = Invoice::with([
