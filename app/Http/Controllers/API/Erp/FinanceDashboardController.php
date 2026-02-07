@@ -25,7 +25,7 @@ class FinanceDashboardController extends Controller
         $totalPaidToSuppliers = SupplierPayment::sum('amount');
 
         // فلوس لسه لك على العملاء
-        $receivables = Invoice::whereIn('status', ['unpaid', 'partial'])
+        $receivables = Invoice::whereIn('status', ['unpaid', 'partially_paid'])
             ->with('payments')
             ->get()
             ->sum(function ($invoice) {

@@ -51,7 +51,8 @@ class InvoicePaymentController extends Controller
                 'entry_date'     => now()->toDateString(),
                 'source_type' => Payment::class,
                 'source_id'   => $payment->id,
-                'description' => 'Invoice payment #' . $invoice->number,
+                // 'description' => 'Invoice payment #' . $invoice->number,
+                'description' => 'Invoice payment #' . $payment->id,
                 'created_by' => $request->user()->id ?? null,
             ]);
 

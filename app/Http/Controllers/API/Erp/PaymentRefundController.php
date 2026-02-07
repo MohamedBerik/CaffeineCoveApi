@@ -62,7 +62,7 @@ class PaymentRefundController extends Controller
             if ($invoice->net_paid <= 0) {
                 $invoice->update(['status' => 'unpaid']);
             } elseif ($invoice->net_paid < $invoice->total) {
-                $invoice->update(['status' => 'partial']);
+                $invoice->update(['status' => 'partially_paid']);
             } else {
                 $invoice->update(['status' => 'paid']);
             }
