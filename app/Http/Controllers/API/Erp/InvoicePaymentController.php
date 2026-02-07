@@ -9,6 +9,7 @@ use App\Models\JournalEntry;
 use App\Models\JournalLine;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use App\Models\CustomerLedgerEntry;
 
 class InvoicePaymentController extends Controller
 {
@@ -37,6 +38,17 @@ class InvoicePaymentController extends Controller
                 'method'     => $data['method'],
                 'paid_at'    => $data['paid_at'] ?? now(),
                 'created_by' => $request->user()->id ?? null,
+            ]);
+
+            CustomerLedgerEntry::create([
+                'customer_id' => $invoice->customer_id,
+                'invoice_id'  => $invoice->id,
+                'payment_id'  => $payment->id,
+                'type'        => 'payment',
+                'debit'       => 0,
+                'credit'      => $payment->amount,
+                'entry_date'  => now(),
+                'description' => 'Payment #' . $payment->id,
             ]);
 
             /*

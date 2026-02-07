@@ -12,6 +12,7 @@ use Illuminate\Support\Str;
 use Illuminate\Support\Facades\DB;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\OrderResource;
+use App\Models\CustomerLedgerEntry;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Validator;
@@ -284,6 +285,16 @@ class OrderController extends Controller
                 'total'       => $total, // ← لا نعتمد على order->total
                 'status'      => 'unpaid',
                 'issued_at'   => now(),
+            ]);
+
+            CustomerLedgerEntry::create([
+                'customer_id' => $invoice->customer_id,
+                'invoice_id'  => $invoice->id,
+                'type'        => 'invoice',
+                'debit'       => $invoice->total,
+                'credit'      => 0,
+                'entry_date'  => now(),
+                'description' => 'Invoice ' . $invoice->number,
             ]);
 
             // نسخ أصناف الطلب إلى أصناف الفاتورة

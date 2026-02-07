@@ -4,6 +4,7 @@ namespace App\Http\Controllers\API\Erp;
 
 use App\Http\Controllers\Controller;
 use App\Models\Invoice;
+use App\Models\CustomerLedgerEntry;
 
 class InvoiceController extends Controller
 {
@@ -69,8 +70,7 @@ class InvoiceController extends Controller
     {
         $invoice = Invoice::with([
             'items.product',
-            'payments',
-            'refunds'
+            'payments.refunds'
         ])->findOrFail($id);
 
         return response()->json($invoice);
@@ -79,8 +79,7 @@ class InvoiceController extends Controller
     {
         $invoice = Invoice::with([
             'items.product',        // كل items مربوط بالـ product
-            'payments',             // كل الـ payments
-            'refunds',              // كل الـ refunds
+            'payments.refunds',
             'journalEntries.lines'  // كل القيود المحاسبية والخطوط
         ])->findOrFail($id);
 

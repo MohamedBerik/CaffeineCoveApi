@@ -8,6 +8,7 @@ use App\Models\Account;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use App\Services\AccountingService;
+use App\Models\CustomerLedgerEntry;
 
 class PaymentRefundController extends Controller
 {
@@ -35,6 +36,18 @@ class PaymentRefundController extends Controller
                 'refunded_at' => now(),
                 'created_by' => $request->user()->id ?? null
             ]);
+
+            CustomerLedgerEntry::create([
+                'customer_id' => $payment->invoice->customer_id,
+                'invoice_id'  => $payment->invoice_id,
+                'refund_id'   => $refund->id,
+                'type'        => 'refund',
+                'debit'       => $refund->amount,
+                'credit'      => 0,
+                'entry_date'  => now(),
+                'description' => 'Refund for payment #' . $payment->id,
+            ]);
+
 
             $cashAccount  = Account::where('code', '1000')->firstOrFail();
             $salesAccount = Account::where('code', '4000')->firstOrFail();
