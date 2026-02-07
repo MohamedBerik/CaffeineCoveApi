@@ -23,6 +23,7 @@ use App\Http\Controllers\API\Erp\InvoiceController;
 use App\Http\Controllers\API\Erp\PurchaseOrderController;
 use App\Http\Controllers\API\Erp\FinanceDashboardController;
 use App\Http\Controllers\API\Erp\ActivityLogController;
+use App\Http\Controllers\API\Erp\CustomerStatementController;
 use App\Http\Controllers\API\Erp\OrderInvoiceController;
 use App\Http\Controllers\API\Erp\PaymentRefundController;
 
@@ -140,4 +141,7 @@ Route::prefix('erp')->middleware('auth:sanctum')->group(function () {
 
     //Journal entries
     Route::get('/invoices/{invoice}/journal-entries', [\App\Http\Controllers\API\Erp\InvoiceJournalController::class, 'index']);
+
+    //Customer statement
+    Route::get('/customers/{id}/statement', [CustomerStatementController::class, 'statement']);
 });
