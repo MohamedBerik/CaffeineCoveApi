@@ -11,27 +11,25 @@ class InvoiceController extends Controller
     {
         $invoices = Invoice::with([
             'customer',
-            'payments.refunds',
-            'refunds'
+            'payments.refunds'
         ])
             ->orderBy('issued_at', 'desc')
             ->get()
             ->map(function ($invoice) {
 
+                // مجموع المدفوع
                 $totalPaid = $invoice->payments->sum('amount');
 
-                $totalRefunded = $invoice->refunds->sum('amount');
+                // مجموع المرتجع (من payment_refunds فقط)
+                $totalRefunded = $invoice->payments->sum(function ($p) {
+                    return $p->refunds->sum('amount');
+                });
 
                 $remaining = $invoice->total - ($totalPaid - $totalRefunded);
 
                 if ($remaining < 0) {
                     $remaining = 0;
                 }
-
-                // 👇 أضف refunded_amount لكل payment
-                $invoice->payments->each(function ($p) {
-                    $p->refunded_amount = $p->refunds->sum('amount');
-                });
 
                 return [
                     'id' => $invoice->id,
@@ -42,11 +40,26 @@ class InvoiceController extends Controller
 
                     'customer' => $invoice->customer,
 
+                    // للواجهة
                     'total_paid' => $totalPaid,
                     'total_refunded' => $totalRefunded,
                     'remaining' => $remaining,
 
-                    'payments' => $invoice->payments,
+                    // مهم جدًا للـ UI (refund per payment)
+                    'payments' => $invoice->payments->map(function ($p) {
+
+                        $refunded = $p->refunds->sum('amount');
+
+                        return [
+                            'id' => $p->id,
+                            'amount' => $p->amount,
+                            'method' => $p->method,
+                            'paid_at' => $p->paid_at,
+
+                            // 👇 هذا الذي تستخدمه في الواجهة
+                            'refunded_amount' => $refunded,
+                        ];
+                    }),
                 ];
             });
 
