@@ -80,7 +80,7 @@ class InvoicePaymentController extends Controller
              */
 
             $paid = $invoice->payments()->sum('amount');
-            $refunded = $invoice->refunds()->sum('amount');
+            $refunded = $invoice->refunds()->sum('payment_refunds.amount');
 
             $net = $paid - $refunded;
 
