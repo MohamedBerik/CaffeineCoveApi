@@ -20,7 +20,7 @@ class InvoiceController extends Controller
 
                 $totalPaid = $invoice->payments->sum('amount');
 
-                $totalRefunded = $invoice->refunds->sum('payment_refunds.amount');
+                $totalRefunded = $invoice->refunds->sum('amount');
 
                 $remaining = $invoice->total - ($totalPaid - $totalRefunded);
 
@@ -30,7 +30,7 @@ class InvoiceController extends Controller
 
                 // 👇 أضف refunded_amount لكل payment
                 $invoice->payments->each(function ($p) {
-                    $p->refunded_amount = $p->refunds->sum('payment_refunds.amount');
+                    $p->refunded_amount = $p->refunds->sum('amount');
                 });
 
                 return [
@@ -52,7 +52,6 @@ class InvoiceController extends Controller
 
         return response()->json($invoices);
     }
-
     public function show($id)
     {
         $invoice = Invoice::with([
