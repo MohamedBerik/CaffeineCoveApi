@@ -143,5 +143,5 @@ Route::prefix('erp')->middleware('auth:sanctum')->group(function () {
     Route::get('/invoices/{invoice}/journal-entries', [\App\Http\Controllers\API\Erp\InvoiceJournalController::class, 'index']);
 
     //Customer statement
-    Route::get('/customers/{id}/statement', [CustomerStatementController::class, 'statement']);
+    Route::get('/customers/{customerId}/statement', [CustomerStatementController::class, 'show']);
 });
