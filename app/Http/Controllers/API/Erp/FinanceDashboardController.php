@@ -7,6 +7,7 @@ use App\Models\Invoice;
 use App\Models\Payment;
 use App\Models\PurchaseOrder;
 use App\Models\SupplierPayment;
+use App\Models\PaymentRefund;
 use App\Models\ActivityLog;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -15,18 +16,16 @@ class FinanceDashboardController extends Controller
 {
     public function index()
     {
-        /* ================= KPI ================= */
+        /* ============================================================
+         | Old data (KEEP – backward compatible)
+         * ============================================================ */
 
-        $salesToday = Invoice::whereDate('created_at', today())->sum('total');
+        $totalSales = Invoice::sum('total');
+        $totalCollected = Payment::sum('amount');
+        $totalPurchases = PurchaseOrder::sum('total');
+        $totalPaidToSuppliers = SupplierPayment::sum('amount');
 
-        $paymentsToday = Payment::whereDate('created_at', today())->sum('amount');
-
-        // لو عندك refunds في جدول مستقل عدّلها هنا
-        $refundsToday = DB::table('payment_refunds')
-            ->whereDate('created_at', today())
-            ->sum('amount');
-
-        $outstanding = Invoice::whereIn('status', ['unpaid', 'partially_paid'])
+        $receivables = Invoice::whereIn('status', ['unpaid', 'partially_paid'])
             ->with('payments')
             ->get()
             ->sum(function ($invoice) {
@@ -34,50 +33,64 @@ class FinanceDashboardController extends Controller
                 return max($invoice->total - $paid, 0);
             });
 
-        /* ================= charts : last 7 days sales ================= */
-
-        $salesChart = Invoice::select(
-            DB::raw('DATE(created_at) as date'),
-            DB::raw('SUM(total) as total')
-        )
-            ->whereDate('created_at', '>=', now()->subDays(6))
-            ->groupBy('date')
-            ->orderBy('date')
-            ->get();
-
-        /* ================= payments vs refunds ================= */
-
-        $payments = Payment::select(
-            DB::raw('DATE(created_at) as date'),
-            DB::raw('SUM(amount) as total')
-        )
-            ->whereDate('created_at', '>=', now()->subDays(6))
-            ->groupBy('date')
+        $payables = PurchaseOrder::whereNotIn('status', ['cancelled'])
+            ->with('payments')
             ->get()
-            ->keyBy('date');
+            ->sum(function ($po) {
+                $paid = $po->payments->sum('amount');
+                return max($po->total - $paid, 0);
+            });
 
-        $refunds = DB::table('payment_refunds')
-            ->select(
-                DB::raw('DATE(created_at) as date'),
-                DB::raw('SUM(amount) as total')
-            )
-            ->whereDate('created_at', '>=', now()->subDays(6))
-            ->groupBy('date')
-            ->get()
-            ->keyBy('date');
+        /* ============================================================
+         | New dashboard KPIs
+         * ============================================================ */
+
+        $today = Carbon::today();
+
+        $salesToday = Invoice::whereDate('created_at', $today)->sum('total');
+        $paymentsToday = Payment::whereDate('created_at', $today)->sum('amount');
+        $refundsToday = PaymentRefund::whereDate('created_at', $today)->sum('amount');
+
+        $outstanding = $receivables;
+
+        /* ============================================================
+         | Charts – last 7 days
+         * ============================================================ */
 
         $period = collect();
+
         for ($i = 6; $i >= 0; $i--) {
-            $date = now()->subDays($i)->toDateString();
+
+            $date = Carbon::today()->subDays($i)->toDateString();
+
+            $sales = Invoice::whereDate('created_at', $date)->sum('total');
+
+            $payments = Payment::whereDate('created_at', $date)->sum('amount');
+
+            $refunds = PaymentRefund::whereDate('created_at', $date)->sum('amount');
 
             $period->push([
-                'date'     => $date,
-                'payments' => $payments[$date]->total ?? 0,
-                'refunds'  => $refunds[$date]->total ?? 0,
+                'date' => $date,
+                'total' => $sales,
+                'payments' => $payments,
+                'refunds' => $refunds,
             ]);
         }
 
-        /* ================= latest invoices ================= */
+        $salesChart = $period->map(fn($r) => [
+            'date' => $r['date'],
+            'total' => $r['total'],
+        ]);
+
+        $paymentsChart = $period->map(fn($r) => [
+            'date' => $r['date'],
+            'payments' => $r['payments'],
+            'refunds' => $r['refunds'],
+        ]);
+
+        /* ============================================================
+         | Latest invoices
+         * ============================================================ */
 
         $latestInvoices = Invoice::with('customer')
             ->latest()
@@ -85,18 +98,20 @@ class FinanceDashboardController extends Controller
             ->get()
             ->map(function ($i) {
                 return [
-                    'id'       => $i->id,
-                    'number'   => $i->number ?? $i->id,
+                    'id' => $i->id,
+                    'number' => $i->number ?? $i->id,
                     'customer' => $i->customer?->name,
-                    'total'    => $i->total,
-                    'status'   => $i->status,
+                    'total' => $i->total,
+                    'status' => $i->status,
                 ];
             });
 
-        /* ================= recent activity ================= */
+        /* ============================================================
+         | Recent activity
+         * ============================================================ */
 
         $activities = ActivityLog::latest()
-            ->limit(8)
+            ->limit(6)
             ->get()
             ->map(function ($a) {
                 return [
@@ -107,6 +122,9 @@ class FinanceDashboardController extends Controller
             });
 
         return response()->json([
+
+            /* ===== new dashboard shape ===== */
+
             'stats' => [
                 'sales_today'    => $salesToday,
                 'payments_today' => $paymentsToday,
@@ -114,10 +132,19 @@ class FinanceDashboardController extends Controller
                 'outstanding'    => $outstanding,
             ],
 
-            'sales_chart'      => $salesChart,
-            'payments_chart'   => $period,
-            'latest_invoices'  => $latestInvoices,
-            'activities'       => $activities,
+            'sales_chart'     => $salesChart->values(),
+            'payments_chart'  => $paymentsChart->values(),
+            'latest_invoices' => $latestInvoices,
+            'activities'      => $activities,
+
+            /* ===== old data (DO NOT BREAK) ===== */
+
+            'total_sales' => $totalSales,
+            'total_collected' => $totalCollected,
+            'total_purchases' => $totalPurchases,
+            'total_paid_to_suppliers' => $totalPaidToSuppliers,
+            'receivables' => $receivables,
+            'payables' => $payables,
         ]);
     }
 }
