@@ -13,87 +13,91 @@ class CustomerStatementController extends Controller
     {
         $customer = Customer::findOrFail($customerId);
 
-        // لو لم يرسل تاريخ
-        $from = $request->get('from');
-        $to   = $request->get('to');
+        $from = $request->query('from');
+        $to   = $request->query('to');
 
-        if (!$from) {
-            $from = now()->startOfMonth()->toDateString();
+        // -----------------------------------------
+        // Opening balance
+        // كل ما قبل from
+        // -----------------------------------------
+        $openingQuery = CustomerLedgerEntry::where('customer_id', $customerId);
+
+        if ($from) {
+            $openingQuery->where('entry_date', '<', $from);
         }
 
-        if (!$to) {
-            $to = now()->toDateString();
+        $openingDebit  = (clone $openingQuery)->sum('debit');
+        $openingCredit = (clone $openingQuery)->sum('credit');
+
+        $openingBalance = $openingDebit - $openingCredit;
+
+        // -----------------------------------------
+        // Entries inside period
+        // -----------------------------------------
+        $entriesQuery = CustomerLedgerEntry::where('customer_id', $customerId);
+
+        if ($from) {
+            $entriesQuery->where('entry_date', '>=', $from);
         }
 
-        /*
-        |--------------------------------------------------------------------------
-        | Opening balance (قبل from)
-        |--------------------------------------------------------------------------
-        */
-        $openingBalance = CustomerLedgerEntry::where('customer_id', $customer->id)
-            ->where('entry_date', '<', $from)
-            ->selectRaw('COALESCE(SUM(debit),0) - COALESCE(SUM(credit),0) as balance')
-            ->value('balance');
+        if ($to) {
+            $entriesQuery->where('entry_date', '<=', $to);
+        }
 
-        $openingBalance = $openingBalance ?? 0;
-
-        /*
-        |--------------------------------------------------------------------------
-        | Entries داخل الفترة
-        |--------------------------------------------------------------------------
-        */
-        $entries = CustomerLedgerEntry::where('customer_id', $customer->id)
-            ->whereBetween('entry_date', [
-                $from . ' 00:00:00',
-                $to   . ' 23:59:59'
-            ])
+        $entries = $entriesQuery
             ->orderBy('entry_date')
             ->orderBy('id')
             ->get();
 
-        /*
-        |--------------------------------------------------------------------------
-        | running balance
-        |--------------------------------------------------------------------------
-        */
+        // -----------------------------------------
+        // Running balance
+        // -----------------------------------------
         $running = $openingBalance;
 
-        $entries = $entries->map(function ($row) use (&$running) {
+        $rows = $entries->map(function ($row) use (&$running) {
 
             $running += ($row->debit - $row->credit);
 
             return [
                 'id'          => $row->id,
-                'date'        => $row->entry_date,
+                'entry_date' => $row->entry_date->toDateString(),
                 'description' => $row->description,
-                'debit'       => $row->debit,
-                'credit'      => $row->credit,
-                'balance'     => $running,
+                'type'       => $row->type,
 
-                'type'        => $row->type,
-                'invoice_id'  => $row->invoice_id,
-                'payment_id'  => $row->payment_id,
-                'refund_id'   => $row->refund_id,
+                'debit'      => $row->debit,
+                'credit'     => $row->credit,
+
+                'balance'    => $running,
+
+                'invoice_id' => $row->invoice_id,
+                'payment_id' => $row->payment_id,
+                'refund_id'  => $row->refund_id,
             ];
         });
 
+        // -----------------------------------------
+        // Closing balance
+        // -----------------------------------------
+        $closingBalance = $running;
+
         return response()->json([
             'customer' => [
-                'id'      => $customer->id,
-                'name'    => $customer->name ?? null,
-                'code'    => $customer->code ?? null,
-                'phone'   => $customer->phone ?? null,
-                'address' => $customer->address ?? null,
+                'id'    => $customer->id,
+                'name'  => $customer->name,
+                'code'  => $customer->code ?? null,
+                'phone' => $customer->phone ?? null,
+                'email' => $customer->email ?? null,
             ],
 
             'period' => [
-                'from' => $from,
-                'to'   => $to,
+                'from' => $from ?? 'Beginning',
+                'to'   => $to   ?? now()->toDateString(),
             ],
 
             'opening_balance' => $openingBalance,
+            'closing_balance' => $closingBalance,
 
-            'entries' => $entries,
+            'entries' => $rows
         ]);
     }
 }
