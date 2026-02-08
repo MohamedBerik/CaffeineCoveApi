@@ -18,7 +18,7 @@ class PaymentRefundController extends Controller
             'amount' => ['required', 'numeric', 'min:0.01']
         ]);
 
-        $alreadyRefunded = $payment->refunds()->sum('payment_refunds.amount');
+        $alreadyRefunded = $payment->refunds()->sum('amount');
 
         $remaining = $payment->amount - $alreadyRefunded;
 
@@ -40,6 +40,7 @@ class PaymentRefundController extends Controller
             CustomerLedgerEntry::create([
                 'customer_id' => $payment->invoice->customer_id,
                 'invoice_id'  => $payment->invoice_id,
+                'payment_id'  => $payment->id,
                 'refund_id'   => $refund->id,
                 'type'        => 'refund',
                 'debit'       => $refund->amount,
