@@ -80,7 +80,7 @@ class InvoiceController extends Controller
         $invoice = Invoice::with([
             'items.product',        // كل items مربوط بالـ product
             'payments.refunds',
-            'journalEntries.lines'  // كل القيود المحاسبية والخطوط
+            'journalEntries.lines.account'  // كل القيود المحاسبية والخطوط
         ])->findOrFail($id);
 
         return response()->json([
