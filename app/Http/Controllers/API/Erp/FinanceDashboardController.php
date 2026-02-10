@@ -42,6 +42,14 @@ class FinanceDashboardController extends Controller
             });
 
         /* ============================================================
+         | ✅ Added – financial collection breakdown
+         * ============================================================ */
+
+        $grossCollected = Payment::sum('amount');                // <-- added
+        $refundsTotal   = PaymentRefund::sum('amount');         // <-- added
+        $netCollected   = $grossCollected - $refundsTotal;      // <-- added
+
+        /* ============================================================
          | New dashboard KPIs
          * ============================================================ */
 
@@ -145,6 +153,14 @@ class FinanceDashboardController extends Controller
             'total_paid_to_suppliers' => $totalPaidToSuppliers,
             'receivables' => $receivables,
             'payables' => $payables,
+
+            /* =========================================================
+             | ✅ Added – new fields for dashboard (no breaking change)
+             * ========================================================= */
+
+            'gross_collected' => $grossCollected,   // <-- added
+            'refunds_total'   => $refundsTotal,     // <-- added
+            'net_collected'   => $netCollected,     // <-- added
         ]);
     }
 }
