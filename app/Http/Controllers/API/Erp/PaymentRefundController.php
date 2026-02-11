@@ -50,15 +50,15 @@ class PaymentRefundController extends Controller
             ]);
 
 
-            $cashAccount  = Account::where('code', '1000')->firstOrFail();
-            $salesAccount = Account::where('code', '4000')->firstOrFail();
+            $arAccount = Account::where('code', '1100')->firstOrFail();
+            $cashAccount = Account::where('code', '1000')->firstOrFail();
 
             AccountingService::createEntry(
                 $payment->invoice,
                 'Refund for payment #' . $payment->id,
                 [
                     [
-                        'account_id' => $salesAccount->id,
+                        'account_id' => $arAccount->id,
                         'debit'  => $request->amount,
                         'credit' => 0
                     ],
@@ -70,6 +70,7 @@ class PaymentRefundController extends Controller
                 ],
                 $request->user()->id ?? null
             );
+
 
             $invoice = $payment->invoice->fresh();
 
