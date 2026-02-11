@@ -139,4 +139,49 @@ class PurchaseOrderController extends Controller
             ]);
         });
     }
+    public function indexErp()
+    {
+        $orders = PurchaseOrder::with([
+            'supplier',
+            'items.product',
+            'payments'
+        ])
+            ->orderByDesc('created_at')
+            ->get()
+            ->map(function ($po) {
+
+                $totalPaid = $po->payments->sum('amount');
+                $remaining = $po->total - $totalPaid;
+
+                if ($remaining < 0) {
+                    $remaining = 0;
+                }
+
+                return [
+                    'id' => $po->id,
+                    'number' => $po->number,
+                    'status' => $po->status,
+                    'total' => $po->total,
+
+                    'supplier' => $po->supplier,
+
+                    // للواجهة
+                    'total_paid' => $totalPaid,
+                    'remaining'  => $remaining,
+
+                    'created_at' => $po->created_at,
+
+                    'payments' => $po->payments->map(function ($p) {
+                        return [
+                            'id' => $p->id,
+                            'amount' => $p->amount,
+                            'method' => $p->method,
+                            'paid_at' => $p->paid_at,
+                        ];
+                    }),
+                ];
+            });
+
+        return response()->json($orders);
+    }
 }
