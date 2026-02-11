@@ -42,7 +42,7 @@ class InvoiceController extends Controller
                     'customer' => $invoice->customer,
 
                     // للواجهة
-                    'total_paid' => $totalPaid,
+                    'total_paid' => $totalPaid - $totalRefunded,
                     'total_refunded' => $totalRefunded,
                     'remaining' => $remaining,
 
