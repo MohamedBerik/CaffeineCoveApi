@@ -7,6 +7,7 @@ use Illuminate\Support\Facades\DB;
 use App\Http\Controllers\API\AuthController;
 use App\Http\Controllers\API\CategoryController;
 use App\Http\Controllers\API\CustomerController;
+use App\Http\Controllers\API\SupplierController;
 use App\Http\Controllers\API\EmployeeController;
 use App\Http\Controllers\API\UserController;
 use App\Http\Controllers\API\ProductController;
@@ -70,6 +71,9 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // -------- Customers --------
     Route::apiResource('customers', CustomerController::class);
+
+    // -------- Customers --------
+    Route::apiResource('suppliers', SupplierController::class);
 
     // -------- Employees --------
     Route::apiResource('employees', EmployeeController::class);
