@@ -14,6 +14,7 @@ use App\Models\Category;
 use App\Models\Employee;
 use App\Models\Invoice;
 use App\Models\Reservation;
+use App\Models\Supplier;
 
 class AdminDashboardController extends Controller
 {
@@ -33,6 +34,7 @@ class AdminDashboardController extends Controller
                 'sales'         => Sale::count(),
                 'reservations'  => Reservation::count(),
                 'invoices'  => Invoice::count(),
+                'suppliers'  => Supplier::count(),
             ],
 
             /* ========= LATEST DATA ========= */
@@ -46,6 +48,7 @@ class AdminDashboardController extends Controller
                 'sales' => Sale::latest()->take(5)->get(),
                 'reservations' => Reservation::latest()->take(5)->get(),
                 'invoices' => Invoice::latest()->take(5)->get(),
+                'suppliers' => Supplier::latest()->take(5)->get(),
             ]
         ]);
     }

@@ -73,7 +73,7 @@ class SupplierController extends Controller
     {
 
         $validate = Validator::make($request->all(), [
-            // 'id' => 'required|unique:suppliers|max:20',
+            'id' => 'required|unique:suppliers|max:20',
             'name' => 'required|min:3|max:255',
             'email' => 'required|min:3|max:255',
             'phone' => 'required|min:3|max:255',
@@ -89,7 +89,7 @@ class SupplierController extends Controller
         }
 
         $supplier = Supplier::create([
-            // "id" => $request->id,
+            "id" => $request->id,
             "name" => $request->name,
             "email" => $request->email,
             "phone" => $request->phone,
@@ -108,7 +108,7 @@ class SupplierController extends Controller
         $supplier = Supplier::find($old_id);
 
         $validate = Validator::make($request->all(), [
-            // "id" => ['required', Rule::unique('suppliers')->ignore($old_id)],
+            "id" => ['required', Rule::unique('suppliers')->ignore($old_id)],
             "name" => "required|min:3|max:255",
             "email" => "required|min:3|max:255",
             "phone" => "required|min:3|max:255",
@@ -127,7 +127,7 @@ class SupplierController extends Controller
         if ($supplier) {
 
             $supplier->update([
-                // "id" => $request->id,
+                "id" => $request->id,
                 "name" => $request->name,
                 "email" => $request->email,
                 "phone" => $request->phone,
