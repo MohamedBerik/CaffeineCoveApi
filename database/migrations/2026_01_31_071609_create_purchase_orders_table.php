@@ -23,8 +23,9 @@ class CreatePurchaseOrdersTable extends Migration
 
             $table->decimal('total', 10, 2)->default(0);
 
-            $table->string('status')->default('draft');
-            // draft, ordered, received, cancelled
+            $table->string('status')->default('draft');      // draft, ordered, received, cancelled
+
+            $table->timestamp('received_at')->nullable();
 
             $table->timestamps();
         });

@@ -84,7 +84,7 @@ class PurchaseOrderController extends Controller
             }
 
             $po->update([
-                'status' => 'received'
+                'received_at' => now()
             ]);
             activity('purchase.received', $po);
 
@@ -168,6 +168,7 @@ class PurchaseOrderController extends Controller
                     // للواجهة
                     'total_paid' => $totalPaid,
                     'remaining'  => $remaining,
+                    'is_received' => ! is_null($po->received_at),
 
                     'created_at' => $po->created_at,
 
@@ -183,5 +184,15 @@ class PurchaseOrderController extends Controller
             });
 
         return response()->json($orders);
+    }
+    public function show($id)
+    {
+        $po = PurchaseOrder::with([
+            'supplier',
+            'items.product',
+            'payments'
+        ])->findOrFail($id);
+
+        return response()->json($po);
     }
 }
