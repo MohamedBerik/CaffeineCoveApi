@@ -57,7 +57,7 @@ class PurchaseOrderController extends Controller
                 'type' => 'purchase',
                 'debit' => $total,
                 'credit' => 0,
-                'entry_date' => now(),
+                'entry_date' => now()->toDateString(),
                 'description' => 'Purchase order #' . $po->number,
             ]);
 
@@ -95,8 +95,10 @@ class PurchaseOrderController extends Controller
             }
 
             $po->update([
-                'received_at' => now()
+                'received_at' => now(),
+                'status' => 'received'
             ]);
+
             activity('purchase.received', $po);
 
             return response()->json([
@@ -122,8 +124,9 @@ class PurchaseOrderController extends Controller
                 'remaining' => $remaining
             ], 422);
         }
+        $alreadyPaid = $po->payments->sum('amount');
 
-        return DB::transaction(function () use ($po, $request, $remaining) {
+        return DB::transaction(function () use ($po, $request, $alreadyPaid) {
 
             $payment = SupplierPayment::create([
                 'supplier_id' => $po->supplier_id,
@@ -144,8 +147,7 @@ class PurchaseOrderController extends Controller
                 'description' => 'Payment for PO #' . $po->number,
             ]);
 
-
-            $newPaid = $po->payments()->sum('amount') + $request->amount;
+            $newPaid = $alreadyPaid + $request->amount;
 
             if ($newPaid >= $po->total) {
                 $po->update(['status' => 'paid']);
@@ -207,7 +209,7 @@ class PurchaseOrderController extends Controller
 
         return response()->json($orders);
     }
-    public function show($id)
+    public function showErp($id)
     {
         $po = PurchaseOrder::with([
             'supplier',
@@ -215,6 +217,47 @@ class PurchaseOrderController extends Controller
             'payments'
         ])->findOrFail($id);
 
-        return response()->json($po);
+        $totalPaid = $po->payments->sum('amount');
+        $remaining = $po->total - $totalPaid;
+
+        if ($remaining < 0) {
+            $remaining = 0;
+        }
+
+        return response()->json([
+            'id' => $po->id,
+            'number' => $po->number,
+            'status' => $po->status,
+            'total' => $po->total,
+
+            'supplier' => $po->supplier,
+
+            'created_at' => $po->created_at,
+            'received_at' => $po->received_at,
+
+            // للواجهة
+            'total_paid' => $totalPaid,
+            'remaining'  => $remaining,
+            'is_received' => ! is_null($po->received_at),
+
+            'items' => $po->items->map(function ($item) {
+                return [
+                    'id' => $item->id,
+                    'product' => $item->product,
+                    'quantity' => $item->quantity,
+                    'unit_cost' => $item->unit_cost,
+                    'total' => $item->total,
+                ];
+            }),
+
+            'payments' => $po->payments->map(function ($p) {
+                return [
+                    'id' => $p->id,
+                    'amount' => $p->amount,
+                    'method' => $p->method,
+                    'paid_at' => $p->paid_at,
+                ];
+            }),
+        ]);
     }
 }
