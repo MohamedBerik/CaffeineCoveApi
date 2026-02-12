@@ -158,7 +158,7 @@ class PurchaseOrderController extends Controller
     {
         $po = PurchaseOrder::with('items')->findOrFail($id);
 
-        if ($po->status === 'received') {
+        if (! is_null($po->received_at)) {
             return response()->json([
                 'msg' => 'Purchase order already received'
             ], 422);
@@ -171,21 +171,22 @@ class PurchaseOrderController extends Controller
                 $product = Product::lockForUpdate()
                     ->findOrFail($item->product_id);
 
-                $product->increment('stock_quantity', $item->quantity);
+                $product->stock_quantity += $item->quantity;
+                $product->save();
 
                 StockMovement::create([
-                    'product_id' => $product->id,
-                    'type' => 'in',
-                    'quantity' => $item->quantity,
+                    'product_id'     => $product->id,
+                    'type'           => 'in',
+                    'quantity'       => $item->quantity,
                     'reference_type' => PurchaseOrder::class,
-                    'reference_id' => $po->id,
-                    'created_by' => $request->user()->id ?? null,
+                    'reference_id'   => $po->id,
+                    'created_by'     => $request->user()->id ?? null,
                 ]);
             }
 
             $po->update([
                 'received_at' => now(),
-                'status' => 'received'
+                'status'      => 'received'
             ]);
 
             activity('purchase.received', $po);
@@ -195,6 +196,7 @@ class PurchaseOrderController extends Controller
             ]);
         });
     }
+
     public function pay(Request $request, $id)
     {
         $po = PurchaseOrder::with(['payments', 'supplier'])->findOrFail($id);
@@ -237,7 +239,7 @@ class PurchaseOrderController extends Controller
 
             $newPaid = $alreadyPaid + $request->amount;
 
-            if ($newPaid >= $po->total) {
+            if ($newPaid >= $po->total && is_null($po->received_at)) {
                 $po->update(['status' => 'paid']);
             }
 
