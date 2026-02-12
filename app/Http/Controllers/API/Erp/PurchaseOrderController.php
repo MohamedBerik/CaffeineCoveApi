@@ -14,6 +14,103 @@ use Illuminate\Support\Facades\DB;
 
 class PurchaseOrderController extends Controller
 {
+    public function indexErp()
+    {
+        $orders = PurchaseOrder::with([
+            'supplier',
+            'items.product',
+            'payments'
+        ])
+            ->orderByDesc('created_at')
+            ->get()
+            ->map(function ($po) {
+
+                $totalPaid = $po->payments->sum('amount');
+                $remaining = $po->total - $totalPaid;
+
+                if ($remaining < 0) {
+                    $remaining = 0;
+                }
+
+                return [
+                    'id' => $po->id,
+                    'number' => $po->number,
+                    'status' => $po->status,
+                    'total' => $po->total,
+
+                    'supplier' => $po->supplier,
+
+                    // للواجهة
+                    'total_paid' => $totalPaid,
+                    'remaining'  => $remaining,
+                    'is_received' => ! is_null($po->received_at),
+
+                    'created_at' => $po->created_at,
+
+                    'payments' => $po->payments->map(function ($p) {
+                        return [
+                            'id' => $p->id,
+                            'amount' => $p->amount,
+                            'method' => $p->method,
+                            'paid_at' => $p->paid_at,
+                        ];
+                    }),
+                ];
+            });
+
+        return response()->json($orders);
+    }
+    public function showErp($id)
+    {
+        $po = PurchaseOrder::with([
+            'supplier',
+            'items.product',
+            'payments'
+        ])->findOrFail($id);
+
+        $totalPaid = $po->payments->sum('amount');
+        $remaining = $po->total - $totalPaid;
+
+        if ($remaining < 0) {
+            $remaining = 0;
+        }
+
+        return response()->json([
+            'id' => $po->id,
+            'number' => $po->number,
+            'status' => $po->status,
+            'total' => $po->total,
+
+            'supplier' => $po->supplier,
+
+            'created_at' => $po->created_at,
+            'received_at' => $po->received_at,
+
+            // للواجهة
+            'total_paid' => $totalPaid,
+            'remaining'  => $remaining,
+            'is_received' => ! is_null($po->received_at),
+
+            'items' => $po->items->map(function ($item) {
+                return [
+                    'id' => $item->id,
+                    'product' => $item->product,
+                    'quantity' => $item->quantity,
+                    'unit_cost' => $item->unit_cost,
+                    'total' => $item->total,
+                ];
+            }),
+
+            'payments' => $po->payments->map(function ($p) {
+                return [
+                    'id' => $p->id,
+                    'amount' => $p->amount,
+                    'method' => $p->method,
+                    'paid_at' => $p->paid_at,
+                ];
+            }),
+        ]);
+    }
     public function store(Request $request)
     {
         $data = $request->validate([
@@ -162,102 +259,5 @@ class PurchaseOrderController extends Controller
                 'payment_id' => $payment->id
             ]);
         });
-    }
-    public function indexErp()
-    {
-        $orders = PurchaseOrder::with([
-            'supplier',
-            'items.product',
-            'payments'
-        ])
-            ->orderByDesc('created_at')
-            ->get()
-            ->map(function ($po) {
-
-                $totalPaid = $po->payments->sum('amount');
-                $remaining = $po->total - $totalPaid;
-
-                if ($remaining < 0) {
-                    $remaining = 0;
-                }
-
-                return [
-                    'id' => $po->id,
-                    'number' => $po->number,
-                    'status' => $po->status,
-                    'total' => $po->total,
-
-                    'supplier' => $po->supplier,
-
-                    // للواجهة
-                    'total_paid' => $totalPaid,
-                    'remaining'  => $remaining,
-                    'is_received' => ! is_null($po->received_at),
-
-                    'created_at' => $po->created_at,
-
-                    'payments' => $po->payments->map(function ($p) {
-                        return [
-                            'id' => $p->id,
-                            'amount' => $p->amount,
-                            'method' => $p->method,
-                            'paid_at' => $p->paid_at,
-                        ];
-                    }),
-                ];
-            });
-
-        return response()->json($orders);
-    }
-    public function showErp($id)
-    {
-        $po = PurchaseOrder::with([
-            'supplier',
-            'items.product',
-            'payments'
-        ])->findOrFail($id);
-
-        $totalPaid = $po->payments->sum('amount');
-        $remaining = $po->total - $totalPaid;
-
-        if ($remaining < 0) {
-            $remaining = 0;
-        }
-
-        return response()->json([
-            'id' => $po->id,
-            'number' => $po->number,
-            'status' => $po->status,
-            'total' => $po->total,
-
-            'supplier' => $po->supplier,
-
-            'created_at' => $po->created_at,
-            'received_at' => $po->received_at,
-
-            // للواجهة
-            'total_paid' => $totalPaid,
-            'remaining'  => $remaining,
-            'is_received' => ! is_null($po->received_at),
-
-            'items' => $po->items->map(function ($item) {
-                return [
-                    'id' => $item->id,
-                    'product' => $item->product,
-                    'quantity' => $item->quantity,
-                    'unit_cost' => $item->unit_cost,
-                    'total' => $item->total,
-                ];
-            }),
-
-            'payments' => $po->payments->map(function ($p) {
-                return [
-                    'id' => $p->id,
-                    'amount' => $p->amount,
-                    'method' => $p->method,
-                    'paid_at' => $p->paid_at,
-                ];
-            }),
-        ]);
     }
 }
