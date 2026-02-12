@@ -80,9 +80,7 @@ class PurchaseOrderController extends Controller
             'number' => $po->number,
             'status' => $po->status,
             'total' => $po->total,
-
             'supplier' => $po->supplier,
-
             'created_at' => $po->created_at,
             'received_at' => $po->received_at,
 
@@ -166,7 +164,7 @@ class PurchaseOrderController extends Controller
     {
         $po = PurchaseOrder::with('items')->findOrFail($id);
 
-        if ($po->status === 'received') {
+        if ($po->received_at) {
             return response()->json([
                 'msg' => 'Purchase order already received'
             ], 422);
@@ -193,7 +191,6 @@ class PurchaseOrderController extends Controller
 
             $po->update([
                 'received_at' => now(),
-                'status' => 'received'
             ]);
 
             activity('purchase.received', $po);
@@ -221,7 +218,6 @@ class PurchaseOrderController extends Controller
                 'remaining' => $remaining
             ], 422);
         }
-        $alreadyPaid = $po->payments->sum('amount');
 
         return DB::transaction(function () use ($po, $request, $alreadyPaid) {
 
