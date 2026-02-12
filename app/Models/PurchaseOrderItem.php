@@ -14,4 +14,8 @@ class PurchaseOrderItem extends Model
         'unit_cost',
         'total'
     ];
+    public function product()
+    {
+        return $this->belongsTo(Product::class);
+    }
 }
