@@ -27,6 +27,7 @@ use App\Http\Controllers\API\Erp\ActivityLogController;
 use App\Http\Controllers\API\Erp\CustomerStatementController;
 use App\Http\Controllers\API\Erp\OrderInvoiceController;
 use App\Http\Controllers\API\Erp\PaymentRefundController;
+use App\Http\Controllers\API\Erp\SupplierStatementController;
 
 /*
 |--------------------------------------------------------------------------
@@ -138,6 +139,7 @@ Route::prefix('erp')->middleware('auth:sanctum')->group(function () {
     Route::middleware('permission:finance.view')->post('/purchase-orders/{id}/pay', [PurchaseOrderController::class, 'pay']);
     Route::middleware('permission:finance.view')->get('/purchase-orders', [PurchaseOrderController::class, 'indexErp']);
     Route::middleware('permission:finance.view')->get('/purchase-orders/{id}', [PurchaseOrderController::class, 'show']);
+    Route::middleware('permission:finance.view')->get('/suppliers/{supplier}/statement', [SupplierStatementController::class, 'show']);
 
 
     // Dashboard

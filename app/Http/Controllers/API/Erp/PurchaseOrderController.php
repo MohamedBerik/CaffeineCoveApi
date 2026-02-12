@@ -8,6 +8,7 @@ use App\Models\PurchaseOrderItem;
 use App\Models\Product;
 use App\Models\StockMovement;
 use App\Models\SupplierPayment;
+use App\Models\SupplierLedgerEntry;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -50,6 +51,15 @@ class PurchaseOrderController extends Controller
             }
 
             $po->update(['total' => $total]);
+            SupplierLedgerEntry::create([
+                'supplier_id'       => $po->supplier_id,
+                'purchase_order_id' => $po->id,
+                'type'              => 'order',
+                'debit'             => $po->total,
+                'credit'            => 0,
+                'entry_date'        => now()->toDateString(),
+                'description'       => 'Purchase order #' . $po->number,
+            ]);
 
             return response()->json($po, 201);
         });
@@ -122,6 +132,17 @@ class PurchaseOrderController extends Controller
                 'paid_at' => now(),
                 'paid_by' => $request->user()->id ?? null
             ]);
+            SupplierLedgerEntry::create([
+                'supplier_id'         => $po->supplier_id,
+                'purchase_order_id'   => $po->id,
+                'supplier_payment_id' => $payment->id,
+                'type'                => 'payment',
+                'debit'               => 0,
+                'credit'              => $payment->amount,
+                'entry_date'          => now()->toDateString(),
+                'description'         => 'Supplier payment #' . $payment->id,
+            ]);
+
 
             $newPaid = $po->payments()->sum('amount') + $request->amount;
 
