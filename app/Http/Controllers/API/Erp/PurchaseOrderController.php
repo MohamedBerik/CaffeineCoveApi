@@ -156,23 +156,25 @@ class PurchaseOrderController extends Controller
     }
     public function receive(Request $request, $id)
     {
-        $po = PurchaseOrder::with('items')->findOrFail($id);
+        $po = PurchaseOrder::with('items.product')->findOrFail($id);
 
-        if (! is_null($po->received_at)) {
+        if ($po->received_at !== null) {
             return response()->json([
                 'msg' => 'Purchase order already received'
             ], 422);
         }
 
-        return DB::transaction(function () use ($po, $request) {
+        DB::transaction(function () use ($po, $request) {
 
             foreach ($po->items as $item) {
 
-                $product = Product::lockForUpdate()
-                    ->findOrFail($item->product_id);
+                $product = $item->product;
 
-                $product->stock_quantity += $item->quantity;
-                $product->save();
+                if (!$product) {
+                    throw new \Exception("Product not found for item {$item->id}");
+                }
+
+                $product->increment('stock_quantity', $item->quantity);
 
                 StockMovement::create([
                     'product_id'     => $product->id,
@@ -180,21 +182,25 @@ class PurchaseOrderController extends Controller
                     'quantity'       => $item->quantity,
                     'reference_type' => PurchaseOrder::class,
                     'reference_id'   => $po->id,
-                    'created_by'     => $request->user()->id ?? null,
+                    'created_by'     => $request->user()?->id,
                 ]);
             }
 
             $po->update([
                 'received_at' => now(),
-                'status'      => 'received'
             ]);
 
-            activity('purchase.received', $po);
-
-            return response()->json([
-                'msg' => 'Stock received successfully'
-            ]);
+            // لا تغيّر status إذا كان مدفوع
+            if ($po->status === 'ordered') {
+                $po->update([
+                    'status' => 'received'
+                ]);
+            }
         });
+
+        return response()->json([
+            'msg' => 'Purchase order received successfully'
+        ]);
     }
 
     public function pay(Request $request, $id)
@@ -239,9 +245,14 @@ class PurchaseOrderController extends Controller
 
             $newPaid = $alreadyPaid + $request->amount;
 
-            if ($newPaid >= $po->total && is_null($po->received_at)) {
-                $po->update(['status' => 'paid']);
+            if ($po->received_at) {
+                $po->status = 'received';
+            } else {
+                $po->status = 'paid';
             }
+
+            $po->save();
+
 
             activity('supplier.paid', $po, [
                 'amount' => $request->amount
