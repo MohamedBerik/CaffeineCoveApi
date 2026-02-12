@@ -52,14 +52,15 @@ class PurchaseOrderController extends Controller
 
             $po->update(['total' => $total]);
             SupplierLedgerEntry::create([
-                'supplier_id'       => $po->supplier_id,
+                'supplier_id' => $po->supplier_id,
                 'purchase_order_id' => $po->id,
-                'type'              => 'order',
-                'debit'             => $po->total,
-                'credit'            => 0,
-                'entry_date'        => now()->toDateString(),
-                'description'       => 'Purchase order #' . $po->number,
+                'type' => 'purchase',
+                'debit' => $total,
+                'credit' => 0,
+                'entry_date' => now(),
+                'description' => 'Purchase order #' . $po->number,
             ]);
+
 
             return response()->json($po, 201);
         });
@@ -140,7 +141,7 @@ class PurchaseOrderController extends Controller
                 'debit'               => 0,
                 'credit'              => $payment->amount,
                 'entry_date'          => now()->toDateString(),
-                'description'         => 'Supplier payment #' . $payment->id,
+                'description' => 'Payment for PO #' . $po->number,
             ]);
 
 

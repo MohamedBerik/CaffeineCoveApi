@@ -89,8 +89,8 @@ class SupplierStatementController extends Controller
             'supplier' => [
                 'id'    => $supplier->id,
                 'name'  => $supplier->name,
-                'phone' => $supplier->phone,
                 'email' => $supplier->email,
+                'phone' => $supplier->phone,
             ],
 
             'period' => [
