@@ -218,7 +218,6 @@ class PurchaseOrderController extends Controller
             ]);
         });
     }
-
     public function pay(Request $request, $id)
     {
         $po = PurchaseOrder::with(['payments', 'supplier'])->findOrFail($id);
@@ -282,6 +281,75 @@ class PurchaseOrderController extends Controller
             return response()->json([
                 'msg' => 'Supplier payment recorded',
                 'payment_id' => $payment->id
+            ]);
+        });
+    }
+    public function returnItems(Request $request, $id)
+    {
+        $request->validate([
+            'product_id' => ['required', 'exists:products,id'],
+            'quantity'   => ['required', 'numeric', 'min:0.01'],
+        ]);
+
+        $po = PurchaseOrder::findOrFail($id);
+
+        return DB::transaction(function () use ($request, $po) {
+
+            $productId = $request->product_id;
+            $qty       = $request->quantity;
+
+            // مجموع الداخل
+            $totalIn = StockMovement::where('reference_type', PurchaseOrder::class)
+                ->where('reference_id', $po->id)
+                ->where('product_id', $productId)
+                ->where('type', 'in')
+                ->sum('quantity');
+
+            // مجموع المرتجع
+            $totalOut = StockMovement::where('reference_type', PurchaseOrder::class)
+                ->where('reference_id', $po->id)
+                ->where('product_id', $productId)
+                ->where('type', 'out')
+                ->sum('quantity');
+
+            $availableToReturn = $totalIn - $totalOut;
+
+            if ($availableToReturn <= 0) {
+                return response()->json([
+                    'msg' => 'No received quantity available to return for this product'
+                ], 422);
+            }
+
+            if ($qty > $availableToReturn) {
+                return response()->json([
+                    'msg' => 'Return quantity exceeds received quantity',
+                    'available' => $availableToReturn
+                ], 422);
+            }
+
+            $product = Product::lockForUpdate()->findOrFail($productId);
+
+            if ($product->stock_quantity < $qty) {
+                return response()->json([
+                    'msg' => 'Insufficient stock to return'
+                ], 422);
+            }
+
+            // إنقاص المخزون
+            $product->decrement('stock_quantity', $qty);
+
+            // تسجيل حركة مرتجع
+            StockMovement::create([
+                'product_id'     => $productId,
+                'type'           => 'out',
+                'quantity'       => $qty,
+                'reference_type' => PurchaseOrder::class,
+                'reference_id'   => $po->id,
+                'created_by'     => $request->user()?->id,
+            ]);
+
+            return response()->json([
+                'msg' => 'Items returned successfully'
             ]);
         });
     }
