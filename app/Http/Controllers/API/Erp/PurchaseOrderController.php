@@ -261,13 +261,18 @@ class PurchaseOrderController extends Controller
             $newPaid = $alreadyPaid + $request->amount;
 
             if ($po->received_at) {
+
                 $po->status = 'received';
             } else {
-                $po->status = 'paid';
+
+                if ($newPaid >= $po->total) {
+                    $po->status = 'paid';
+                } else {
+                    $po->status = 'partially_paid';
+                }
             }
 
             $po->save();
-
 
             activity('supplier.paid', $po, [
                 'amount' => $request->amount
