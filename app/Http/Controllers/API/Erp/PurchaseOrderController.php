@@ -208,7 +208,7 @@ class PurchaseOrderController extends Controller
 
             $po->update([
                 'received_at' => now(),
-                'status'      => 'received',
+                // 'status'      => 'received',
             ]);
 
             $po->save();
@@ -260,17 +260,12 @@ class PurchaseOrderController extends Controller
 
             $newPaid = $alreadyPaid + $request->amount;
 
-            if ($po->received_at) {
-
-                $po->status = 'received';
+            if ($newPaid < $po->total) {
+                $po->status = 'partially_paid';
             } else {
-
-                if ($newPaid >= $po->total) {
-                    $po->status = 'paid';
-                } else {
-                    $po->status = 'partially_paid';
-                }
+                $po->status = 'paid';
             }
+
 
             $po->save();
 
@@ -297,6 +292,17 @@ class PurchaseOrderController extends Controller
 
             $productId = $request->product_id;
             $qty       = $request->quantity;
+
+            $hasAnyReceive = StockMovement::where('reference_type', PurchaseOrder::class)
+                ->where('reference_id', $po->id)
+                ->where('type', 'in')
+                ->exists();
+
+            if (! $hasAnyReceive) {
+                return response()->json([
+                    'msg' => 'This purchase order has not been received yet'
+                ], 422);
+            }
 
             // مجموع الداخل
             $totalIn = StockMovement::where('reference_type', PurchaseOrder::class)

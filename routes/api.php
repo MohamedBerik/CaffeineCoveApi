@@ -138,7 +138,7 @@ Route::prefix('erp')->middleware('auth:sanctum')->group(function () {
     Route::middleware('permission:finance.view')->get('/purchase-orders', [PurchaseOrderController::class, 'indexErp']);
     Route::middleware('permission:finance.view')->get('/purchase-orders/{id}', [PurchaseOrderController::class, 'showErp']);
     Route::middleware('permission:purchases.receive')->post('/purchase-orders/{id}/receive', [PurchaseOrderController::class, 'receive']);
-    Route::middleware('permission:purchases.returnItems')->post('/purchase-orders/{id}/returnItems', [PurchaseOrderController::class, 'returnItems']);
+    Route::middleware('permission:purchases.return')->post('/purchase-orders/{id}/return', [PurchaseOrderController::class, 'returnItems']);
     Route::middleware('permission:finance.view')->post('/purchase-orders/{id}/pay', [PurchaseOrderController::class, 'pay']);
 
     //Suppliers
