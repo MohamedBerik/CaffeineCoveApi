@@ -286,30 +286,36 @@ class PurchaseOrderController extends Controller
             'quantity'   => ['required', 'numeric', 'min:0.01'],
         ]);
 
-        $po = PurchaseOrder::findOrFail($id);
+        $po = PurchaseOrder::with('items')->findOrFail($id);
 
         return DB::transaction(function () use ($request, $po) {
 
-            $productId = $request->product_id;
-            $qty       = $request->quantity;
+            $productId = (int) $request->product_id;
+            $qty       = (float) $request->quantity;
 
-            $hasAnyReceive = StockMovement::where('reference_type', PurchaseOrder::class)
-                ->where('reference_id', $po->id)
-                ->where('type', 'in')
-                ->exists();
+            // تأكد أن المنتج تابع لهذا الأمر
+            $item = $po->items()
+                ->where('product_id', $productId)
+                ->first();
 
-            if (! $hasAnyReceive) {
+            if (! $item) {
                 return response()->json([
-                    'msg' => 'This purchase order has not been received yet'
+                    'msg' => 'This product does not belong to this purchase order'
                 ], 422);
             }
 
-            // مجموع الداخل
+            // مجموع الداخل لهذا المنتج
             $totalIn = StockMovement::where('reference_type', PurchaseOrder::class)
                 ->where('reference_id', $po->id)
                 ->where('product_id', $productId)
                 ->where('type', 'in')
                 ->sum('quantity');
+
+            if ($totalIn <= 0) {
+                return response()->json([
+                    'msg' => 'This product has not been received yet'
+                ], 422);
+            }
 
             // مجموع المرتجع
             $totalOut = StockMovement::where('reference_type', PurchaseOrder::class)
@@ -341,10 +347,10 @@ class PurchaseOrderController extends Controller
                 ], 422);
             }
 
-            // إنقاص المخزون
+            // خصم المخزون
             $product->decrement('stock_quantity', $qty);
 
-            // تسجيل حركة مرتجع
+            // حركة مخزون
             StockMovement::create([
                 'product_id'     => $productId,
                 'type'           => 'out',
@@ -354,8 +360,26 @@ class PurchaseOrderController extends Controller
                 'created_by'     => $request->user()?->id,
             ]);
 
+            /*
+         | قيد المورد (مرتجع مشتريات)
+         | نفترض أن سعر الصنف محفوظ في item->price
+         */
+
+            $amount = $item->unit_cost * $qty;
+
+            SupplierLedgerEntry::create([
+                'supplier_id'       => $po->supplier_id,
+                'purchase_order_id' => $po->id,
+                'type'              => 'purchase_return',
+                'debit'             => $amount,
+                'credit'            => 0,
+                'entry_date'        => now()->toDateString(),
+                'description'       => 'Purchase return for PO #' . $po->number,
+            ]);
+
             return response()->json([
-                'msg' => 'Items returned successfully'
+                'msg' => 'Items returned successfully',
+                'returned_quantity' => $qty
             ]);
         });
     }
