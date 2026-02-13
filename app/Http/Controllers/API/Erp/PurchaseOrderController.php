@@ -156,15 +156,33 @@ class PurchaseOrderController extends Controller
     }
     public function receive(Request $request, $id)
     {
-        $po = PurchaseOrder::with('items.product')->findOrFail($id);
+        return DB::transaction(function () use ($request, $id) {
 
-        if ($po->received_at !== null) {
-            return response()->json([
-                'msg' => 'Purchase order already received'
-            ], 422);
-        }
+            $po = PurchaseOrder::with('items.product')
+                ->lockForUpdate()
+                ->findOrFail($id);
 
-        DB::transaction(function () use ($po, $request) {
+            if ($po->received_at !== null) {
+                return response()->json([
+                    'msg' => 'Purchase order already received'
+                ], 422);
+            }
+
+            $alreadyMoved = StockMovement::where('reference_type', PurchaseOrder::class)
+                ->where('reference_id', $po->id)
+                ->exists();
+
+            if ($alreadyMoved) {
+                return response()->json([
+                    'msg' => 'Stock already received for this purchase order'
+                ], 422);
+            }
+
+            if ($po->items->isEmpty()) {
+                return response()->json([
+                    'msg' => 'Purchase order has no items'
+                ], 422);
+            }
 
             foreach ($po->items as $item) {
 
@@ -186,21 +204,18 @@ class PurchaseOrderController extends Controller
                 ]);
             }
 
-            $po->update([
-                'received_at' => now(),
-            ]);
+            $po->received_at = now();
 
-            // لا تغيّر status إذا كان مدفوع
             if ($po->status === 'ordered') {
-                $po->update([
-                    'status' => 'received'
-                ]);
+                $po->status = 'received';
             }
-        });
 
-        return response()->json([
-            'msg' => 'Purchase order received successfully'
-        ]);
+            $po->save();
+
+            return response()->json([
+                'msg' => 'Purchase order received successfully'
+            ]);
+        });
     }
 
     public function pay(Request $request, $id)
