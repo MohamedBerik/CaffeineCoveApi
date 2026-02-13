@@ -204,11 +204,12 @@ class PurchaseOrderController extends Controller
                 ]);
             }
 
+            $po->received_at = now();
+
             $po->update([
                 'received_at' => now(),
                 'status'      => 'received',
             ]);
-
 
             $po->save();
 
