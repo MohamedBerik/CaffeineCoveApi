@@ -418,4 +418,30 @@ class PurchaseOrderController extends Controller
             'items' => $items->values()
         ]);
     }
+    public function returnHistory($id)
+    {
+        $po = PurchaseOrder::findOrFail($id);
+
+        $rows = StockMovement::with('product')
+            ->where('reference_type', PurchaseOrder::class)
+            ->where('reference_id', $po->id)
+            ->where('type', 'out')
+            ->orderByDesc('created_at')
+            ->get()
+            ->map(function ($m) {
+                return [
+                    'id'         => $m->id,
+                    'product_id' => $m->product_id,
+                    'product'    => $m->product?->title_en,
+                    'quantity'   => $m->quantity,
+                    'created_at' => $m->created_at,
+                    'created_by' => $m->created_by,
+                ];
+            });
+
+        return response()->json([
+            'purchase_order_id' => $po->id,
+            'returns' => $rows
+        ]);
+    }
 }
