@@ -373,7 +373,9 @@ class PurchaseOrderController extends Controller
                 'entry_date'        => now()->toDateString(),
                 'description'       => 'Purchase return for PO #' . $po->number,
             ]);
-
+            $po->update([
+                'status' => 'has_return',
+            ]);
             return response()->json([
                 'msg' => 'Items returned successfully',
                 'returned_quantity' => $qty
