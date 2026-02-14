@@ -15,4 +15,8 @@ class StockMovement extends Model
         'reference_id',
         'created_by'
     ];
+    public function product()
+    {
+        return $this->belongsTo(Product::class);
+    }
 }
