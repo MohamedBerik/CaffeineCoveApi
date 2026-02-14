@@ -383,4 +383,40 @@ class PurchaseOrderController extends Controller
             ]);
         });
     }
+    public function getReturnableItems($id)
+    {
+        $po = PurchaseOrder::with(['items.product'])->findOrFail($id);
+
+        $items = $po->items->map(function ($item) use ($po) {
+
+            $totalIn = StockMovement::where('reference_type', PurchaseOrder::class)
+                ->where('reference_id', $po->id)
+                ->where('product_id', $item->product_id)
+                ->where('type', 'in')
+                ->sum('quantity');
+
+            $totalOut = StockMovement::where('reference_type', PurchaseOrder::class)
+                ->where('reference_id', $po->id)
+                ->where('product_id', $item->product_id)
+                ->where('type', 'out')
+                ->sum('quantity');
+
+            $available = $totalIn - $totalOut;
+
+            return [
+                'product_id'          => $item->product_id,
+                'product_name'        => $item->product?->name,
+                'ordered_quantity'    => $item->quantity,
+                'received_quantity'   => $totalIn,
+                'returned_quantity'   => $totalOut,
+                'available_to_return' => max(0, $available),
+                'unit_price'          => $item->unit_cost ?? null,
+            ];
+        });
+
+        return response()->json([
+            'purchase_order_id' => $po->id,
+            'items' => $items
+        ]);
+    }
 }
