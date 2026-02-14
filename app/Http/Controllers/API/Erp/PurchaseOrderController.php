@@ -286,17 +286,18 @@ class PurchaseOrderController extends Controller
             'quantity'   => ['required', 'numeric', 'min:0.01'],
         ]);
 
-        $po = PurchaseOrder::with('items')->findOrFail($id);
+        return DB::transaction(function () use ($request, $id) {
 
-        return DB::transaction(function () use ($request, $po) {
+            $po = PurchaseOrder::with('items')
+                ->lockForUpdate()
+                ->findOrFail($id);
 
             $productId = (int) $request->product_id;
             $qty       = (float) $request->quantity;
 
-            // تأكد أن المنتج تابع لهذا الأمر
-            $item = $po->items()
-                ->where('product_id', $productId)
-                ->first();
+            // تأكد أن المنتج تابع للأمر
+            $item = $po->items
+                ->firstWhere('product_id', $productId);
 
             if (! $item) {
                 return response()->json([
@@ -304,7 +305,7 @@ class PurchaseOrderController extends Controller
                 ], 422);
             }
 
-            // مجموع الداخل لهذا المنتج
+            // مجموع الداخل
             $totalIn = StockMovement::where('reference_type', PurchaseOrder::class)
                 ->where('reference_id', $po->id)
                 ->where('product_id', $productId)
@@ -350,7 +351,7 @@ class PurchaseOrderController extends Controller
             // خصم المخزون
             $product->decrement('stock_quantity', $qty);
 
-            // حركة مخزون
+            // حركة المخزون
             StockMovement::create([
                 'product_id'     => $productId,
                 'type'           => 'out',
@@ -360,19 +361,15 @@ class PurchaseOrderController extends Controller
                 'created_by'     => $request->user()?->id,
             ]);
 
-            /*
-         | قيد المورد (مرتجع مشتريات)
-         | نفترض أن سعر الصنف محفوظ في item->price
-         */
-
-            $amount = $item->unit_cost * $qty;
+            // قيد المورد
+            $unitCost = $item->unit_cost;
 
             SupplierLedgerEntry::create([
                 'supplier_id'       => $po->supplier_id,
                 'purchase_order_id' => $po->id,
                 'type'              => 'purchase_return',
-                'debit'             => $amount,
-                'credit'            => 0,
+                'debit'             => 0,
+                'credit'            => $qty * $unitCost,
                 'entry_date'        => now()->toDateString(),
                 'description'       => 'Purchase return for PO #' . $po->number,
             ]);
@@ -410,13 +407,13 @@ class PurchaseOrderController extends Controller
                 'received_quantity'   => $totalIn,
                 'returned_quantity'   => $totalOut,
                 'available_to_return' => max(0, $available),
-                'unit_price'          => $item->unit_cost ?? null,
+                'unit_price'          => $item->unit_cost,
             ];
         });
 
         return response()->json([
             'purchase_order_id' => $po->id,
-            'items' => $items
+            'items' => $items->values()
         ]);
     }
 }
