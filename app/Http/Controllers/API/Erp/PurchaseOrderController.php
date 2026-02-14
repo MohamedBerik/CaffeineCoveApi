@@ -405,7 +405,7 @@ class PurchaseOrderController extends Controller
 
             return [
                 'product_id'          => $item->product_id,
-                'product_name'        => $item->product?->name,
+                'product_name'        => $item->product?->title_en,
                 'ordered_quantity'    => $item->quantity,
                 'received_quantity'   => $totalIn,
                 'returned_quantity'   => $totalOut,
