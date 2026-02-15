@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Model;
 class Invoice extends Model
 {
     protected $fillable = [
+        'company_id',
         'number',
         'order_id',
         'customer_id',
@@ -75,5 +76,9 @@ class Invoice extends Model
     public function customerLedgerEntries()
     {
         return $this->hasMany(CustomerLedgerEntry::class);
+    }
+    public function company()
+    {
+        return $this->belongsTo(Company::class);
     }
 }

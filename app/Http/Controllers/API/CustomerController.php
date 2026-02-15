@@ -14,20 +14,28 @@ use Illuminate\Support\Facades\Hash;
 
 class CustomerController extends Controller
 {
-    function index()
+    public function index(Request $request)
     {
-        $customer = CustomerResource::collection(Customer::all());
-        $data = [
+        $companyId = $request->user()->company_id;
+
+        $customer = CustomerResource::collection(
+            Customer::where('company_id', $companyId)->get()
+        );
+
+        return response()->json([
             "msg" => "Return All Data From Customer Table",
             "status" => 200,
             "data" => $customer
-        ];
-        return response()->json($data);
+        ]);
     }
 
-    function show($id)
+
+    public function show(Request $request, $id)
     {
-        $customer = Customer::find($id);
+        $companyId = $request->user()->company_id;
+
+        $customer = Customer::where('company_id', $companyId)
+            ->find($id);
 
         if ($customer) {
             $data = [
@@ -46,10 +54,13 @@ class CustomerController extends Controller
         }
     }
 
-    function delete(Request $request)
+    public function delete(Request $request)
     {
-        $id = $request->id;
-        $customer = Customer::find($id);
+        $companyId = $request->user()->company_id;
+
+        $customer = Customer::where('company_id', $companyId)
+            ->find($request->id);
+
         if ($customer) {
 
             $customer->delete();
@@ -93,6 +104,7 @@ class CustomerController extends Controller
             "name" => $request->name,
             "email" => $request->email,
             "password" => Hash::make($request->password),
+            "company_id" => $request->user()->company_id
         ]);
         $data = [
             "msg" => "Created Successfully",
@@ -105,7 +117,10 @@ class CustomerController extends Controller
     public function update(Request $request)
     {
         $old_id = $request->old_id;
-        $customer = Customer::find($old_id);
+        $companyId = $request->user()->company_id;
+
+        $customer = Customer::where('company_id', $companyId)
+            ->find($old_id);
 
         $validate = Validator::make($request->all(), [
             "id" => ['required', Rule::unique('customers')->ignore($old_id)],

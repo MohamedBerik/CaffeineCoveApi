@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 class JournalEntry extends Model
 {
     protected $fillable = [
+        'company_id',
         'entry_date',
         'source_type',
         'source_id',
@@ -22,5 +23,9 @@ class JournalEntry extends Model
     public function source()
     {
         return $this->morphTo();
+    }
+    public function company()
+    {
+        return $this->belongsTo(Company::class);
     }
 }

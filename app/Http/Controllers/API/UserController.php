@@ -14,20 +14,27 @@ use Illuminate\Support\Facades\Hash;
 
 class UserController extends Controller
 {
-    function index()
+    public function index(Request $request)
     {
-        $user = UserResource::collection(User::all());
-        $data = [
-            "msg" => "Return All Data From User Table",
+        $companyId = $request->user()->company_id;
+
+        $users = UserResource::collection(
+            User::where('company_id', $companyId)->get()
+        );
+
+        return response()->json([
+            "msg" => "Users list",
             "status" => 200,
-            "data" => $user
-        ];
-        return response()->json($data);
+            "data" => $users
+        ]);
     }
 
-    function show($id)
+
+    public function show(Request $request, $id)
     {
-        $user = User::find($id);
+        $companyId = $request->user()->company_id;
+
+        $user = User::where('company_id', $companyId)->find($id);
 
         if ($user) {
             $data = [
@@ -46,10 +53,13 @@ class UserController extends Controller
         }
     }
 
-    function delete(Request $request)
+    public function delete(Request $request)
     {
-        $id = $request->id;
-        $user = User::find($id);
+        $companyId = $request->user()->company_id;
+
+        $user = User::where('company_id', $companyId)
+            ->find($request->id);
+
         if ($user) {
 
             $user->delete();
@@ -93,6 +103,7 @@ class UserController extends Controller
             "name" => $request->name,
             "email" => $request->email,
             "password" => Hash::make($request->password),
+            "company_id" => $request->user()->company_id
         ]);
         $data = [
             "msg" => "Created Successfully",
@@ -105,7 +116,9 @@ class UserController extends Controller
     public function update(Request $request)
     {
         $old_id = $request->old_id;
-        $user = User::find($old_id);
+        $companyId = $request->user()->company_id;
+
+        $user = User::where('company_id', $companyId)->find($old_id);
 
         $validate = Validator::make($request->all(), [
             "id" => ['required', Rule::unique('users')->ignore($old_id)],

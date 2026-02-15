@@ -12,11 +12,17 @@ use App\Models\CustomerLedgerEntry;
 
 class PaymentRefundController extends Controller
 {
-    public function refund(Request $request, Payment $payment)
+    public function refund(Request $request, $paymentId)
     {
         $request->validate([
             'amount' => ['required', 'numeric', 'min:0.01']
         ]);
+
+        $companyId = $request->user()->company_id;
+
+        $payment = Payment::where('company_id', $companyId)
+            ->with('invoice')
+            ->findOrFail($paymentId);
 
         $alreadyRefunded = $payment->refunds()->sum('amount');
 
@@ -31,13 +37,18 @@ class PaymentRefundController extends Controller
 
         return DB::transaction(function () use ($request, $payment) {
 
+            $companyId = $request->user()->company_id;
+
             $refund = $payment->refunds()->create([
+                'company_id' => $companyId,
                 'amount'     => $request->amount,
                 'refunded_at' => now(),
                 'created_by' => $request->user()->id ?? null
             ]);
 
+
             CustomerLedgerEntry::create([
+                'company_id' => $companyId,
                 'customer_id' => $payment->invoice->customer_id,
                 'invoice_id'  => $payment->invoice_id,
                 'payment_id'  => $payment->id,
@@ -50,8 +61,14 @@ class PaymentRefundController extends Controller
             ]);
 
 
-            $arAccount = Account::where('code', '1100')->firstOrFail();
-            $cashAccount = Account::where('code', '1000')->firstOrFail();
+            $arAccount = Account::where('company_id', $companyId)
+                ->where('code', '1100')
+                ->firstOrFail();
+
+            $cashAccount = Account::where('company_id', $companyId)
+                ->where('code', '1000')
+                ->firstOrFail();
+
 
             AccountingService::createEntry(
                 $payment->invoice,

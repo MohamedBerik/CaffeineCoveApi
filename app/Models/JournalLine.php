@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 class JournalLine extends Model
 {
     protected $fillable = [
+        'company_id',
         'journal_entry_id',
         'account_id',
         'debit',
@@ -21,5 +22,9 @@ class JournalLine extends Model
     public function account()
     {
         return $this->belongsTo(Account::class);
+    }
+    public function company()
+    {
+        return $this->belongsTo(Company::class);
     }
 }
