@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Model;
 class SupplierLedgerEntry extends Model
 {
     protected $fillable = [
+        'company_id',
         'supplier_id',
         'purchase_order_id',
         'supplier_payment_id',
@@ -20,4 +21,8 @@ class SupplierLedgerEntry extends Model
     protected $casts = [
         'entry_date' => 'date',
     ];
+    public function company()
+    {
+        return $this->belongsTo(Company::class);
+    }
 }

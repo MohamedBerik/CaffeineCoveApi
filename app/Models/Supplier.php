@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 
 class Supplier extends Model
 {
-    protected $fillable = ['name', 'email', 'phone'];
+    protected $fillable = ['company_id', 'name', 'email', 'phone'];
 
     public function purchaseOrders()
     {
@@ -17,5 +17,10 @@ class Supplier extends Model
     public function payments()
     {
         return $this->hasMany(SupplierPayment::class);
+    }
+
+    public function company()
+    {
+        return $this->belongsTo(Company::class);
     }
 }

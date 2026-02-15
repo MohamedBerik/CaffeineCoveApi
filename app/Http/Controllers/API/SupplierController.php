@@ -14,20 +14,26 @@ use Illuminate\Support\Facades\Hash;
 
 class SupplierController extends Controller
 {
-    function index()
+    function index(Request $request)
     {
-        $supplier = SupplierResource::collection(Supplier::all());
-        $data = [
+        $companyId = $request->user()->company_id;
+
+        $supplier = SupplierResource::collection(
+            Supplier::where('company_id', $companyId)->get()
+        );
+
+        return response()->json([
             "msg" => "Return All Data From supplier Table",
             "status" => 200,
             "data" => $supplier
-        ];
-        return response()->json($data);
+        ]);
     }
 
-    function show($id)
+
+    function show(Request $request, $id)
     {
-        $supplier = Supplier::find($id);
+        $supplier = Supplier::where('company_id', $request->user()->company_id)
+            ->find($id);
 
         if ($supplier) {
             $data = [
@@ -49,7 +55,8 @@ class SupplierController extends Controller
     function delete(Request $request)
     {
         $id = $request->id;
-        $supplier = Supplier::find($id);
+        $supplier = Supplier::where('company_id', $request->user()->company_id)
+            ->find($id);
         if ($supplier) {
 
             $supplier->delete();
@@ -73,7 +80,6 @@ class SupplierController extends Controller
     {
 
         $validate = Validator::make($request->all(), [
-            'id' => 'required|unique:suppliers|max:20',
             'name' => 'required|min:3|max:255',
             'email' => 'required|min:3|max:255',
             'phone' => 'required|min:3|max:255',
@@ -89,11 +95,12 @@ class SupplierController extends Controller
         }
 
         $supplier = Supplier::create([
-            "id" => $request->id,
-            "name" => $request->name,
+            "company_id" => $request->user()->company_id,
+            "name"  => $request->name,
             "email" => $request->email,
             "phone" => $request->phone,
         ]);
+
         $data = [
             "msg" => "Created Successfully",
             "status" => 200,
@@ -105,10 +112,10 @@ class SupplierController extends Controller
     public function update(Request $request)
     {
         $old_id = $request->old_id;
-        $supplier = Supplier::find($old_id);
+        $supplier = Supplier::where('company_id', $request->user()->company_id)
+            ->find($old_id);
 
         $validate = Validator::make($request->all(), [
-            "id" => ['required', Rule::unique('suppliers')->ignore($old_id)],
             "name" => "required|min:3|max:255",
             "email" => "required|min:3|max:255",
             "phone" => "required|min:3|max:255",
@@ -127,7 +134,6 @@ class SupplierController extends Controller
         if ($supplier) {
 
             $supplier->update([
-                "id" => $request->id,
                 "name" => $request->name,
                 "email" => $request->email,
                 "phone" => $request->phone,

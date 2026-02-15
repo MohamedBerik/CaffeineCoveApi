@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Model;
 class PurchaseOrderItem extends Model
 {
     protected $fillable = [
+        'company_id',
         'purchase_order_id',
         'product_id',
         'quantity',
@@ -17,5 +18,9 @@ class PurchaseOrderItem extends Model
     public function product()
     {
         return $this->belongsTo(Product::class);
+    }
+    public function company()
+    {
+        return $this->belongsTo(Company::class);
     }
 }

@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Model;
 class PurchaseOrder extends Model
 {
     protected $fillable = [
+        'company_id',
         'supplier_id',
         'number',
         'total',
@@ -27,5 +28,10 @@ class PurchaseOrder extends Model
     public function payments()
     {
         return $this->hasMany(SupplierPayment::class);
+    }
+
+    public function company()
+    {
+        return $this->belongsTo(Company::class);
     }
 }

@@ -11,6 +11,7 @@ class Product extends Model
 
     protected $fillable = [
         "id",
+        'company_id',
         "product_image",
         "title_en",
         "title_ar",
@@ -24,5 +25,9 @@ class Product extends Model
     public function orderItems()
     {
         return $this->hasMany(OrderItem::class);
+    }
+    public function company()
+    {
+        return $this->belongsTo(Company::class);
     }
 }

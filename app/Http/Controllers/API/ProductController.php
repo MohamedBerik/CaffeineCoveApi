@@ -12,19 +12,25 @@ use Illuminate\Validation\Rule;
 
 class ProductController extends Controller
 {
-    function index()
+    public function index(Request $request)
     {
-        $product = ProductResource::collection(Product::all());
-        $data = [
+        $companyId = $request->user()->company_id;
+
+        $product = ProductResource::collection(
+            Product::where('company_id', $companyId)->get()
+        );
+
+        return response()->json([
             "msg" => "Return All Data From Product Table",
             "status" => 200,
             "data" => $product
-        ];
-        return response()->json($data);
+        ]);
     }
-    function show($id)
+
+    function show(Request $request, $id)
     {
-        $product = Product::find($id);
+        $product = Product::where('company_id', $request->user()->company_id)
+            ->find($id);
 
         if ($product) {
             $data = [
@@ -45,7 +51,8 @@ class ProductController extends Controller
     function delete(Request $request)
     {
         $id = $request->id;
-        $product = Product::find($id);
+        $product = Product::where('company_id', $request->user()->company_id)
+            ->find($id);
         if ($product) {
             if (File::exists(public_path("/img/product/" . $product->product_image))) {
                 File::delete(public_path("/img/product/" . $product->product_image));
@@ -71,14 +78,12 @@ class ProductController extends Controller
 
         $validate = Validator::make($request->all(), [
             'product_image' => 'required|image|max:2048|mimes:png,jpeg',
-            'id' => 'required|unique:products|max:20',
             'title_en' => 'required|min:3|max:255',
             'title_ar' => 'required|min:3|max:255',
             'description_en' => 'required|min:3|max:255',
             'description_ar' => 'required|min:3|max:255',
-            'unit_price' => 'required',
-            'quantity' => 'required',
-            'category_id' => 'required',
+            'unit_price' => 'required|numeric',
+            'category_id' => 'required|exists:categories,id',
         ]);
 
         if ($validate->fails()) {
@@ -97,16 +102,17 @@ class ProductController extends Controller
         }
 
         $product = Product::create([
-            "cate_image" => $imageName,
-            "id" => $request->id,
-            "title_en" => $request->title_en,
-            "title_ar" => $request->title_ar,
+            "company_id"     => $request->user()->company_id,
+            "product_image"  => $imageName,
+            "title_en"       => $request->title_en,
+            "title_ar"       => $request->title_ar,
             "description_en" => $request->description_en,
             "description_ar" => $request->description_ar,
-            "unit_price" => $request->unit_price,
-            "quantity" => $request->quantity,
-            "category_id" => $request->category_id,
+            "unit_price"     => $request->unit_price,
+            "stock_quantity" => 0,
+            "category_id"    => $request->category_id,
         ]);
+
         $data = [
             "msg" => "Created Successfully",
             "status" => 200,
@@ -117,17 +123,17 @@ class ProductController extends Controller
     public function update(Request $request)
     {
         $old_id = $request->old_id;
-        $product = Product::find($old_id);
+        $product = Product::where('company_id', $request->user()->company_id)
+            ->find($old_id);
 
         $validate = Validator::make($request->all(), [
             "product_image" => "image|max:2048|mimes:png,jpeg",
-            "id" => ['required', Rule::unique('products')->ignore($old_id)],
             "title_en" => "required|min:3|max:255",
             "title_ar" => "required|min:3|max:255",
             "description_en" => "required|min:3|max:255",
             "description_ar" => "required|min:3|max:255",
             "unit_price" => "required",
-            "quantity" => "required",
+            // "stock_quantity" => "required",
             "category_id" => "required",
         ]);
 
@@ -143,13 +149,12 @@ class ProductController extends Controller
         if ($product) {
 
             $product->update([
-                "id" => $request->id,
                 "title_en" => $request->title_en,
                 "title_ar" => $request->title_ar,
                 "description_en" => $request->description_en,
                 "description_ar" => $request->description_ar,
                 "unit_price" => $request->unit_price,
-                "quantity" => $request->quantity,
+                // "stock_quantity" => $request->stock_quantity,
                 "category_id" => $request->category_id,
             ]);
             $data = [

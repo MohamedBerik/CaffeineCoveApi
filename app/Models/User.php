@@ -11,13 +11,17 @@ class User extends Authenticatable
     use HasApiTokens, Notifiable;
 
     protected $fillable = [
+        'company_id',
         'name',
         'email',
         'password',
         'role',
         'status',
     ];
-
+    public function company()
+    {
+        return $this->belongsTo(Company::class);
+    }
     protected $hidden = [
         'password',
         'remember_token',

@@ -11,7 +11,10 @@ class SupplierStatementController extends Controller
 {
     public function show(Request $request, $supplierId)
     {
-        $supplier = Supplier::findOrFail($supplierId);
+        $companyId = $request->user()->company_id;
+
+        $supplier = Supplier::where('company_id', $companyId)
+            ->findOrFail($supplierId);
 
         $from = $request->query('from');
         $to   = $request->query('to');
@@ -23,7 +26,8 @@ class SupplierStatementController extends Controller
          |------------------------------------------------
          */
 
-        $openingQuery = SupplierLedgerEntry::where('supplier_id', $supplierId);
+        $openingQuery = SupplierLedgerEntry::where('company_id', $companyId)
+            ->where('supplier_id', $supplierId);
 
         if ($from) {
             $openingQuery->where('entry_date', '<', $from);
@@ -40,7 +44,8 @@ class SupplierStatementController extends Controller
          |------------------------------------------------
          */
 
-        $entriesQuery = SupplierLedgerEntry::where('supplier_id', $supplierId);
+        $entriesQuery = SupplierLedgerEntry::where('company_id', $companyId)
+            ->where('supplier_id', $supplierId);
 
         if ($from) {
             $entriesQuery->where('entry_date', '>=', $from);
