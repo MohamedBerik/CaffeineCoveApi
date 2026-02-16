@@ -4,24 +4,33 @@ namespace App\Http\Controllers\API\Erp;
 
 use App\Http\Controllers\Controller;
 use App\Models\Invoice;
-use App\Models\CustomerLedgerEntry;
+use Illuminate\Http\Request;
 
 class InvoiceController extends Controller
 {
-    public function indexErp()
+    public function indexErp(Request $request)
     {
+        $companyId = $request->user()->company_id;
+
         $invoices = Invoice::with([
-            'customer',
-            'payments.refunds'
+            'customer' => function ($q) use ($companyId) {
+                $q->where('company_id', $companyId);
+            },
+            'payments' => function ($q) use ($companyId) {
+                $q->where('company_id', $companyId);
+            },
+            'payments.refunds' => function ($q) use ($companyId) {
+                $q->where('company_id', $companyId);
+            },
         ])
+
+            ->where('company_id', $companyId)
             ->orderBy('issued_at', 'desc')
             ->get()
             ->map(function ($invoice) {
 
-                // مجموع المدفوع
                 $totalPaid = $invoice->payments->sum('amount');
 
-                // مجموع المرتجع (من payment_refunds فقط)
                 $totalRefunded = $invoice->payments->sum(function ($p) {
                     return $p->refunds->sum('amount');
                 });
@@ -41,12 +50,10 @@ class InvoiceController extends Controller
 
                     'customer' => $invoice->customer,
 
-                    // للواجهة
                     'total_paid' => $totalPaid - $totalRefunded,
                     'total_refunded' => $totalRefunded,
                     'remaining' => $remaining,
 
-                    // مهم جدًا للـ UI (refund per payment)
                     'payments' => $invoice->payments->map(function ($p) {
 
                         $refunded = $p->refunds->sum('amount');
@@ -56,8 +63,6 @@ class InvoiceController extends Controller
                             'amount' => $p->amount,
                             'method' => $p->method,
                             'paid_at' => $p->paid_at,
-
-                            // 👇 هذا الذي تستخدمه في الواجهة
                             'refunded_amount' => $refunded,
                         ];
                     }),
@@ -66,22 +71,42 @@ class InvoiceController extends Controller
 
         return response()->json($invoices);
     }
-    public function show($id)
+
+    public function show(Request $request, $id)
     {
+        $companyId = $request->user()->company_id;
+
         $invoice = Invoice::with([
-            'items.product',
-            'payments.refunds'
-        ])->findOrFail($id);
+            'items' => fn($q) => $q->where('company_id', $companyId),
+            'items.product' => fn($q) => $q->where('company_id', $companyId),
+
+            'payments' => fn($q) => $q->where('company_id', $companyId),
+            'payments.refunds' => fn($q) => $q->where('company_id', $companyId),
+        ])
+            ->where('company_id', $companyId)
+            ->findOrFail($id);
 
         return response()->json($invoice);
     }
-    public function showFullInvoice($id)
+
+    public function showFullInvoice(Request $request, $id)
     {
+        $companyId = $request->user()->company_id;
+
         $invoice = Invoice::with([
-            'items.product',        // كل items مربوط بالـ product
-            'payments.refunds',
-            'journalEntries.lines.account'  // كل القيود المحاسبية والخطوط
-        ])->findOrFail($id);
+            'items' => fn($q) => $q->where('company_id', $companyId),
+            'items.product' => fn($q) => $q->where('company_id', $companyId),
+
+            'payments' => fn($q) => $q->where('company_id', $companyId),
+            'payments.refunds' => fn($q) => $q->where('company_id', $companyId),
+
+            'journalEntries' => fn($q) => $q->where('company_id', $companyId),
+            'journalEntries.lines',
+            'journalEntries.lines.account' => fn($q) => $q->where('company_id', $companyId),
+        ])
+
+            ->where('company_id', $companyId)
+            ->findOrFail($id);
 
         return response()->json([
             'invoice' => $invoice

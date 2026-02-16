@@ -20,159 +20,55 @@ use Illuminate\Validation\Rule;
 
 class OrderController extends Controller
 {
-    public function indexErp()
+    public function indexErp(Request $request)
     {
+        $companyId = $request->user()->company_id;
+
         $orders = Order::with(['customer', 'items.product', 'invoice'])
+            ->where('company_id', $companyId)
             ->latest()
             ->get();
 
         return response()->json($orders);
     }
-    public function showErp($id)
+
+    public function showErp(Request $request, $id)
     {
+        $companyId = $request->user()->company_id;
+
         $order = Order::with([
             'customer',
             'items.product',
             'invoice.payments',
             'invoice.refunds'
-        ])->findOrFail($id);
+        ])
+            ->where('company_id', $companyId)
+            ->findOrFail($id);
 
         return response()->json($order);
     }
-
-    function index()
-    {
-        $order = OrderResource::collection(Order::all());
-        $data = [
-            "msg" => "Return All Data From Order Table",
-            "status" => 200,
-            "data" => $order
-        ];
-        return response()->json($data);
-    }
-    function show($id)
-    {
-        $order = Order::find($id);
-
-        if ($order) {
-            $data = [
-                "msg" => "Return One Record of Order Table",
-                "status" => 200,
-                "data" => new OrderResource($order)
-            ];
-            return response()->json($data);
-        } else {
-            $data = [
-                "msg" => "No Such id",
-                "status" => 205,
-                "data" => null
-            ];
-            return response()->json($data);
-        }
-    }
-    function delete(Request $request)
-    {
-        $id = $request->id;
-        $order = Order::find($id);
-        if ($order) {
-            $order->delete();
-            $data = [
-                "msg" => "Deleted Successfully",
-                "status" => 200,
-                "data" => null
-            ];
-            return response()->json($data);
-        } else {
-            $data = [
-                "msg" => "No Such id",
-                "status" => 205,
-                "data" => null
-            ];
-            return response()->json($data);
-        }
-    }
-    public function store(Request $request)
-    {
-        $validate = Validator::make($request->all(), [
-            'customer_id' => ['required', 'exists:customers,id'],
-            'status'      => ['nullable', 'in:pending,confirmed,cancelled'],
-        ]);
-
-        if ($validate->fails()) {
-            return response()->json([
-                "msg" => "Validation required",
-                "status" => 422,
-                "data" => $validate->errors()
-            ], 422);
-        }
-
-        $order = Order::create([
-            'customer_id' => $request->customer_id,
-            'status'      => $request->status ?? 'pending',
-            'total'       => 0,
-            'created_by'  => $request->user()->id ?? null,
-        ]);
-
-        return response()->json([
-            "msg" => "Order created (simple)",
-            "status" => 200,
-            "data" => new OrderResource($order)
-        ]);
-    }
-    public function update(Request $request)
-    {
-        $old_id = $request->old_id;
-        $order = Order::find($old_id);
-
-        $validate = Validator::make($request->all(), [
-            'customer_id' => ['required', 'exists:customers,id'],
-            'status'      => ['required', 'in:pending,confirmed,cancelled'],
-        ]);
-
-
-        if ($validate->fails()) {
-            $data = [
-                "msg" => "Validation required",
-                "status" => 201,
-                "data" => $validate->errors()
-            ];
-            return response()->json($data);
-        }
-
-        if ($order) {
-
-            $order->update([
-                'customer_id' => $request->customer_id,
-                'status'      => $request->status,
-            ]);
-
-            $data = [
-                "msg" => "Updated Successfully",
-                "status" => 200,
-                "data" => new OrderResource($order)
-            ];
-            return response()->json($data);
-        } else {
-            $data = [
-                "msg" => "No such id",
-                "status" => 205,
-                "data" => null
-            ];
-            return response()->json($data);
-        }
-    }
     public function storeErp(Request $request)
     {
+        $companyId = $request->user()->company_id;
+
         $data = $request->validate([
-            'customer_id' => ['required', 'exists:customers,id'],
+            'customer_id' => [
+                'required',
+                Rule::exists('customers', 'id')->where('company_id', $companyId)
+            ],
             'items' => ['required', 'array', 'min:1'],
-            'items.*.product_id' => ['required', 'exists:products,id'],
+            'items.*.product_id' => [
+                'required',
+                Rule::exists('products', 'id')->where('company_id', $companyId)
+            ],
             'items.*.quantity' => ['required', 'integer', 'min:1'],
         ]);
+
 
         return DB::transaction(function () use ($data, $request) {
 
             $order = Order::create([
+                'company_id' => $companyId,
                 'customer_id' => $data['customer_id'],
                 'status'      => 'pending',
                 'total'       => 0,
@@ -188,7 +84,9 @@ class OrderController extends Controller
 
             foreach ($data['items'] as $item) {
 
-                $product = Product::lockForUpdate()->findOrFail($item['product_id']);
+                $product = Product::where('company_id', $companyId)
+                    ->lockForUpdate()
+                    ->findOrFail($item['product_id']);
 
                 // منع البيع لو المخزون لا يكفي
                 if ($product->quantity < $item['quantity']) {
@@ -199,6 +97,7 @@ class OrderController extends Controller
 
                 // إنشاء OrderItem
                 OrderItem::create([
+                    'company_id' => $companyId,
                     'order_id'    => $order->id,
                     'product_id'  => $product->id,
                     'quantity'    => $item['quantity'],
@@ -211,6 +110,7 @@ class OrderController extends Controller
 
                 // تسجيل حركة المخزون
                 StockMovement::create([
+                    'company_id' => $companyId,
                     'product_id'     => $product->id,
                     'type'           => 'out',
                     'quantity'       => $item['quantity'],
@@ -231,9 +131,14 @@ class OrderController extends Controller
             ], 201);
         });
     }
-    public function confirm($id)
+    public function confirm(Request $request, $id)
     {
-        $order = Order::with(['items', 'invoice'])->findOrFail($id);
+        $companyId = $request->user()->company_id;
+
+        $order = Order::with(['items', 'invoice'])
+            ->where('company_id', $companyId)
+            ->findOrFail($id);
+
 
         // لا يمكن إنشاء فاتورة مرتين لنفس الطلب
         if ($order->invoice) {
@@ -279,6 +184,7 @@ class OrderController extends Controller
 
             // إنشاء الفاتورة
             $invoice = Invoice::create([
+                'company_id' => $companyId,
                 'number'      => 'INV-' . now()->format('YmdHis') . '-' . $order->id,
                 'order_id'    => $order->id,
                 'customer_id' => $order->customer_id,
@@ -288,6 +194,7 @@ class OrderController extends Controller
             ]);
 
             CustomerLedgerEntry::create([
+                'company_id' => $companyId,
                 'customer_id' => $invoice->customer_id,
                 'invoice_id'  => $invoice->id,
                 'type'        => 'invoice',
@@ -301,6 +208,7 @@ class OrderController extends Controller
             foreach ($order->items as $item) {
 
                 InvoiceItem::create([
+                    'company_id' => $companyId,
                     'invoice_id' => $invoice->id,
                     'product_id' => $item->product_id,
                     'quantity'   => $item->quantity,
@@ -317,7 +225,9 @@ class OrderController extends Controller
     }
     public function cancel(Request $request, $id)
     {
-        $order = Order::with('items')->findOrFail($id);
+        $order = Order::with('items')
+            ->where('company_id', $companyId)
+            ->findOrFail($id);
 
         if ($order->status === 'cancelled') {
             return response()->json([
@@ -329,14 +239,17 @@ class OrderController extends Controller
 
             foreach ($order->items as $item) {
 
-                $product = Product::lockForUpdate()
+                $product = Product::where('company_id', $companyId)
+                    ->lockForUpdate()
                     ->findOrFail($item->product_id);
+
 
                 // إعادة الكمية
                 $product->increment('quantity', $item->quantity);
 
                 // حركة مخزون
                 StockMovement::create([
+                    'company_id' => $companyId,
                     'product_id'   => $product->id,
                     'type'         => 'in',
                     'quantity'     => $item->quantity,
@@ -356,4 +269,134 @@ class OrderController extends Controller
             ]);
         });
     }
+
+    // function index()
+    // {
+    //     $order = OrderResource::collection(Order::all());
+    //     $data = [
+    //         "msg" => "Return All Data From Order Table",
+    //         "status" => 200,
+    //         "data" => $order
+    //     ];
+    //     return response()->json($data);
+    // }
+    // function show($id)
+    // {
+    //     $order = Order::find($id);
+
+    //     if ($order) {
+    //         $data = [
+    //             "msg" => "Return One Record of Order Table",
+    //             "status" => 200,
+    //             "data" => new OrderResource($order)
+    //         ];
+    //         return response()->json($data);
+    //     } else {
+    //         $data = [
+    //             "msg" => "No Such id",
+    //             "status" => 205,
+    //             "data" => null
+    //         ];
+    //         return response()->json($data);
+    //     }
+    // }
+    // function delete(Request $request)
+    // {
+    //     $id = $request->id;
+    //     $order = Order::find($id);
+    //     if ($order) {
+    //         $order->delete();
+    //         $data = [
+    //             "msg" => "Deleted Successfully",
+    //             "status" => 200,
+    //             "data" => null
+    //         ];
+    //         return response()->json($data);
+    //     } else {
+    //         $data = [
+    //             "msg" => "No Such id",
+    //             "status" => 205,
+    //             "data" => null
+    //         ];
+    //         return response()->json($data);
+    //     }
+    // }
+    // public function store(Request $request)
+    // {
+    //     $companyId = $request->user()->company_id;
+
+    //     $validate = Validator::make($request->all(), [
+    //         'customer_id' => [
+    //             'required',
+    //             Rule::exists('customers', 'id')
+    //                 ->where('company_id', $companyId)
+    //         ],
+    //         'status' => ['nullable', 'in:pending,confirmed,cancelled']
+    //     ]);
+
+
+    //     if ($validate->fails()) {
+    //         return response()->json([
+    //             "msg" => "Validation required",
+    //             "status" => 422,
+    //             "data" => $validate->errors()
+    //         ], 422);
+    //     }
+
+    //     $order = Order::create([
+    //         'company_id' => $companyId,
+    //         'customer_id' => $request->customer_id,
+    //         'status'      => $request->status ?? 'pending',
+    //         'total'       => 0,
+    //         'created_by'  => $request->user()->id ?? null,
+    //     ]);
+
+    //     return response()->json([
+    //         "msg" => "Order created (simple)",
+    //         "status" => 200,
+    //         "data" => new OrderResource($order)
+    //     ]);
+    // }
+    // public function update(Request $request)
+    // {
+    //     $old_id = $request->old_id;
+    //     $order = Order::find($old_id);
+
+    //     $validate = Validator::make($request->all(), [
+    //         'customer_id' => ['required', 'exists:customers,id'],
+    //         'status'      => ['required', 'in:pending,confirmed,cancelled'],
+    //     ]);
+
+
+    //     if ($validate->fails()) {
+    //         $data = [
+    //             "msg" => "Validation required",
+    //             "status" => 201,
+    //             "data" => $validate->errors()
+    //         ];
+    //         return response()->json($data);
+    //     }
+
+    //     if ($order) {
+
+    //         $order->update([
+    //             'customer_id' => $request->customer_id,
+    //             'status'      => $request->status,
+    //         ]);
+
+    //         $data = [
+    //             "msg" => "Updated Successfully",
+    //             "status" => 200,
+    //             "data" => new OrderResource($order)
+    //         ];
+    //         return response()->json($data);
+    //     } else {
+    //         $data = [
+    //             "msg" => "No such id",
+    //             "status" => 205,
+    //             "data" => null
+    //         ];
+    //         return response()->json($data);
+    //     }
+    // }
 }

@@ -15,13 +15,24 @@ class InvoicePaymentController extends Controller
 {
     public function store(Request $request, $invoiceId)
     {
+        $companyId = $request->user()->company_id;
+
         $data = $request->validate([
-            'amount' => ['required', 'numeric', 'min:0.01'],
-            'method' => ['required', 'string'],
+            'amount'  => ['required', 'numeric', 'min:0.01'],
+            'method'  => ['required', 'string'],
             'paid_at' => ['nullable', 'date'],
         ]);
 
-        $invoice = Invoice::with(['payments', 'refunds'])->findOrFail($invoiceId);
+        $invoice = Invoice::with([
+            'payments' => function ($q) use ($companyId) {
+                $q->where('company_id', $companyId);
+            },
+            'payments.refunds' => function ($q) use ($companyId) {
+                $q->where('company_id', $companyId);
+            }
+        ])
+            ->where('company_id', $companyId)
+            ->findOrFail($invoiceId);
 
         // لا يمكن الدفع على فاتورة ملغاة
         if ($invoice->status === 'cancelled') {
@@ -30,9 +41,10 @@ class InvoicePaymentController extends Controller
             ], 422);
         }
 
-        return DB::transaction(function () use ($invoice, $data, $request) {
+        return DB::transaction(function () use ($invoice, $data, $request, $companyId) {
 
             $payment = Payment::create([
+                'company_id' => $companyId,
                 'invoice_id' => $invoice->id,
                 'amount'     => $data['amount'],
                 'method'     => $data['method'],
@@ -41,6 +53,7 @@ class InvoicePaymentController extends Controller
             ]);
 
             CustomerLedgerEntry::create([
+                'company_id'  => $companyId,
                 'customer_id' => $invoice->customer_id,
                 'invoice_id'  => $invoice->id,
                 'payment_id'  => $payment->id,
@@ -60,30 +73,32 @@ class InvoicePaymentController extends Controller
              */
 
             $entry = JournalEntry::create([
-                'entry_date'     => now()->toDateString(),
+                'company_id'  => $companyId,
+                'entry_date'  => now()->toDateString(),
                 'source_type' => Payment::class,
                 'source_id'   => $payment->id,
-                // 'description' => 'Invoice payment #' . $invoice->number,
                 'description' => 'Invoice payment #' . $payment->id,
-                'created_by' => $request->user()->id ?? null,
+                'created_by'  => $request->user()->id ?? null,
             ]);
 
-            // ⚠️ الأرقام التالية يجب أن تربطها لاحقاً بجدول accounts
-            $cashAccountId = 1;      // Cash / Bank
-            $arAccountId   = 2;      // Accounts receivable
+            // لاحقاً يتم ربطها بجدول accounts حسب الشركة
+            $cashAccountId = 1;
+            $arAccountId   = 2;
 
             JournalLine::create([
+                'company_id'       => $companyId,
                 'journal_entry_id' => $entry->id,
-                'account_id' => $cashAccountId,
-                'debit'  => $payment->amount,
-                'credit' => 0,
+                'account_id'       => $cashAccountId,
+                'debit'            => $payment->amount,
+                'credit'           => 0,
             ]);
 
             JournalLine::create([
+                'company_id'       => $companyId,
                 'journal_entry_id' => $entry->id,
-                'account_id' => $arAccountId,
-                'debit'  => 0,
-                'credit' => $payment->amount,
+                'account_id'       => $arAccountId,
+                'debit'            => 0,
+                'credit'           => $payment->amount,
             ]);
 
             /*
@@ -92,8 +107,20 @@ class InvoicePaymentController extends Controller
              |--------------------------------------------------------------------------
              */
 
-            $paid = $invoice->payments()->sum('amount');
-            $refunded = $invoice->refunds()->sum('payment_refunds.amount');
+            $paid = $invoice->payments()
+                ->where('company_id', $companyId)
+                ->sum('amount');
+
+            $refunded = $invoice->payments()
+                ->where('company_id', $companyId)
+                ->withSum(
+                    ['refunds as refunded_amount' => function ($q) use ($companyId) {
+                        $q->where('company_id', $companyId);
+                    }],
+                    'amount'
+                )
+                ->get()
+                ->sum('refunded_amount');
 
             $net = $paid - $refunded;
 
@@ -110,8 +137,8 @@ class InvoicePaymentController extends Controller
             ]);
 
             return response()->json([
-                'msg' => 'Payment recorded successfully',
-                'payment_id' => $payment->id,
+                'msg'            => 'Payment recorded successfully',
+                'payment_id'     => $payment->id,
                 'invoice_status' => $status
             ], 201);
         });

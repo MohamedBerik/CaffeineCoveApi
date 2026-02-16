@@ -11,8 +11,14 @@ use Illuminate\Support\Facades\DB;
 
 class OrderInvoiceController extends Controller
 {
-    public function store(Order $order)
+    public function store(Request $request, $id)
     {
+        $companyId = $request->user()->company_id;
+
+        $order = Order::with('items')
+            ->where('company_id', $companyId)
+            ->findOrFail($id);
+
         // منع إنشاء أكثر من فاتورة لنفس الأوردر
         if ($order->invoice) {
             return response()->json([
@@ -21,14 +27,11 @@ class OrderInvoiceController extends Controller
             ], 422);
         }
 
-        // التأكد أن الأوردر مؤكد
         if ($order->status !== 'confirmed') {
             return response()->json([
                 'msg' => 'Only confirmed orders can be invoiced'
             ], 422);
         }
-
-        $order->load('items');
 
         if ($order->items->isEmpty()) {
             return response()->json([
@@ -36,29 +39,30 @@ class OrderInvoiceController extends Controller
             ], 422);
         }
 
-        return DB::transaction(function () use ($order) {
+        return DB::transaction(function () use ($order, $companyId) {
 
-            // حساب إجمالي الفاتورة
             $total = 0;
+
             foreach ($order->items as $item) {
                 $total += $item->unit_price * $item->quantity;
             }
 
-            // إنشاء الفاتورة
             $invoice = Invoice::create([
+                'company_id' => $companyId,   // ✅ مهم
                 'number'      => $this->generateInvoiceNumber(),
                 'order_id'    => $order->id,
-                'customer_id' => $order->customer_id ?? null,
+                'customer_id' => $order->customer_id,
                 'total'       => $total,
                 'status'      => 'unpaid',
                 'issued_at'   => now()
             ]);
 
-            // إنشاء تفاصيل الفاتورة (Invoice Items)
             foreach ($order->items as $item) {
+
                 InvoiceItem::create([
+                    'company_id' => $companyId,   // ✅ لو العمود موجود
                     'invoice_id' => $invoice->id,
-                    'product_id' => $item->product_id ?? null,
+                    'product_id' => $item->product_id,
                     'quantity'   => $item->quantity,
                     'unit_price' => $item->unit_price,
                     'total'      => $item->unit_price * $item->quantity,
@@ -71,6 +75,7 @@ class OrderInvoiceController extends Controller
             ], 201);
         });
     }
+
 
     /**
      * توليد رقم فاتورة تلقائي
