@@ -6,148 +6,170 @@ use App\Http\Controllers\Controller;
 use App\Http\Resources\EmployeeResource;
 use App\Models\Employee;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
 use Illuminate\Support\Facades\Hash;
 
-
 class EmployeeController extends Controller
 {
-    function index()
+    public function index(Request $request)
     {
-        $employee = EmployeeResource::collection(Employee::all());
-        $data = [
+        $companyId = $request->user()->company_id;
+
+        $employee = EmployeeResource::collection(
+            Employee::where('company_id', $companyId)->get()
+        );
+
+        return response()->json([
             "msg" => "Return All Data From Employee Table",
             "status" => 200,
             "data" => $employee
-        ];
-        return response()->json($data);
+        ]);
     }
 
-    function show($id)
+    public function show(Request $request, $id)
     {
-        $employee = Employee::find($id);
+        $companyId = $request->user()->company_id;
+
+        $employee = Employee::where('company_id', $companyId)
+            ->find($id);
 
         if ($employee) {
-            $data = [
+            return response()->json([
                 "msg" => "Return One Record of Employee Table",
                 "status" => 200,
                 "data" => new EmployeeResource($employee)
-            ];
-            return response()->json($data);
-        } else {
-            $data = [
-                "msg" => "No Such id",
-                "status" => 205,
-                "data" => null
-            ];
-            return response()->json($data);
+            ]);
         }
+
+        return response()->json([
+            "msg" => "No Such id",
+            "status" => 205,
+            "data" => null
+        ]);
     }
 
-    function delete(Request $request)
+    public function delete(Request $request)
     {
+        $companyId = $request->user()->company_id;
         $id = $request->id;
-        $employee = Employee::find($id);
+
+        $employee = Employee::where('company_id', $companyId)
+            ->find($id);
+
         if ($employee) {
 
             $employee->delete();
-            $data = [
+
+            return response()->json([
                 "msg" => "Deleted Successfully",
                 "status" => 200,
                 "data" => null
-            ];
-            return response()->json($data);
-        } else {
-            $data = [
-                "msg" => "No Such id",
-                "status" => 205,
-                "data" => null
-            ];
-            return response()->json($data);
+            ]);
         }
+
+        return response()->json([
+            "msg" => "No Such id",
+            "status" => 205,
+            "data" => null
+        ]);
     }
 
     public function store(Request $request)
     {
+        $companyId = $request->user()->company_id;
 
         $validate = Validator::make($request->all(), [
-            'id' => 'required|unique:employees|max:20',
-            'name' => 'required|min:3|max:255',
-            'email' => 'required|min:3|max:255',
+            'id'       => [
+                'required',
+                'max:20',
+                Rule::unique('employees')->where(
+                    fn($q) =>
+                    $q->where('company_id', $companyId)
+                ),
+            ],
+            'name'     => 'required|min:3|max:255',
+            'email'    => 'required|min:3|max:255',
             'password' => 'required|min:3|max:255',
-            'salary' => 'required',
+            'salary'   => 'required',
         ]);
 
         if ($validate->fails()) {
-            $data = [
+            return response()->json([
                 "msg" => "Validation required",
                 "status" => 201,
                 "data" => $validate->errors()
-            ];
-            return response()->json($data);
+            ]);
         }
 
         $employee = Employee::create([
-            "id" => $request->id,
-            "name" => $request->name,
-            "email" => $request->email,
-            "password" => Hash::make($request->password),
-            "salary" => $request->salary,
+            "id"         => $request->id,
+            "company_id" => $companyId,
+            "name"       => $request->name,
+            "email"      => $request->email,
+            "password"   => Hash::make($request->password),
+            "salary"     => $request->salary,
         ]);
-        $data = [
+
+        return response()->json([
             "msg" => "Created Successfully",
             "status" => 200,
             "data" => new EmployeeResource($employee)
-        ];
-        return response()->json($data);
+        ]);
     }
 
     public function update(Request $request)
     {
+        $companyId = $request->user()->company_id;
         $old_id = $request->old_id;
-        $employee = Employee::find($old_id);
+
+        $employee = Employee::where('company_id', $companyId)
+            ->find($old_id);
 
         $validate = Validator::make($request->all(), [
-            "id" => ['required', Rule::unique('employees')->ignore($old_id)],
-            "name" => "required|min:3|max:255",
-            "email" => "required|min:3|max:255",
+            "id" => [
+                'required',
+                Rule::unique('employees')
+                    ->ignore($old_id)
+                    ->where(
+                        fn($q) =>
+                        $q->where('company_id', $companyId)
+                    ),
+            ],
+            "name"     => "required|min:3|max:255",
+            "email"    => "required|min:3|max:255",
             "password" => "required|min:3|max:255",
-            "salary" => "required",
+            "salary"   => "required",
         ]);
 
         if ($validate->fails()) {
-            $data = [
+            return response()->json([
                 "msg" => "Validation required",
                 "status" => 201,
                 "data" => $validate->errors()
-            ];
-            return response()->json($data);
+            ]);
         }
 
-
-        if ($employee) {
-            $employee->update([
-                "id" => $request->id,
-                "name" => $request->name,
-                "email" => $request->email,
-                "password" => Hash::make($request->password),
-                "salary" => $request->salary,
-            ]);
-            $data = [
-                "msg" => "Updated Successfully",
-                "status" => 200,
-                "data" => new EmployeeResource($employee)
-            ];
-            return response()->json($data);
-        } else {
-            $data = [
+        if (!$employee) {
+            return response()->json([
                 "msg" => "No such id",
                 "status" => 205,
                 "data" => null
-            ];
-            return response()->json($data);
+            ]);
         }
+
+        $employee->update([
+            "id"       => $request->id,
+            "name"     => $request->name,
+            "email"    => $request->email,
+            "password" => Hash::make($request->password),
+            "salary"   => $request->salary,
+        ]);
+
+        return response()->json([
+            "msg" => "Updated Successfully",
+            "status" => 200,
+            "data" => new EmployeeResource($employee)
+        ]);
     }
 }
