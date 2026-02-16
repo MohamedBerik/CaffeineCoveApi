@@ -168,7 +168,7 @@ class OrderController extends Controller
             ], 422);
         }
 
-        return DB::transaction(function () use ($order) {
+        return DB::transaction(function () use ($order, $companyId) {
 
             // حساب الإجمالي من عناصر الطلب (من السيرفر فقط)
             $total = $order->items->sum(function ($item) {
@@ -180,8 +180,7 @@ class OrderController extends Controller
                 'status' => 'confirmed'
             ]);
 
-            activity('order.confirmed', $order);
-
+            activity('order.confirmed', $order, [], $companyId);
             // إنشاء الفاتورة
             $invoice = Invoice::create([
                 'company_id' => $companyId,
@@ -225,6 +224,7 @@ class OrderController extends Controller
     }
     public function cancel(Request $request, $id)
     {
+        $companyId = $request->user()->company_id;
         $order = Order::with('items')
             ->where('company_id', $companyId)
             ->findOrFail($id);
@@ -235,7 +235,7 @@ class OrderController extends Controller
             ], 422);
         }
 
-        return DB::transaction(function () use ($order, $request) {
+        return DB::transaction(function () use ($order, $request, $companyId) {
 
             foreach ($order->items as $item) {
 
