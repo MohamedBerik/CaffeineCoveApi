@@ -66,7 +66,7 @@ class PaymentRefundController extends Controller
             ]);
 
             $arAccount = Account::where('company_id', $companyId)
-                ->where('code', '1100')
+                ->where('code', '1000')
                 ->firstOrFail();
 
             $cashAccount = Account::where('company_id', $companyId)
