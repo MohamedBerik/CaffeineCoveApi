@@ -10,22 +10,28 @@ use App\Models\SupplierPayment;
 use App\Models\PaymentRefund;
 use App\Models\ActivityLog;
 use Carbon\Carbon;
-use Illuminate\Support\Facades\DB;
+use Illuminate\Http\Request;
 
 class FinanceDashboardController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
+        $companyId = $request->user()->company_id;
+
         /* ============================================================
          | Old data (KEEP – backward compatible)
          * ============================================================ */
 
-        $totalSales = Invoice::sum('total');
-        $totalCollected = Payment::sum('amount');
-        $totalPurchases = PurchaseOrder::sum('total');
-        $totalPaidToSuppliers = SupplierPayment::sum('amount');
+        $totalSales = Invoice::where('company_id', $companyId)->sum('total');
 
-        $receivables = Invoice::whereIn('status', ['unpaid', 'partially_paid'])
+        $totalCollected = Payment::where('company_id', $companyId)->sum('amount');
+
+        $totalPurchases = PurchaseOrder::where('company_id', $companyId)->sum('total');
+
+        $totalPaidToSuppliers = SupplierPayment::where('company_id', $companyId)->sum('amount');
+
+        $receivables = Invoice::where('company_id', $companyId)
+            ->whereIn('status', ['unpaid', 'partially_paid'])
             ->with('payments')
             ->get()
             ->sum(function ($invoice) {
@@ -33,7 +39,8 @@ class FinanceDashboardController extends Controller
                 return max($invoice->total - $paid, 0);
             });
 
-        $payables = PurchaseOrder::whereNotIn('status', ['cancelled'])
+        $payables = PurchaseOrder::where('company_id', $companyId)
+            ->whereNotIn('status', ['cancelled'])
             ->with('payments')
             ->get()
             ->sum(function ($po) {
@@ -42,12 +49,14 @@ class FinanceDashboardController extends Controller
             });
 
         /* ============================================================
-         | ✅ Added – financial collection breakdown
+         | Financial collection breakdown
          * ============================================================ */
 
-        $grossCollected = Payment::sum('amount');                // <-- added
-        $refundsTotal   = PaymentRefund::sum('amount');         // <-- added
-        $netCollected   = $grossCollected - $refundsTotal;      // <-- added
+        $grossCollected = Payment::where('company_id', $companyId)->sum('amount');
+
+        $refundsTotal = PaymentRefund::where('company_id', $companyId)->sum('amount');
+
+        $netCollected = $grossCollected - $refundsTotal;
 
         /* ============================================================
          | New dashboard KPIs
@@ -55,9 +64,17 @@ class FinanceDashboardController extends Controller
 
         $today = Carbon::today();
 
-        $salesToday = Invoice::whereDate('created_at', $today)->sum('total');
-        $paymentsToday = Payment::whereDate('created_at', $today)->sum('amount');
-        $refundsToday = PaymentRefund::whereDate('created_at', $today)->sum('amount');
+        $salesToday = Invoice::where('company_id', $companyId)
+            ->whereDate('created_at', $today)
+            ->sum('total');
+
+        $paymentsToday = Payment::where('company_id', $companyId)
+            ->whereDate('created_at', $today)
+            ->sum('amount');
+
+        $refundsToday = PaymentRefund::where('company_id', $companyId)
+            ->whereDate('created_at', $today)
+            ->sum('amount');
 
         $outstanding = $receivables;
 
@@ -71,46 +88,53 @@ class FinanceDashboardController extends Controller
 
             $date = Carbon::today()->subDays($i)->toDateString();
 
-            $sales = Invoice::whereDate('created_at', $date)->sum('total');
+            $sales = Invoice::where('company_id', $companyId)
+                ->whereDate('created_at', $date)
+                ->sum('total');
 
-            $payments = Payment::whereDate('created_at', $date)->sum('amount');
+            $payments = Payment::where('company_id', $companyId)
+                ->whereDate('created_at', $date)
+                ->sum('amount');
 
-            $refunds = PaymentRefund::whereDate('created_at', $date)->sum('amount');
+            $refunds = PaymentRefund::where('company_id', $companyId)
+                ->whereDate('created_at', $date)
+                ->sum('amount');
 
             $period->push([
-                'date' => $date,
-                'total' => $sales,
+                'date'     => $date,
+                'total'    => $sales,
                 'payments' => $payments,
-                'refunds' => $refunds,
+                'refunds'  => $refunds,
             ]);
         }
 
         $salesChart = $period->map(fn($r) => [
-            'date' => $r['date'],
+            'date'  => $r['date'],
             'total' => $r['total'],
         ]);
 
         $paymentsChart = $period->map(fn($r) => [
-            'date' => $r['date'],
+            'date'     => $r['date'],
             'payments' => $r['payments'],
-            'refunds' => $r['refunds'],
+            'refunds'  => $r['refunds'],
         ]);
 
         /* ============================================================
          | Latest invoices
          * ============================================================ */
 
-        $latestInvoices = Invoice::with('customer')
+        $latestInvoices = Invoice::where('company_id', $companyId)
+            ->with('customer')
             ->latest()
             ->limit(5)
             ->get()
             ->map(function ($i) {
                 return [
-                    'id' => $i->id,
-                    'number' => $i->number ?? $i->id,
+                    'id'       => $i->id,
+                    'number'   => $i->number ?? $i->id,
                     'customer' => $i->customer?->name,
-                    'total' => $i->total,
-                    'status' => $i->status,
+                    'total'    => $i->total,
+                    'status'   => $i->status,
                 ];
             });
 
@@ -118,14 +142,15 @@ class FinanceDashboardController extends Controller
          | Recent activity
          * ============================================================ */
 
-        $activities = ActivityLog::latest()
+        $activities = ActivityLog::where('company_id', $companyId)
+            ->latest()
             ->limit(6)
             ->get()
             ->map(function ($a) {
                 return [
-                    'id' => $a->id,
+                    'id'          => $a->id,
                     'description' => $a->description,
-                    'created_at' => $a->created_at->diffForHumans(),
+                    'created_at'  => $a->created_at->diffForHumans(),
                 ];
             });
 
@@ -154,13 +179,11 @@ class FinanceDashboardController extends Controller
             'receivables' => $receivables,
             'payables' => $payables,
 
-            /* =========================================================
-             | ✅ Added – new fields for dashboard (no breaking change)
-             * ========================================================= */
+            /* ===== added fields (no breaking change) ===== */
 
-            'gross_collected' => $grossCollected,   // <-- added
-            'refunds_total'   => $refundsTotal,     // <-- added
-            'net_collected'   => $netCollected,     // <-- added
+            'gross_collected' => $grossCollected,
+            'refunds_total'   => $refundsTotal,
+            'net_collected'   => $netCollected,
         ]);
     }
 }

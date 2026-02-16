@@ -11,7 +11,11 @@ class CustomerStatementController extends Controller
 {
     public function show(Request $request, $customerId)
     {
-        $customer = Customer::findOrFail($customerId);
+        $companyId = $request->user()->company_id;
+
+        // التأكد أن العميل تابع لنفس الشركة
+        $customer = Customer::where('company_id', $companyId)
+            ->findOrFail($customerId);
 
         $from = $request->query('from');
         $to   = $request->query('to');
@@ -20,7 +24,8 @@ class CustomerStatementController extends Controller
         // Opening balance
         // كل ما قبل from
         // -----------------------------------------
-        $openingQuery = CustomerLedgerEntry::where('customer_id', $customerId);
+        $openingQuery = CustomerLedgerEntry::where('company_id', $companyId)
+            ->where('customer_id', $customerId);
 
         if ($from) {
             $openingQuery->where('entry_date', '<', $from);
@@ -34,7 +39,8 @@ class CustomerStatementController extends Controller
         // -----------------------------------------
         // Entries inside period
         // -----------------------------------------
-        $entriesQuery = CustomerLedgerEntry::where('customer_id', $customerId);
+        $entriesQuery = CustomerLedgerEntry::where('company_id', $companyId)
+            ->where('customer_id', $customerId);
 
         if ($from) {
             $entriesQuery->where('entry_date', '>=', $from);
@@ -60,18 +66,18 @@ class CustomerStatementController extends Controller
 
             return [
                 'id'          => $row->id,
-                'entry_date' => $row->entry_date->toDateString(),
+                'entry_date'  => $row->entry_date->toDateString(),
                 'description' => $row->description,
-                'type'       => $row->type,
+                'type'        => $row->type,
 
-                'debit'      => $row->debit,
-                'credit'     => $row->credit,
+                'debit'       => $row->debit,
+                'credit'      => $row->credit,
 
-                'balance'    => $running,
+                'balance'     => $running,
 
-                'invoice_id' => $row->invoice_id,
-                'payment_id' => $row->payment_id,
-                'refund_id'  => $row->refund_id,
+                'invoice_id'  => $row->invoice_id,
+                'payment_id'  => $row->payment_id,
+                'refund_id'   => $row->refund_id,
             ];
         });
 

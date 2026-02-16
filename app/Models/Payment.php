@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Model;
 class Payment extends Model
 {
     protected $fillable = [
+        'company_id',
         'invoice_id',
         'amount',
         'method',
@@ -26,5 +27,9 @@ class Payment extends Model
     public function customerLedgerEntry()
     {
         return $this->hasOne(CustomerLedgerEntry::class);
+    }
+    public function company()
+    {
+        return $this->belongsTo(Company::class);
     }
 }

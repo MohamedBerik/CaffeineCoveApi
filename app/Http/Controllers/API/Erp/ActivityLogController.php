@@ -10,8 +10,15 @@ class ActivityLogController extends Controller
 {
     public function index(Request $request)
     {
-        // مثال: آخر 6 سجلات
-        $logs = ActivityLog::latest()->limit($request->get('limit', 6))->get();
+        $companyId = $request->user()->company_id;
+
+        $limit = (int) $request->get('limit', 6);
+
+        $logs = ActivityLog::where('company_id', $companyId)
+            ->latest()
+            ->limit($limit)
+            ->get();
+
         return response()->json($logs);
     }
 }

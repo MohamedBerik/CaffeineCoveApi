@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Model;
 class CustomerLedgerEntry extends Model
 {
     protected $fillable = [
+        'company_id',
         'customer_id',
         'invoice_id',
         'payment_id',
@@ -41,5 +42,9 @@ class CustomerLedgerEntry extends Model
     public function paymentRefund()
     {
         return $this->belongsTo(PaymentRefund::class);
+    }
+    public function company()
+    {
+        return $this->belongsTo(Company::class);
     }
 }

@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Model;
 class Customer extends Model
 {
     protected $fillable = [
-        "id",
+        'company_id',
         "name",
         "email",
         "password",
@@ -18,5 +18,9 @@ class Customer extends Model
     public function ledgerEntries()
     {
         return $this->hasMany(CustomerLedgerEntry::class);
+    }
+    public function company()
+    {
+        return $this->belongsTo(Company::class);
     }
 }

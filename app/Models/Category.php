@@ -8,12 +8,15 @@ use Illuminate\Database\Eloquent\Model;
 class Category extends Model
 {
     protected $fillable = [
-        "id",
+        'company_id',
         "cate_image",
         "title_en",
         "title_ar",
         "description_en",
         "description_ar",
-
     ];
+    public function company()
+    {
+        return $this->belongsTo(Company::class);
+    }
 }
