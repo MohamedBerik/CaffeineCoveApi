@@ -7,8 +7,8 @@ use Illuminate\Database\Eloquent\Model;
 
 class Sale extends Model
 {
-    protected $fillable=[
-        "id",
+    protected $fillable = [
+        'company_id',
         "title_en",
         "title_ar",
         "description_en",
@@ -17,4 +17,8 @@ class Sale extends Model
         "quantity",
         "employee_id",
     ];
+    public function company()
+    {
+        return $this->belongsTo(Company::class);
+    }
 }

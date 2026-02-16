@@ -12,9 +12,14 @@ use Illuminate\Validation\Rule;
 
 class CategoryController extends Controller
 {
-    function index()
+    function index(Request $request)
     {
-        $category = CategoryResource::collection(Category::all());
+        $companyId = $request->user()->company_id;
+
+        $category = CategoryResource::collection(
+            Category::where('company_id', $companyId)->get()
+        );
+
         $data = [
             "msg" => "Return All Data From Category Table",
             "status" => 200,
@@ -22,9 +27,13 @@ class CategoryController extends Controller
         ];
         return response()->json($data);
     }
-    function show($id)
+
+    function show(Request $request, $id)
     {
-        $category = Category::find($id);
+        $companyId = $request->user()->company_id;
+
+        $category = Category::where('company_id', $companyId)
+            ->find($id);
 
         if ($category) {
             $data = [
@@ -42,15 +51,24 @@ class CategoryController extends Controller
             return response()->json($data);
         }
     }
+
     function delete(Request $request)
     {
+        $companyId = $request->user()->company_id;
+
         $id = $request->id;
-        $category = Category::find($id);
+
+        $category = Category::where('company_id', $companyId)
+            ->find($id);
+
         if ($category) {
+
             if (File::exists(public_path("/img/category/" . $category->cate_image))) {
                 File::delete(public_path("/img/category/" . $category->cate_image));
             }
+
             $category->delete();
+
             $data = [
                 "msg" => "Deleted Successfully",
                 "status" => 200,
@@ -58,6 +76,7 @@ class CategoryController extends Controller
             ];
             return response()->json($data);
         } else {
+
             $data = [
                 "msg" => "No Such id",
                 "status" => 205,
@@ -66,12 +85,23 @@ class CategoryController extends Controller
             return response()->json($data);
         }
     }
+
     public function store(Request $request)
     {
+        $companyId = $request->user()->company_id;
 
         $validate = Validator::make($request->all(), [
             'cate_image' => 'required|image|max:2048|mimes:png,jpeg',
-            'id' => 'required|unique:categories|max:20',
+
+            // unique per company
+            'id' => [
+                'required',
+                'max:20',
+                Rule::unique('categories')->where(function ($q) use ($companyId) {
+                    return $q->where('company_id', $companyId);
+                }),
+            ],
+
             'title_en' => 'required|min:3|max:255',
             'title_ar' => 'required|min:3|max:255',
             'description_en' => 'required|min:3|max:255',
@@ -94,13 +124,15 @@ class CategoryController extends Controller
         }
 
         $category = Category::create([
-            "cate_image" => $imageName,
-            "id" => $request->id,
-            "title_en" => $request->title_en,
-            "title_ar" => $request->title_ar,
+            "company_id"     => $companyId,
+            "cate_image"     => $imageName,
+            "id"             => $request->id,
+            "title_en"       => $request->title_en,
+            "title_ar"       => $request->title_ar,
             "description_en" => $request->description_en,
             "description_ar" => $request->description_ar,
         ]);
+
         $data = [
             "msg" => "Created Successfully",
             "status" => 200,
@@ -108,14 +140,29 @@ class CategoryController extends Controller
         ];
         return response()->json($data);
     }
+
     public function update(Request $request)
     {
+        $companyId = $request->user()->company_id;
+
         $old_id = $request->old_id;
-        $category = Category::find($old_id);
+
+        $category = Category::where('company_id', $companyId)
+            ->find($old_id);
 
         $validate = Validator::make($request->all(), [
             "cate_image" => "image|max:2048|mimes:png,jpeg",
-            "id" => ['required', Rule::unique('categories')->ignore($old_id)],
+
+            // unique per company
+            "id" => [
+                'required',
+                Rule::unique('categories')
+                    ->where(function ($q) use ($companyId) {
+                        return $q->where('company_id', $companyId);
+                    })
+                    ->ignore($old_id),
+            ],
+
             "title_en" => "required|min:3|max:255",
             "title_ar" => "required|min:3|max:255",
             "description_en" => "required|min:3|max:255",
@@ -131,32 +178,32 @@ class CategoryController extends Controller
             return response()->json($data);
         }
 
-
-
-
-
-
         if ($category) {
 
             if ($request->hasFile("cate_image")) {
+
                 $image = $request->cate_image;
                 $imageName = rand(1, 1000) . "_" . time() . "." . $image->extension();
 
                 if (File::exists(public_path("/img/category/" . $category->cate_image))) {
                     File::delete(public_path("/img/category/" . $category->cate_image));
                 }
+
                 $image->move(public_path("/img/category/"), $imageName);
             } else {
+
                 $imageName = $category->cate_image;
             }
+
             $category->update([
-                "cate_image" => $imageName,
-                "id" => $request->id,
-                "title_en" => $request->title_en,
-                "title_ar" => $request->title_ar,
+                "cate_image"     => $imageName,
+                "id"             => $request->id,
+                "title_en"       => $request->title_en,
+                "title_ar"       => $request->title_ar,
                 "description_en" => $request->description_en,
                 "description_ar" => $request->description_ar,
             ]);
+
             $data = [
                 "msg" => "Updated Successfully",
                 "status" => 200,
@@ -164,6 +211,7 @@ class CategoryController extends Controller
             ];
             return response()->json($data);
         } else {
+
             $data = [
                 "msg" => "No such id",
                 "status" => 205,

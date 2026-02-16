@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Model;
 class Reservation extends Model
 {
     protected $fillable = [
-        "id",
+        'company_id',
         "name",
         "email",
         "persons",
@@ -16,6 +16,9 @@ class Reservation extends Model
         "date",
         "time",
         "message",
-
     ];
+    public function company()
+    {
+        return $this->belongsTo(Company::class);
+    }
 }
