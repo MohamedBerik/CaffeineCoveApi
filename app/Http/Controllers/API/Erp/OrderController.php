@@ -66,7 +66,7 @@ class OrderController extends Controller
 
 
         return DB::transaction(function () use ($data, $request) {
-
+            $companyId = $request->user()->company_id;
             $order = Order::create([
                 'company_id' => $companyId,
                 'customer_id' => $data['customer_id'],
