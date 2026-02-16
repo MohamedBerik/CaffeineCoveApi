@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 class Account extends Model
 {
     protected $fillable = [
+        'company_id',
         'code',
         'name',
         'type',
@@ -21,5 +22,9 @@ class Account extends Model
     public function children()
     {
         return $this->hasMany(Account::class, 'parent_id');
+    }
+    public function company()
+    {
+        return $this->belongsTo(Company::class);
     }
 }
