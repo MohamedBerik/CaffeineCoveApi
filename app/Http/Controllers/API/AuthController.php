@@ -50,7 +50,8 @@ class AuthController extends Controller
         }
 
         // حماية إضافية: لا يسمح بتسجيل الدخول لو المستخدم غير مرتبط بشركة
-        if (!$user->company_id) {
+        // مع استثناء السوبر أدمن (is_super_admin = true)
+        if (!$user->company_id && !$user->is_super_admin) {
             return response()->json([
                 'message' => 'User is not assigned to any company'
             ], 403);

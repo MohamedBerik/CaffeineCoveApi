@@ -4,7 +4,7 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-class AddCompanyIdToAccountsTable extends Migration
+class MakeCompanyIdNullableInUsers extends Migration
 {
     /**
      * Run the migrations.
@@ -13,10 +13,11 @@ class AddCompanyIdToAccountsTable extends Migration
      */
     public function up()
     {
-        Schema::table('accounts', function (Blueprint $table) {
-            $table->foreignId('company_id')->after('id')->constrained()->cascadeOnDelete();
+        Schema::table('users', function (Blueprint $table) {
+            $table->unsignedBigInteger('company_id')->nullable()->change();
         });
     }
+
 
     /**
      * Reverse the migrations.
@@ -25,7 +26,7 @@ class AddCompanyIdToAccountsTable extends Migration
      */
     public function down()
     {
-        Schema::table('accounts', function (Blueprint $table) {
+        Schema::table('users', function (Blueprint $table) {
             //
         });
     }
