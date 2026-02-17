@@ -124,47 +124,49 @@ Route::middleware([
     });
 
 
-Route::prefix('erp')->middleware('auth:sanctum')->group(function () {
+Route::prefix('erp')
+    ->middleware(['auth:sanctum', 'company.user'])
+    ->group(function () {
 
-    // Orders
-    Route::middleware('permission:orders.manage')->post('/orders', [OrderController::class, 'storeErp']);
-    Route::middleware('permission:orders.view')->get('/orders', [OrderController::class, 'indexErp']);
-    Route::get('/orders/{id}', [OrderController::class, 'showErp']);
-    Route::middleware('permission:orders.confirm')->post('/orders/{id}/confirm', [OrderController::class, 'confirm']);
-    Route::middleware('permission:orders.cancel')->post('/orders/{id}/cancel', [OrderController::class, 'cancel']);
+        // Orders
+        Route::middleware('permission:orders.manage')->post('/orders', [OrderController::class, 'storeErp']);
+        Route::middleware('permission:orders.view')->get('/orders', [OrderController::class, 'indexErp']);
+        Route::get('/orders/{id}', [OrderController::class, 'showErp']);
+        Route::middleware('permission:orders.confirm')->post('/orders/{id}/confirm', [OrderController::class, 'confirm']);
+        Route::middleware('permission:orders.cancel')->post('/orders/{id}/cancel', [OrderController::class, 'cancel']);
 
-    // Invoices
-    Route::middleware('permission:finance.create')->post('/invoices/{invoice}/payments', [InvoicePaymentController::class, 'store']);
-    Route::middleware('permission:finance.view')->get('/invoices', [InvoiceController::class, 'indexErp']);
-    Route::middleware('permission:finance.view')->get('/invoices/{id}', [InvoiceController::class, 'show']);
-    Route::middleware('permission:finance.view')->get('/invoices/{id}/full', [InvoiceController::class, 'showFullInvoice']);
+        // Invoices
+        Route::middleware('permission:finance.create')->post('/invoices/{invoice}/payments', [InvoicePaymentController::class, 'store']);
+        Route::middleware('permission:finance.view')->get('/invoices', [InvoiceController::class, 'indexErp']);
+        Route::middleware('permission:finance.view')->get('/invoices/{id}', [InvoiceController::class, 'show']);
+        Route::middleware('permission:finance.view')->get('/invoices/{id}/full', [InvoiceController::class, 'showFullInvoice']);
 
-    //Refund payment
-    Route::middleware('permission:payments.refund')->post('/payments/{payment}/refund', [PaymentRefundController::class, 'refund']);
+        //Refund payment
+        Route::middleware('permission:payments.refund')->post('/payments/{payment}/refund', [PaymentRefundController::class, 'refund']);
 
-    // Purchase Orders
-    Route::middleware('permission:purchases.manage')->post('/purchase-orders', [PurchaseOrderController::class, 'store']);
-    Route::middleware('permission:finance.view')->get('/purchase-orders', [PurchaseOrderController::class, 'indexErp']);
-    Route::middleware('permission:finance.view')->get('/purchase-orders/{id}', [PurchaseOrderController::class, 'showErp']);
-    Route::middleware('permission:purchases.receive')->post('/purchase-orders/{id}/receive', [PurchaseOrderController::class, 'receive']);
-    Route::middleware('permission:purchases.return')->post('/purchase-orders/{id}/return', [PurchaseOrderController::class, 'returnItems']);
-    Route::get('/purchase-orders/{id}/returnable-items', [PurchaseOrderController::class, 'getReturnableItems']);
-    Route::get('/purchase-orders/{id}/returns-history', [PurchaseOrderController::class, 'returnHistory']);
+        // Purchase Orders
+        Route::middleware('permission:purchases.manage')->post('/purchase-orders', [PurchaseOrderController::class, 'store']);
+        Route::middleware('permission:finance.view')->get('/purchase-orders', [PurchaseOrderController::class, 'indexErp']);
+        Route::middleware('permission:finance.view')->get('/purchase-orders/{id}', [PurchaseOrderController::class, 'showErp']);
+        Route::middleware('permission:purchases.receive')->post('/purchase-orders/{id}/receive', [PurchaseOrderController::class, 'receive']);
+        Route::middleware('permission:purchases.return')->post('/purchase-orders/{id}/return', [PurchaseOrderController::class, 'returnItems']);
+        Route::get('/purchase-orders/{id}/returnable-items', [PurchaseOrderController::class, 'getReturnableItems']);
+        Route::get('/purchase-orders/{id}/returns-history', [PurchaseOrderController::class, 'returnHistory']);
 
-    Route::middleware('permission:finance.view')->post('/purchase-orders/{id}/pay', [PurchaseOrderController::class, 'pay']);
+        Route::middleware('permission:finance.view')->post('/purchase-orders/{id}/pay', [PurchaseOrderController::class, 'pay']);
 
-    //Suppliers
-    Route::middleware('permission:finance.view')->get('/suppliers/{supplier}/statement', [SupplierStatementController::class, 'show']);
+        //Suppliers
+        Route::middleware('permission:finance.view')->get('/suppliers/{supplier}/statement', [SupplierStatementController::class, 'show']);
 
-    // Dashboard
-    Route::middleware('permission:finance.view')->get('/dashboard/finance', [FinanceDashboardController::class, 'index']);
+        // Dashboard
+        Route::middleware('permission:finance.view')->get('/dashboard/finance', [FinanceDashboardController::class, 'index']);
 
-    //Activity log
-    Route::middleware('permission:finance.view')->get('/activity-logs', [ActivityLogController::class, 'index']);
+        //Activity log
+        Route::middleware('permission:finance.view')->get('/activity-logs', [ActivityLogController::class, 'index']);
 
-    //Journal entries
-    Route::get('/invoices/{invoice}/journal-entries', [\App\Http\Controllers\API\Erp\InvoiceJournalController::class, 'index']);
+        //Journal entries
+        Route::get('/invoices/{invoice}/journal-entries', [\App\Http\Controllers\API\Erp\InvoiceJournalController::class, 'index']);
 
-    //Customer statement
-    Route::get('/customers/{customerId}/statement', [CustomerStatementController::class, 'show']);
-});
+        //Customer statement
+        Route::get('/customers/{customerId}/statement', [CustomerStatementController::class, 'show']);
+    });
