@@ -92,6 +92,15 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::apiResource('sales', SaleController::class);
 });
 
+Route::middleware(['auth:sanctum', 'super.admin'])->group(function () {
+
+    Route::get('/admin-crud/{table}', [AdminCrudController::class, 'index']);
+    Route::get('/admin-crud/{table}/{id}', [AdminCrudController::class, 'show']);
+    Route::post('/admin-crud/{table}', [AdminCrudController::class, 'store']);
+    Route::put('/admin-crud/{table}/{id}', [AdminCrudController::class, 'update']);
+    Route::delete('/admin-crud/{table}/{id}', [AdminCrudController::class, 'destroy']);
+});
+
 //////////////////////////////////////
 // Admin Routes (Admin Only)
 //////////////////////////////////////
@@ -106,12 +115,12 @@ Route::middleware([
         // 🔹 Dashboard
         Route::get('dashboard', [AdminDashboardController::class, 'index']);
 
-        // 🔹 Generic CRUD
-        Route::get('{table}',         [AdminCrudController::class, 'index']);
-        Route::get('{table}/{id}',    [AdminCrudController::class, 'show']);
-        Route::post('{table}',        [AdminCrudController::class, 'store']);
-        Route::put('{table}/{id}',    [AdminCrudController::class, 'update']);
-        Route::delete('{table}/{id}', [AdminCrudController::class, 'destroy']);
+        // // 🔹 Generic CRUD
+        // Route::get('{table}',         [AdminCrudController::class, 'index']);
+        // Route::get('{table}/{id}',    [AdminCrudController::class, 'show']);
+        // Route::post('{table}',        [AdminCrudController::class, 'store']);
+        // Route::put('{table}/{id}',    [AdminCrudController::class, 'update']);
+        // Route::delete('{table}/{id}', [AdminCrudController::class, 'destroy']);
     });
 
 
