@@ -20,6 +20,7 @@ class Reservation extends Model
         "time",
         "message",
     ];
+
     public function company()
     {
         return $this->belongsTo(Company::class);

@@ -17,6 +17,7 @@ class Category extends Model
         "title_ar",
         "description_en",
         "description_ar",
+
     ];
     public function company()
     {

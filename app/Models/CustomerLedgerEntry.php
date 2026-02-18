@@ -29,22 +29,26 @@ class CustomerLedgerEntry extends Model
 
     public function customer()
     {
-        return $this->belongsTo(Customer::class);
+        return $this->belongsTo(Customer::class)
+            ->where('company_id', $this->company_id);
     }
 
     public function invoice()
     {
-        return $this->belongsTo(Invoice::class);
+        return $this->belongsTo(Invoice::class)
+            ->where('company_id', $this->company_id);
     }
 
     public function payment()
     {
-        return $this->belongsTo(Payment::class);
+        return $this->belongsTo(Payment::class)
+            ->where('company_id', $this->company_id);
     }
 
     public function paymentRefund()
     {
-        return $this->belongsTo(PaymentRefund::class);
+        return $this->belongsTo(PaymentRefund::class)
+            ->where('company_id', $this->company_id);
     }
     public function company()
     {

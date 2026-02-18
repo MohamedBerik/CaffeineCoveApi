@@ -19,12 +19,14 @@ class JournalLine extends Model
 
     public function entry()
     {
-        return $this->belongsTo(JournalEntry::class, 'journal_entry_id');
+        return $this->belongsTo(JournalEntry::class, 'journal_entry_id')
+            ->where('company_id', $this->company_id);
     }
 
     public function account()
     {
-        return $this->belongsTo(Account::class);
+        return $this->belongsTo(Account::class)
+            ->where('company_id', $this->company_id);
     }
     public function company()
     {

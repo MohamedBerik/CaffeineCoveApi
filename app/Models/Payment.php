@@ -18,18 +18,28 @@ class Payment extends Model
         'received_by'
     ];
 
+    /* =====================================================
+     | Relations (company safe)
+     * ===================================================== */
+
     public function invoice()
     {
-        return $this->belongsTo(Invoice::class);
+        return $this->belongsTo(Invoice::class)
+            ->where('company_id', $this->company_id);
     }
+
     public function refunds()
     {
-        return $this->hasMany(\App\Models\PaymentRefund::class);
+        return $this->hasMany(PaymentRefund::class)
+            ->where('company_id', $this->company_id);
     }
+
     public function customerLedgerEntry()
     {
-        return $this->hasOne(CustomerLedgerEntry::class);
+        return $this->hasOne(CustomerLedgerEntry::class)
+            ->where('company_id', $this->company_id);
     }
+
     public function company()
     {
         return $this->belongsTo(Company::class);

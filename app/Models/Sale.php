@@ -20,6 +20,7 @@ class Sale extends Model
         "quantity",
         "employee_id",
     ];
+
     public function company()
     {
         return $this->belongsTo(Company::class);

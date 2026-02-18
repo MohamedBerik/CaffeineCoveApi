@@ -15,6 +15,7 @@ class Role extends Model
             'role_user',
             'role_id',
             'user_id'
+
         );
     }
 

@@ -15,6 +15,7 @@ class Permission extends Model
             'permission_role',
             'permission_id',
             'role_id'
+
         );
     }
 }

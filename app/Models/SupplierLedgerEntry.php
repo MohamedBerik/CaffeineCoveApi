@@ -24,6 +24,7 @@ class SupplierLedgerEntry extends Model
     protected $casts = [
         'entry_date' => 'date',
     ];
+
     public function company()
     {
         return $this->belongsTo(Company::class);

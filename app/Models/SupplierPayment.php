@@ -19,6 +19,7 @@ class SupplierPayment extends Model
         'paid_at',
         'paid_by'
     ];
+
     public function company()
     {
         return $this->belongsTo(Company::class);

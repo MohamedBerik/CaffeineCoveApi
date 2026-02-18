@@ -24,12 +24,14 @@ class OrderItem extends Model
 
     public function order()
     {
-        return $this->belongsTo(Order::class);
+        return $this->belongsTo(Order::class)
+            ->where('company_id', $this->company_id);
     }
 
     public function product()
     {
-        return $this->belongsTo(Product::class);
+        return $this->belongsTo(Product::class)
+            ->where('company_id', $this->company_id);
     }
     public function company()
     {

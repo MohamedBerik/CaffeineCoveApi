@@ -20,7 +20,8 @@ class JournalEntry extends Model
 
     public function lines()
     {
-        return $this->hasMany(JournalLine::class);
+        return $this->hasMany(JournalLine::class)
+            ->where('company_id', $this->company_id);
     }
 
     public function source()

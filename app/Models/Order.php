@@ -37,22 +37,26 @@ class Order extends Model
     // Relations
     public function items()
     {
-        return $this->hasMany(OrderItem::class);
+        return $this->hasMany(OrderItem::class)
+            ->where('company_id', $this->company_id);
     }
 
     public function customer()
     {
-        return $this->belongsTo(Customer::class, 'customer_id');
+        return $this->belongsTo(Customer::class, 'customer_id')
+            ->where('company_id', $this->company_id);
     }
 
     public function creator()
     {
-        return $this->belongsTo(User::class, 'created_by');
+        return $this->belongsTo(User::class, 'created_by')
+            ->where('company_id', $this->company_id);
     }
 
     public function invoice()
     {
-        return $this->hasOne(Invoice::class);
+        return $this->hasOne(Invoice::class)
+            ->where('company_id', $this->company_id);
     }
     public function company()
     {

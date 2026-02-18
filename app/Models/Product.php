@@ -24,7 +24,8 @@ class Product extends Model
 
     public function orderItems()
     {
-        return $this->hasMany(OrderItem::class);
+        return $this->hasMany(OrderItem::class)
+            ->where('company_id', $this->company_id);
     }
     public function company()
     {

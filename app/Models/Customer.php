@@ -20,7 +20,8 @@ class Customer extends Model
 
     public function ledgerEntries()
     {
-        return $this->hasMany(CustomerLedgerEntry::class);
+        return $this->hasMany(CustomerLedgerEntry::class)
+            ->where('company_id', $this->company_id);
     }
     public function company()
     {

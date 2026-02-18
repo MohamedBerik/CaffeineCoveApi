@@ -14,12 +14,14 @@ class Supplier extends Model
 
     public function purchaseOrders()
     {
-        return $this->hasMany(PurchaseOrder::class);
+        return $this->hasMany(PurchaseOrder::class)
+            ->where('company_id', $this->company_id);
     }
 
     public function payments()
     {
-        return $this->hasMany(SupplierPayment::class);
+        return $this->hasMany(SupplierPayment::class)
+            ->where('company_id', $this->company_id);
     }
 
     public function company()

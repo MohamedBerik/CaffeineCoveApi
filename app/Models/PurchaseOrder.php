@@ -20,17 +20,20 @@ class PurchaseOrder extends Model
 
     public function items()
     {
-        return $this->hasMany(PurchaseOrderItem::class);
+        return $this->hasMany(PurchaseOrderItem::class)
+            ->where('company_id', $this->company_id);
     }
 
     public function supplier()
     {
-        return $this->belongsTo(Supplier::class);
+        return $this->belongsTo(Supplier::class)
+            ->where('company_id', $this->company_id);
     }
 
     public function payments()
     {
-        return $this->hasMany(SupplierPayment::class);
+        return $this->hasMany(SupplierPayment::class)
+            ->where('company_id', $this->company_id);
     }
 
     public function company()

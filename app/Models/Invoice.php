@@ -2,7 +2,6 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use App\Models\Concerns\BelongsToCompanyTrait;
 
@@ -20,24 +19,32 @@ class Invoice extends Model
         'issued_at'
     ];
 
+    /* =====================================================
+     | Relations (company safe)
+     * ===================================================== */
+
     public function customer()
     {
-        return $this->belongsTo(\App\Models\Customer::class, 'customer_id');
+        return $this->belongsTo(Customer::class, 'customer_id')
+            ->where('company_id', $this->company_id);
     }
 
     public function items()
     {
-        return $this->hasMany(InvoiceItem::class);
+        return $this->hasMany(InvoiceItem::class)
+            ->where('company_id', $this->company_id);
     }
 
     public function order()
     {
-        return $this->belongsTo(Order::class);
+        return $this->belongsTo(Order::class)
+            ->where('company_id', $this->company_id);
     }
 
     public function payments()
     {
-        return $this->hasMany(Payment::class);
+        return $this->hasMany(Payment::class)
+            ->where('company_id', $this->company_id);
     }
 
     public function refunds()
@@ -45,17 +52,35 @@ class Invoice extends Model
         return $this->hasManyThrough(
             PaymentRefund::class,
             Payment::class,
-            'invoice_id',   // Foreign key on Payment table
-            'payment_id',   // Foreign key on PaymentRefund table
-            'id',           // Local key on Invoice
-            'id'            // Local key on Payment
-        );
+            'invoice_id',   // FK on payments table
+            'payment_id',   // FK on payment_refunds table
+            'id',
+            'id'
+        )
+            ->where('payments.company_id', $this->company_id)
+            ->where('payment_refunds.company_id', $this->company_id);
     }
 
     public function journalEntries()
     {
-        return $this->morphMany(JournalEntry::class, 'source');
+        return $this->morphMany(JournalEntry::class, 'source')
+            ->where('company_id', $this->company_id);
     }
+
+    public function customerLedgerEntries()
+    {
+        return $this->hasMany(CustomerLedgerEntry::class)
+            ->where('company_id', $this->company_id);
+    }
+
+    public function company()
+    {
+        return $this->belongsTo(Company::class);
+    }
+
+    /* =====================================================
+     | Computed attributes
+     * ===================================================== */
 
     public function getTotalPaidAttribute()
     {
@@ -64,7 +89,7 @@ class Invoice extends Model
 
     public function getTotalRefundedAttribute()
     {
-        return $this->refunds()->sum('payment_refunds.amount');
+        return $this->refunds()->sum('amount');
     }
 
     public function getNetPaidAttribute()
@@ -75,13 +100,5 @@ class Invoice extends Model
     public function getRemainingAttribute()
     {
         return max(0, $this->total - $this->net_paid);
-    }
-    public function customerLedgerEntries()
-    {
-        return $this->hasMany(CustomerLedgerEntry::class);
-    }
-    public function company()
-    {
-        return $this->belongsTo(Company::class);
     }
 }

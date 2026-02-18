@@ -2,7 +2,6 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use App\Models\Concerns\BelongsToCompanyTrait;
 
@@ -20,11 +19,13 @@ class PaymentRefund extends Model
 
     public function payment()
     {
-        return $this->belongsTo(Payment::class);
+        return $this->belongsTo(Payment::class)
+            ->where('company_id', $this->company_id);
     }
     public function customerLedgerEntry()
     {
-        return $this->hasOne(CustomerLedgerEntry::class);
+        return $this->hasOne(CustomerLedgerEntry::class)
+            ->where('company_id', $this->company_id);
     }
     public function company()
     {

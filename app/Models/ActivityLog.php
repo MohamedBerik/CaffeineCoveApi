@@ -17,6 +17,7 @@ class ActivityLog extends Model
         'subject_type',
         'subject_id',
         'properties'
+
     ];
 
     protected $casts = [
