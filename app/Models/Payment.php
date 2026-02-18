@@ -2,11 +2,13 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use App\Models\Concerns\BelongsToCompanyTrait;
 
 class Payment extends Model
 {
+    use BelongsToCompanyTrait;
+
     protected $fillable = [
         'company_id',
         'invoice_id',

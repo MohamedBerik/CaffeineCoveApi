@@ -5,10 +5,13 @@ namespace App\Models;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
+use App\Models\Concerns\BelongsToCompanyTrait;
 
 class User extends Authenticatable
 {
     use HasApiTokens, Notifiable;
+    use BelongsToCompanyTrait;
+
 
     protected $fillable = [
         'company_id',
@@ -61,5 +64,10 @@ class User extends Authenticatable
         }
 
         return false;
+    }
+
+    public function isSuperAdmin(): bool
+    {
+        return (bool) $this->is_super_admin;
     }
 }

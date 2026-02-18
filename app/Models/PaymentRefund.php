@@ -4,9 +4,12 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use App\Models\Concerns\BelongsToCompanyTrait;
 
 class PaymentRefund extends Model
 {
+    use BelongsToCompanyTrait;
+
     protected $fillable = [
         'company_id',
         'payment_id',

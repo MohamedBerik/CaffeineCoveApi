@@ -2,18 +2,18 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use App\Models\OrderItem;
 use App\Models\User;
 use App\Models\Invoice;
+use App\Models\Concerns\BelongsToCompanyTrait;
 
 /**
  * @property \Illuminate\Database\Eloquent\Collection|\App\Models\OrderItem[] $items
  */
 class Order extends Model
 {
-    use HasFactory;
+    use BelongsToCompanyTrait;
 
     protected $fillable = [
         'company_id',
