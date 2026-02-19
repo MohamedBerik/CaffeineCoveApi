@@ -53,31 +53,6 @@ Route::middleware('auth:sanctum')->group(function () {
         $request->user()->currentAccessToken()->delete();
         return response()->json(['message' => 'Logged out successfully']);
     });
-
-    /*
-    |--------------------------------------------------------------------------
-    | Old CRUD (company scoped inside controllers)
-    |--------------------------------------------------------------------------
-    */
-
-    Route::apiResource('categories',  CategoryController::class);
-    Route::apiResource('suppliers',   SupplierController::class);
-    Route::apiResource('employees',   EmployeeController::class);
-    Route::apiResource('users',       UserController::class);
-    Route::apiResource('products',    ProductController::class);
-    Route::apiResource('sales',       SaleController::class);
-
-    /*
-    |--------------------------------------------------------------------------
-    | Reservations
-    |--------------------------------------------------------------------------
-    */
-
-    Route::get('/reservations',                [ReservationController::class, 'index']);
-    Route::post('/reservations',               [ReservationController::class, 'store']);
-    Route::post('/reservations/{id}/confirm',  [ReservationController::class, 'confirm']);
-    Route::post('/reservations/{id}/cancel',   [ReservationController::class, 'cancel']);
-    Route::delete('/reservations/{id}',        [ReservationController::class, 'destroy']);
 });
 
 /*
@@ -111,6 +86,18 @@ Route::middleware([
 
         Route::get('/dashboard', [AdminDashboardController::class, 'index']);
         Route::apiResource('customers',   CustomerController::class);
+        Route::apiResource('categories',  CategoryController::class);
+        Route::apiResource('suppliers',   SupplierController::class);
+        Route::apiResource('employees',   EmployeeController::class);
+        Route::apiResource('users',       UserController::class);
+        Route::apiResource('products',    ProductController::class);
+        Route::apiResource('sales',       SaleController::class);
+
+        Route::get('/reservations',                [ReservationController::class, 'index']);
+        Route::post('/reservations',               [ReservationController::class, 'store']);
+        Route::post('/reservations/{id}/confirm',  [ReservationController::class, 'confirm']);
+        Route::post('/reservations/{id}/cancel',   [ReservationController::class, 'cancel']);
+        Route::delete('/reservations/{id}',        [ReservationController::class, 'destroy']);
     });
 
 /*
