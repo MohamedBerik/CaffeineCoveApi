@@ -61,7 +61,6 @@ Route::middleware('auth:sanctum')->group(function () {
     */
 
     Route::apiResource('categories',  CategoryController::class);
-    Route::apiResource('customers',   CustomerController::class);
     Route::apiResource('suppliers',   SupplierController::class);
     Route::apiResource('employees',   EmployeeController::class);
     Route::apiResource('users',       UserController::class);
@@ -111,6 +110,7 @@ Route::middleware([
     ->group(function () {
 
         Route::get('/dashboard', [AdminDashboardController::class, 'index']);
+        Route::apiResource('customers',   CustomerController::class);
     });
 
 /*
