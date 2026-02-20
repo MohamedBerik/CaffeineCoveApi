@@ -83,7 +83,7 @@ class ProductController extends Controller
             'description_ar' => 'required|min:3|max:255',
             'unit_price' => 'required|numeric',
             'category_id' => 'required|exists:categories,id',
-            'product_image' => 'required|max:2048|mimes:png,jpeg',
+            'product_image' => 'required|image|max:2048|mimes:png,jpeg',
         ]);
 
         if ($validate->fails()) {
@@ -109,7 +109,7 @@ class ProductController extends Controller
             "description_ar" => $request->description_ar,
             "unit_price"     => $request->unit_price,
             "stock_quantity" => 0,
-            "quantity" => 0,
+            "quantity"       => $request->quantity,
             "category_id"    => $request->category_id,
             "product_image"  => $imageName,
         ]);
@@ -134,7 +134,7 @@ class ProductController extends Controller
             "description_ar" => "required|min:3|max:255",
             "unit_price" => "required",
             "category_id" => "required",
-            "product_image" => "max:2048|mimes:png,jpeg",
+            "product_image" => "required|image|max:2048|mimes:png,jpeg",
         ]);
 
         if ($validate->fails()) {
@@ -154,6 +154,7 @@ class ProductController extends Controller
                 "description_en" => $request->description_en,
                 "description_ar" => $request->description_ar,
                 "unit_price" => $request->unit_price,
+                // "stock_quantity" => $request->stock_quantity,
                 "category_id" => $request->category_id,
             ]);
             $data = [
