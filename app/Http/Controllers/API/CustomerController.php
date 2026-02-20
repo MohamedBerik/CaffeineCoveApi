@@ -84,7 +84,7 @@ class CustomerController extends Controller
     {
 
         $validate = Validator::make($request->all(), [
-            'id' => 'required|unique:customers|max:20',
+            // 'id' => 'required|unique:customers|max:20',
             'name' => 'required|min:3|max:255',
             'email' => 'required|min:3|max:255',
             'password' => 'required|min:3|max:255',
@@ -100,7 +100,7 @@ class CustomerController extends Controller
         }
 
         $customer = Customer::create([
-            "id" => $request->id,
+            // "id" => $request->id,
             "name" => $request->name,
             "email" => $request->email,
             "password" => Hash::make($request->password),
@@ -123,7 +123,7 @@ class CustomerController extends Controller
             ->find($old_id);
 
         $validate = Validator::make($request->all(), [
-            "id" => ['required', Rule::unique('customers')->ignore($old_id)],
+            // "id" => ['required', Rule::unique('customers')->ignore($old_id)],
             "name" => "required|min:3|max:255",
             "email" => "required|min:3|max:255",
             "password" => "required|min:3|max:255",
@@ -142,7 +142,7 @@ class CustomerController extends Controller
         if ($customer) {
 
             $customer->update([
-                "id" => $request->id,
+                // "id" => $request->id,
                 "name" => $request->name,
                 "email" => $request->email,
                 "password" => Hash::make($request->password),
