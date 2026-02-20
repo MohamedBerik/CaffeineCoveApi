@@ -91,16 +91,16 @@ class CategoryController extends Controller
         $companyId = $request->user()->company_id;
 
         $validate = Validator::make($request->all(), [
-            'cate_image' => 'nullable|image|max:2048|mimes:png,jpeg',
+            'cate_image' => 'required|image|max:2048|mimes:png,jpeg',
 
-            // // unique per company
-            // 'id' => [
-            //     'required',
-            //     'max:20',
-            //     Rule::unique('categories')->where(function ($q) use ($companyId) {
-            //         return $q->where('company_id', $companyId);
-            //     }),
-            // ],
+            // unique per company
+            'id' => [
+                'required',
+                'max:20',
+                Rule::unique('categories')->where(function ($q) use ($companyId) {
+                    return $q->where('company_id', $companyId);
+                }),
+            ],
 
             'title_en' => 'required|min:3|max:255',
             'title_ar' => 'required|min:3|max:255',
@@ -126,7 +126,7 @@ class CategoryController extends Controller
         $category = Category::create([
             "company_id"     => $companyId,
             "cate_image"     => $imageName,
-            // "id"             => $request->id,
+            "id"             => $request->id,
             "title_en"       => $request->title_en,
             "title_ar"       => $request->title_ar,
             "description_en" => $request->description_en,
@@ -151,17 +151,17 @@ class CategoryController extends Controller
             ->find($old_id);
 
         $validate = Validator::make($request->all(), [
-            "cate_image" => "nullable|image|max:2048|mimes:png,jpeg",
+            "cate_image" => "image|max:2048|mimes:png,jpeg",
 
             // unique per company
-            // "id" => [
-            //     'required',
-            //     Rule::unique('categories')
-            //         ->where(function ($q) use ($companyId) {
-            //             return $q->where('company_id', $companyId);
-            //         })
-            //         ->ignore($old_id),
-            // ],
+            "id" => [
+                'required',
+                Rule::unique('categories')
+                    ->where(function ($q) use ($companyId) {
+                        return $q->where('company_id', $companyId);
+                    })
+                    ->ignore($old_id),
+            ],
 
             "title_en" => "required|min:3|max:255",
             "title_ar" => "required|min:3|max:255",
@@ -197,7 +197,7 @@ class CategoryController extends Controller
 
             $category->update([
                 "cate_image"     => $imageName,
-                // "id"             => $request->id,
+                "id"             => $request->id,
                 "title_en"       => $request->title_en,
                 "title_ar"       => $request->title_ar,
                 "description_en" => $request->description_en,
