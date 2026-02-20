@@ -83,7 +83,7 @@ class ProductController extends Controller
             'description_ar' => 'required|min:3|max:255',
             'unit_price' => 'required|numeric',
             'category_id' => 'required|exists:categories,id',
-            'product_image' => 'required|image|max:2048|mimes:png,jpeg',
+            'product_image' => 'required|max:2048|mimes:png,jpeg',
         ]);
 
         if ($validate->fails()) {
@@ -134,7 +134,7 @@ class ProductController extends Controller
             "description_ar" => "required|min:3|max:255",
             "unit_price" => "required",
             "category_id" => "required",
-            "product_image" => "image|max:2048|mimes:png,jpeg",
+            "product_image" => "max:2048|mimes:png,jpeg",
         ]);
 
         if ($validate->fails()) {
