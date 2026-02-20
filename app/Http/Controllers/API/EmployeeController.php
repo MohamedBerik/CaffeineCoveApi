@@ -77,17 +77,17 @@ class EmployeeController extends Controller
 
     public function store(Request $request)
     {
-        $companyId = $request->user()->company_id;
+        // $companyId = $request->user()->company_id;
 
         $validate = Validator::make($request->all(), [
-            'id'       => [
-                'required',
-                'max:20',
-                Rule::unique('employees')->where(
-                    fn($q) =>
-                    $q->where('company_id', $companyId)
-                ),
-            ],
+            // 'id'       => [
+            //     'required',
+            //     'max:20',
+            //     Rule::unique('employees')->where(
+            //         fn($q) =>
+            //         $q->where('company_id', $companyId)
+            //     ),
+            // ],
             'name'     => 'required|min:3|max:255',
             'email'    => 'required|min:3|max:255',
             'password' => 'required|min:3|max:255',
@@ -103,8 +103,7 @@ class EmployeeController extends Controller
         }
 
         $employee = Employee::create([
-            "id"         => $request->id,
-            "company_id" => $companyId,
+            "company_id" => $request->user()->company_id,
             "name"       => $request->name,
             "email"      => $request->email,
             "password"   => Hash::make($request->password),
