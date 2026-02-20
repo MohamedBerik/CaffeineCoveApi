@@ -91,7 +91,7 @@ class CategoryController extends Controller
         $companyId = $request->user()->company_id;
 
         $validate = Validator::make($request->all(), [
-            'cate_image' => 'required|image|max:2048|mimes:png,jpeg',
+            'cate_image' => 'nullable|image|max:2048|mimes:png,jpeg',
 
             // // unique per company
             // 'id' => [
@@ -151,7 +151,7 @@ class CategoryController extends Controller
             ->find($old_id);
 
         $validate = Validator::make($request->all(), [
-            "cate_image" => "image|max:2048|mimes:png,jpeg",
+            "cate_image" => "nullable|image|max:2048|mimes:png,jpeg",
 
             // unique per company
             // "id" => [
