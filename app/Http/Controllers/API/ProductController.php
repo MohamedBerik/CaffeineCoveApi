@@ -83,7 +83,7 @@ class ProductController extends Controller
             'description_ar' => 'required|min:3|max:255',
             'unit_price' => 'required|numeric',
             'category_id' => 'required|exists:categories,id',
-            'product_image' => 'required|image|max:2048|mimes:png,jpeg',
+            // 'product_image' => 'required|image|max:2048|mimes:png,jpeg',
         ]);
 
         if ($validate->fails()) {
@@ -95,11 +95,11 @@ class ProductController extends Controller
             return response()->json($data);
         }
 
-        if ($request->hasFile("product_image")) {
-            $image = $request->product_image;
-            $imageName = rand(1, 1000) . "_" . time() . "." . $image->extension();
-            $image->move(public_path("/img/product/"), $imageName);
-        }
+        // if ($request->hasFile("product_image")) {
+        //     $image = $request->product_image;
+        //     $imageName = rand(1, 1000) . "_" . time() . "." . $image->extension();
+        //     $image->move(public_path("/img/product/"), $imageName);
+        // }
 
         $product = Product::create([
             "company_id"     => $request->user()->company_id,
@@ -109,9 +109,9 @@ class ProductController extends Controller
             "description_ar" => $request->description_ar,
             "unit_price"     => $request->unit_price,
             "stock_quantity" => 0,
-            "quantity"       => $request->quantity,
             "category_id"    => $request->category_id,
-            "product_image"  => $imageName,
+            // "quantity"       => $request->quantity,
+            // "product_image"  => $imageName,
         ]);
 
         $data = [
