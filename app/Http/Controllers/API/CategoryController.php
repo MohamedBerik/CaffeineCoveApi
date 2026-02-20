@@ -91,7 +91,7 @@ class CategoryController extends Controller
         // $companyId = $request->user()->company_id;
 
         $validate = Validator::make($request->all(), [
-            'cate_image' => 'required',
+            // 'cate_image' => 'required|image|max:2048|mimes:png,jpeg',
 
             // unique per company
             // 'id' => [
@@ -117,15 +117,15 @@ class CategoryController extends Controller
             return response()->json($data);
         }
 
-        if ($request->hasFile("cate_image")) {
-            $image = $request->cate_image;
-            $imageName = rand(1, 1000) . "_" . time() . "." . $image->extension();
-            $image->move(public_path("/img/category/"), $imageName);
-        }
+        // if ($request->hasFile("cate_image")) {
+        //     $image = $request->cate_image;
+        //     $imageName = rand(1, 1000) . "_" . time() . "." . $image->extension();
+        //     $image->move(public_path("/img/category/"), $imageName);
+        // }
 
         $category = Category::create([
             "company_id" => $request->user()->company_id,
-            "cate_image"     => $imageName,
+            // "cate_image"     => $imageName,
             "title_en"       => $request->title_en,
             "title_ar"       => $request->title_ar,
             "description_en" => $request->description_en,
