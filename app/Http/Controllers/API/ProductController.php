@@ -77,13 +77,13 @@ class ProductController extends Controller
     {
 
         $validate = Validator::make($request->all(), [
-            // 'product_image' => 'required|image|max:2048|mimes:png,jpeg',
             'title_en' => 'required|min:3|max:255',
             'title_ar' => 'required|min:3|max:255',
             'description_en' => 'required|min:3|max:255',
             'description_ar' => 'required|min:3|max:255',
             'unit_price' => 'required|numeric',
             'category_id' => 'required|exists:categories,id',
+            'product_image' => 'required|image|max:2048|mimes:png,jpeg',
         ]);
 
         if ($validate->fails()) {
@@ -103,14 +103,15 @@ class ProductController extends Controller
 
         $product = Product::create([
             "company_id"     => $request->user()->company_id,
-            "product_image"  => $imageName,
             "title_en"       => $request->title_en,
             "title_ar"       => $request->title_ar,
             "description_en" => $request->description_en,
             "description_ar" => $request->description_ar,
             "unit_price"     => $request->unit_price,
             "stock_quantity" => 0,
+            "quantity" => 0,
             "category_id"    => $request->category_id,
+            "product_image"  => $imageName,
         ]);
 
         $data = [
@@ -127,14 +128,13 @@ class ProductController extends Controller
             ->find($old_id);
 
         $validate = Validator::make($request->all(), [
-            "product_image" => "image|max:2048|mimes:png,jpeg",
             "title_en" => "required|min:3|max:255",
             "title_ar" => "required|min:3|max:255",
             "description_en" => "required|min:3|max:255",
             "description_ar" => "required|min:3|max:255",
             "unit_price" => "required",
-            // "stock_quantity" => "required",
             "category_id" => "required",
+            "product_image" => "image|max:2048|mimes:png,jpeg",
         ]);
 
         if ($validate->fails()) {
@@ -154,7 +154,6 @@ class ProductController extends Controller
                 "description_en" => $request->description_en,
                 "description_ar" => $request->description_ar,
                 "unit_price" => $request->unit_price,
-                // "stock_quantity" => $request->stock_quantity,
                 "category_id" => $request->category_id,
             ]);
             $data = [
