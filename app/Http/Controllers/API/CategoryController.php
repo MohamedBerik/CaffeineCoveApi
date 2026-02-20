@@ -83,16 +83,16 @@ class CategoryController extends Controller
             return response()->json($data);
         }
 
-        if ($request->hasFile("cate_image")) {
-            $image = $request->cate_image;
-            $imageName = rand(1, 1000) . "_" . time() . "." . $image->extension();
-            $image->move(public_path("/img/category/"), $imageName);
-        }
+        // if ($request->hasFile("cate_image")) {
+        //     $image = $request->cate_image;
+        //     $imageName = rand(1, 1000) . "_" . time() . "." . $image->extension();
+        //     $image->move(public_path("/img/category/"), $imageName);
+        // }
 
         $category = Category::create([
             // "id"             => $request->id,
+            // "cate_image"     => $imageName,
             "company_id"     => $companyId,
-            "cate_image"     => $imageName,
             "title_en"       => $request->title_en,
             "title_ar"       => $request->title_ar,
             "description_en" => $request->description_en,
@@ -144,47 +144,47 @@ class CategoryController extends Controller
             return response()->json($data);
         }
 
-        if ($category) {
+        // if ($category) {
 
-            if ($request->hasFile("cate_image")) {
+        //     if ($request->hasFile("cate_image")) {
 
-                $image = $request->cate_image;
-                $imageName = rand(1, 1000) . "_" . time() . "." . $image->extension();
+        //         $image = $request->cate_image;
+        //         $imageName = rand(1, 1000) . "_" . time() . "." . $image->extension();
 
-                if (File::exists(public_path("/img/category/" . $category->cate_image))) {
-                    File::delete(public_path("/img/category/" . $category->cate_image));
-                }
+        //         if (File::exists(public_path("/img/category/" . $category->cate_image))) {
+        //             File::delete(public_path("/img/category/" . $category->cate_image));
+        //         }
 
-                $image->move(public_path("/img/category/"), $imageName);
-            } else {
+        //         $image->move(public_path("/img/category/"), $imageName);
+        //     } else {
 
-                $imageName = $category->cate_image;
-            }
+        //         $imageName = $category->cate_image;
+        //     }
 
-            $category->update([
-                "id"             => $request->id,
-                "cate_image"     => $imageName,
-                "title_en"       => $request->title_en,
-                "title_ar"       => $request->title_ar,
-                "description_en" => $request->description_en,
-                "description_ar" => $request->description_ar,
-            ]);
+        //     $category->update([
+        //         // "id"             => $request->id,
+        //         // "cate_image"     => $imageName,
+        //         "title_en"       => $request->title_en,
+        //         "title_ar"       => $request->title_ar,
+        //         "description_en" => $request->description_en,
+        //         "description_ar" => $request->description_ar,
+        //     ]);
 
-            $data = [
-                "msg" => "Updated Successfully",
-                "status" => 200,
-                "data" => new CategoryResource($category)
-            ];
-            return response()->json($data);
-        } else {
+        //     $data = [
+        //         "msg" => "Updated Successfully",
+        //         "status" => 200,
+        //         "data" => new CategoryResource($category)
+        //     ];
+        //     return response()->json($data);
+        // } else {
 
-            $data = [
-                "msg" => "No such id",
-                "status" => 205,
-                "data" => null
-            ];
-            return response()->json($data);
-        }
+        //     $data = [
+        //         "msg" => "No such id",
+        //         "status" => 205,
+        //         "data" => null
+        //     ];
+        //     return response()->json($data);
+        // }
     }
 
     function delete(Request $request)
