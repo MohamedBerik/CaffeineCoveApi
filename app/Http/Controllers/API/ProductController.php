@@ -77,7 +77,7 @@ class ProductController extends Controller
     {
 
         $validate = Validator::make($request->all(), [
-            'product_image' => 'required|image|max:2048|mimes:png,jpeg',
+            // 'product_image' => 'required|image|max:2048|mimes:png,jpeg',
             'title_en' => 'required|min:3|max:255',
             'title_ar' => 'required|min:3|max:255',
             'description_en' => 'required|min:3|max:255',
