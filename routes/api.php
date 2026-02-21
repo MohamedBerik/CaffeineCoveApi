@@ -23,7 +23,6 @@ use App\Http\Controllers\API\Erp\PurchaseOrderController;
 use App\Http\Controllers\API\Erp\FinanceDashboardController;
 use App\Http\Controllers\API\Erp\ActivityLogController;
 use App\Http\Controllers\API\Erp\CustomerStatementController;
-use App\Http\Controllers\API\Erp\OrderInvoiceController;
 use App\Http\Controllers\API\Erp\PaymentRefundController;
 use App\Http\Controllers\API\Erp\SupplierStatementController;
 use App\Http\Controllers\API\Erp\InvoiceJournalController;
