@@ -54,9 +54,9 @@ class ProductController extends Controller
         $product = Product::where('company_id', $request->user()->company_id)
             ->find($id);
         if ($product) {
-            if (File::exists(public_path("/img/product/" . $product->product_image))) {
-                File::delete(public_path("/img/product/" . $product->product_image));
-            }
+            // if (File::exists(public_path("/img/product/" . $product->product_image))) {
+            //     File::delete(public_path("/img/product/" . $product->product_image));
+            // }
             $product->delete();
             $data = [
                 "msg" => "Deleted Successfully",
