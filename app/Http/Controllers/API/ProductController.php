@@ -109,8 +109,8 @@ class ProductController extends Controller
             "description_ar" => $request->description_ar,
             "unit_price"     => $request->unit_price,
             "stock_quantity" => 0,
-            "quantity"       => 0,
             "category_id"    => $request->category_id,
+            "quantity"       => $request->quantity,
             // "product_image"  => $imageName,
         ]);
 
