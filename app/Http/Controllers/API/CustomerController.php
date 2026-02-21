@@ -29,7 +29,6 @@ class CustomerController extends Controller
         ]);
     }
 
-
     public function show(Request $request, $id)
     {
         $companyId = $request->user()->company_id;
