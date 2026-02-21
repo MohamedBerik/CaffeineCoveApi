@@ -34,7 +34,7 @@ class OrderController extends Controller
 
     public function showErp(Request $request, $id)
     {
-        $companyId = $request->user()->company_id;
+        // $companyId = $request->user()->company_id;
 
         $order = Order::with([
             'customer',
@@ -42,7 +42,7 @@ class OrderController extends Controller
             'invoice.payments',
             'invoice.refunds'
         ])
-            ->where('company_id', $companyId)
+            // ->where('company_id', $companyId)
             ->findOrFail($id);
 
         return response()->json($order);
