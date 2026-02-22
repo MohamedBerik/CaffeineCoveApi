@@ -67,9 +67,10 @@ class OrderController extends Controller
                 'customer_id'   => $data['customer_id'],
                 'status'        => 'pending',
                 'total'         => 0,
-                'created_by'    => $request->user()->id,
-                'title_en'      => $request->input('title_en'),
-                'title_ar'      => $request->input('title_ar'),
+                'created_by'    => $request->user()->id ?? null,
+
+                'title_en'       => $request->input('title_en'),
+                'title_ar'       => $request->input('title_ar'),
                 'description_en' => $request->input('description_en'),
                 'description_ar' => $request->input('description_ar'),
             ]);
@@ -83,20 +84,18 @@ class OrderController extends Controller
                     ->findOrFail($row['product_id']);
 
                 if ($product->quantity < $row['quantity']) {
-                    return response()->json([
-                        'msg' => "Insufficient stock for product {$product->id}"
-                    ], 422);
+                    abort(422, "Insufficient stock for product {$product->id}");
                 }
 
                 $lineTotal = $product->unit_price * $row['quantity'];
 
                 OrderItem::create([
-                    'company_id'  => $companyId,
-                    'order_id'    => $order->id,
-                    'product_id'  => $product->id,
-                    'quantity'    => $row['quantity'],
-                    'unit_price'  => $product->unit_price,
-                    'total'       => $lineTotal,
+                    'company_id' => $companyId,
+                    'order_id'   => $order->id,
+                    'product_id' => $product->id,
+                    'quantity'   => $row['quantity'],
+                    'unit_price' => $product->unit_price,
+                    'total'      => $lineTotal,
                 ]);
 
                 $product->decrement('quantity', $row['quantity']);
@@ -108,7 +107,7 @@ class OrderController extends Controller
                     'quantity'       => $row['quantity'],
                     'reference_type' => Order::class,
                     'reference_id'   => $order->id,
-                    'created_by'     => $request->user()->id,
+                    'created_by'     => $request->user()->id ?? null,
                 ]);
 
                 $total += $lineTotal;
@@ -118,7 +117,7 @@ class OrderController extends Controller
 
             return response()->json([
                 'msg'  => 'Order created (ERP)',
-                'data' => $order->load('items.product'),
+                'data' => $order->load('customer', 'items.product'),
             ], 201);
         });
     }
@@ -127,18 +126,16 @@ class OrderController extends Controller
     {
         $companyId = $request->user()->company_id;
 
-        return DB::transaction(function () use ($request, $id, $companyId) {
+        return DB::transaction(function () use ($id, $companyId) {
 
-            // ✅ القفل داخل الـ transaction
-            $order = Order::with(['items', 'invoice'])
-                ->where('company_id', $companyId)
+            $order = Order::where('company_id', $companyId)
                 ->lockForUpdate()
+                ->with(['items', 'invoice'])
                 ->findOrFail($id);
 
             if ($order->invoice) {
                 return response()->json([
                     'msg' => 'Invoice already exists for this order',
-                    'invoice_id' => $order->invoice->id
                 ], 422);
             }
 
@@ -154,6 +151,7 @@ class OrderController extends Controller
                 ], 422);
             }
 
+            // ✅ هنا السبب اللي بيطلع عندك
             if ($order->items->isEmpty()) {
                 return response()->json([
                     'msg' => 'Order has no items',
@@ -165,13 +163,13 @@ class OrderController extends Controller
             $order->update(['status' => 'confirmed', 'total' => $total]);
 
             $invoice = Invoice::create([
-                'company_id'  => $companyId,
-                'number'      => 'INV-' . now()->format('YmdHis') . '-' . $order->id,
-                'order_id'    => $order->id,
-                'customer_id' => $order->customer_id,
-                'total'       => $total,
-                'status'      => 'unpaid',
-                'issued_at'   => now(),
+                'company_id'   => $companyId,
+                'number'       => 'INV-' . now()->format('YmdHis') . '-' . $order->id,
+                'order_id'     => $order->id,
+                'customer_id'  => $order->customer_id,
+                'total'        => $total,
+                'status'       => 'unpaid',
+                'issued_at'    => now(),
             ]);
 
             CustomerLedgerEntry::create([
@@ -181,7 +179,7 @@ class OrderController extends Controller
                 'type'        => 'invoice',
                 'debit'       => $invoice->total,
                 'credit'      => 0,
-                'entry_date'  => now(),
+                'entry_date'  => now()->toDateString(),
                 'description' => 'Invoice ' . $invoice->number,
             ]);
 
@@ -196,7 +194,6 @@ class OrderController extends Controller
                 ]);
             }
 
-            // ✅ توحيد اللوج للشركة
             activity('order.confirmed', $order, [], $companyId);
 
             return response()->json([
@@ -212,21 +209,14 @@ class OrderController extends Controller
 
         return DB::transaction(function () use ($request, $id, $companyId) {
 
-            $order = Order::with(['items', 'invoice'])
-                ->where('company_id', $companyId)
+            $order = Order::where('company_id', $companyId)
                 ->lockForUpdate()
+                ->with('items')
                 ->findOrFail($id);
 
             if ($order->status === 'cancelled') {
                 return response()->json([
                     'msg' => 'Order already cancelled',
-                ], 422);
-            }
-
-            // ✅ مهم جدًا: منع إلغاء أوردر confirmed عليه فاتورة (إلا لو هتعمل Credit Note / void invoice)
-            if ($order->status === 'confirmed' || $order->invoice) {
-                return response()->json([
-                    'msg' => 'Cannot cancel a confirmed order with an invoice. Create a proper return/credit note flow instead.',
                 ], 422);
             }
 
@@ -245,7 +235,7 @@ class OrderController extends Controller
                     'quantity'       => $item->quantity,
                     'reference_type' => Order::class,
                     'reference_id'   => $order->id,
-                    'created_by'     => $request->user()->id,
+                    'created_by'     => $request->user()->id ?? null,
                 ]);
             }
 
