@@ -43,8 +43,7 @@ class Order extends Model
 
     public function customer()
     {
-        return $this->belongsTo(Customer::class, 'customer_id')
-            ->where('company_id', $this->company_id);
+        return $this->belongsTo(Customer::class, 'customer_id');
     }
 
     public function creator()
