@@ -21,7 +21,7 @@ class Invoice extends Model
 
     protected $casts = [
         'issued_at' => 'datetime',
-        'total'     => 'float',
+        'total'     => 'decimal:2',
     ];
 
     // اختياري: لو حابب الخصائص المحسوبة تظهر في JSON تلقائيًا

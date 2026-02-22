@@ -13,9 +13,11 @@ class AddReceivedAtToPurchaseOrdersTable extends Migration
      */
     public function up()
     {
-        Schema::table('purchase_orders', function (Blueprint $table) {
-            $table->timestamp('received_at')->nullable()->after('status');
-        });
+        if (!Schema::hasColumn('purchase_orders', 'received_at')) {
+            Schema::table('purchase_orders', function (Blueprint $table) {
+                $table->timestamp('received_at')->nullable()->after('status');
+            });
+        }
     }
 
     /**
@@ -25,8 +27,10 @@ class AddReceivedAtToPurchaseOrdersTable extends Migration
      */
     public function down()
     {
-        Schema::table('purchase_orders', function (Blueprint $table) {
-            //
-        });
+        if (Schema::hasColumn('purchase_orders', 'received_at')) {
+            Schema::table('purchase_orders', function (Blueprint $table) {
+                $table->dropColumn('received_at');
+            });
+        }
     }
 }

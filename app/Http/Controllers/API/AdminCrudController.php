@@ -21,6 +21,7 @@ class AdminCrudController extends Controller
         'invoices',
         'suppliers',
         'purchase_orders',
+        'companies',
     ];
 
     private function checkTable(string $table)
@@ -38,21 +39,18 @@ class AdminCrudController extends Controller
     {
         $user = $request->user();
 
-        // ✅ super admin يرى كل شيء
-        if ($user->is_super_admin) {
+        // ✅ super admin يرى كل الشركات (بدون فلترة)
+        if ($user && $user->is_super_admin) {
             return $query;
         }
 
-        if (
-            Schema::hasColumn($table, 'company_id')
-            && $user->company_id
-        ) {
+        // ✅ غير السوبر أدمن: فلترة على company_id
+        if (Schema::hasColumn($table, 'company_id')) {
             $query->where('company_id', $user->company_id);
         }
 
         return $query;
     }
-
 
     // =====================
     // GET ALL
@@ -120,7 +118,6 @@ class AdminCrudController extends Controller
     // =====================
     public function store(Request $request, string $table)
     {
-        // $this->authorizeSuperAdmin($request);
         $this->checkTable($table);
 
         $data = $request->except(['id', 'created_at', 'updated_at']);
@@ -130,18 +127,13 @@ class AdminCrudController extends Controller
         }
 
         if (Schema::hasColumn($table, 'company_id')) {
-
-            if (!$request->user()->is_super_admin) {
-
-                $data['company_id'] = $request->user()->company_id;
-            } else {
-
-                // super admin يجب أن يرسل company_id صراحة
-                if (empty($data['company_id'])) {
-                    return response()->json([
-                        'message' => 'company_id is required for super admin'
-                    ], 422);
+            if ($request->user()->is_super_admin) {
+                // لو مش باعته company_id اعتبرها خطأ
+                if (!isset($data['company_id'])) {
+                    return response()->json(['message' => 'company_id is required'], 422);
                 }
+            } else {
+                $data['company_id'] = $request->user()->company_id;
             }
         }
 
@@ -159,54 +151,6 @@ class AdminCrudController extends Controller
     // =====================
     // UPDATE
     // =====================
-
-    // public function update(Request $request, string $table, int $id)
-    // {
-    //     // $this->authorizeSuperAdmin($request);
-    //     $this->checkTable($table);
-
-    //     $data = $request->except(['id', 'created_at', 'company_id']);
-
-    //     if (array_key_exists('password', $data)) {
-    //         if ($data['password']) {
-    //             $data['password'] = bcrypt($data['password']);
-    //         } else {
-    //             unset($data['password']);
-    //         }
-    //     }
-
-    //     $query = DB::table($table);
-
-    //     if (Schema::hasColumn($table, 'company_id')) {
-
-    //         if (!$request->user()->is_super_admin) {
-
-    //             $data['company_id'] = $request->user()->company_id;
-    //         } else {
-
-    //             // super admin يجب أن يرسل company_id صراحة
-    //             if (empty($data['company_id'])) {
-    //                 return response()->json([
-    //                     'message' => 'company_id is required for super admin'
-    //                 ], 422);
-    //             }
-    //         }
-    //     }
-
-    //     $data['updated_at'] = now();
-
-    //     $updated = $query->where('id', $id)->update($data);
-
-    //     if (!$updated) {
-    //         return response()->json(['message' => 'Not found'], 404);
-    //     }
-
-    //     return response()->json([
-    //         'success' => true,
-    //         'message' => 'Updated successfully'
-    //     ]);
-    // }
-
     public function update(Request $request, string $table, int $id)
     {
         $this->checkTable($table);
@@ -254,42 +198,6 @@ class AdminCrudController extends Controller
     // =====================
     // DELETE
     // =====================
-
-    // public function destroy(Request $request, string $table, int $id)
-    // {
-    //     // $this->authorizeSuperAdmin($request);
-    //     $this->checkTable($table);
-
-    //     $query = DB::table($table);
-
-    //     if (Schema::hasColumn($table, 'company_id')) {
-
-    //         if (!$request->user()->is_super_admin) {
-
-    //             $data['company_id'] = $request->user()->company_id;
-    //         } else {
-
-    //             // super admin يجب أن يرسل company_id صراحة
-    //             if (empty($data['company_id'])) {
-    //                 return response()->json([
-    //                     'message' => 'company_id is required for super admin'
-    //                 ], 422);
-    //             }
-    //         }
-    //     }
-
-    //     $deleted = $query->where('id', $id)->delete();
-
-    //     if (!$deleted) {
-    //         return response()->json(['message' => 'Not found'], 404);
-    //     }
-
-    //     return response()->json([
-    //         'success' => true,
-    //         'message' => 'Deleted successfully'
-    //     ]);
-    // }
-
     public function destroy(Request $request, string $table, int $id)
     {
         $this->checkTable($table);

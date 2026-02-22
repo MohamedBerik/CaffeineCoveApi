@@ -24,7 +24,11 @@ return new class extends Migration
 
     public function up(): void
     {
-        // ✅ already exists => do nothing
+        if (!Schema::hasTable('accounts')) {
+            return;
+        }
+
+        // ✅ لو الإندكس موجود خلاص.. اخرج
         if ($this->indexExists('accounts', 'accounts_company_code_unique')) {
             return;
         }
@@ -36,6 +40,10 @@ return new class extends Migration
 
     public function down(): void
     {
+        if (!Schema::hasTable('accounts')) {
+            return;
+        }
+
         if (! $this->indexExists('accounts', 'accounts_company_code_unique')) {
             return;
         }

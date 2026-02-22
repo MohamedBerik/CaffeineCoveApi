@@ -6,40 +6,26 @@ use Illuminate\Support\Facades\Schema;
 
 class CreateAccountsTable extends Migration
 {
-    /**
-     * Run the migrations.
-     *
-     * @return void
-     */
     public function up()
     {
+        if (Schema::hasTable('accounts')) {
+            return;
+        }
+
         Schema::create('accounts', function (Blueprint $table) {
             $table->id();
-
-            $table->string('code')->unique();
+            $table->unsignedBigInteger('company_id');
+            $table->string('code');
             $table->string('name');
-
-            $table->enum('type', [
-                'asset',
-                'liability',
-                'equity',
-                'revenue',
-                'expense'
-            ]);
-
-            $table->foreignId('parent_id')->nullable()
-                ->constrained('accounts')
-                ->nullOnDelete();
-
+            $table->enum('type', ['asset', 'liability', 'equity', 'revenue', 'expense']);
+            $table->foreignId('parent_id')->nullable()->constrained('accounts')->nullOnDelete();
             $table->timestamps();
+
+            $table->unique(['company_id', 'code'], 'accounts_company_code_unique');
+            $table->foreign('company_id')->references('id')->on('companies')->cascadeOnDelete();
         });
     }
 
-    /**
-     * Reverse the migrations.
-     *
-     * @return void
-     */
     public function down()
     {
         Schema::dropIfExists('accounts');

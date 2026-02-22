@@ -18,6 +18,11 @@ class Customer extends Model
         "status",
     ];
 
+    protected $hidden = [
+        'password',
+        'remember_token',
+    ];
+
     public function ledgerEntries()
     {
         return $this->hasMany(CustomerLedgerEntry::class)
