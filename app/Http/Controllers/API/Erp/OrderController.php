@@ -79,18 +79,18 @@ class OrderController extends Controller
 
             foreach ($data['items'] as $row) {
 
-                $product = Product::where('company_id', $companyId)
-                    ->lockForUpdate()
-                    ->findOrFail($row['product_id']);
+                // داخل storeErp() أثناء loop على items
 
-                if ($product->stock_quantity < $row['quantity']) {
+                $product = Product::lockForUpdate()->findOrFail($row['product_id']);
+
+                // ✅ المخزون الرسمي
+                if ((int)$product->stock_quantity < (int)$row['quantity']) {
                     abort(422, "Insufficient stock for product {$product->id}");
                 }
 
                 $lineTotal = $product->unit_price * $row['quantity'];
 
                 OrderItem::create([
-                    'company_id' => $companyId,
                     'order_id'   => $order->id,
                     'product_id' => $product->id,
                     'quantity'   => $row['quantity'],
@@ -98,17 +98,16 @@ class OrderController extends Controller
                     'total'      => $lineTotal,
                 ]);
 
+                // ✅ خصم من stock_quantity فقط
                 $product->decrement('stock_quantity', $row['quantity']);
-                $product->decrement('quantity', $row['quantity']);
 
                 StockMovement::create([
-                    'company_id'     => $companyId,
                     'product_id'     => $product->id,
                     'type'           => 'out',
                     'quantity'       => $row['quantity'],
                     'reference_type' => Order::class,
                     'reference_id'   => $order->id,
-                    'created_by'     => $request->user()->id ?? null,
+                    'created_by'     => $request->user()->id,
                 ]);
 
                 $total += $lineTotal;
@@ -223,21 +222,18 @@ class OrderController extends Controller
 
             foreach ($order->items as $item) {
 
-                $product = Product::where('company_id', $companyId)
-                    ->lockForUpdate()
-                    ->findOrFail($item->product_id);
+                $product = Product::lockForUpdate()->findOrFail($item->product_id);
 
+                // ✅ رجّع على stock_quantity فقط
                 $product->increment('stock_quantity', $item->quantity);
-                $product->increment('quantity', $item->quantity);
 
                 StockMovement::create([
-                    'company_id'     => $companyId,
                     'product_id'     => $product->id,
                     'type'           => 'in',
                     'quantity'       => $item->quantity,
                     'reference_type' => Order::class,
                     'reference_id'   => $order->id,
-                    'created_by'     => $request->user()->id ?? null,
+                    'created_by'     => $request->user()->id,
                 ]);
             }
 
