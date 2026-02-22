@@ -94,7 +94,7 @@ class Invoice extends Model
 
     public function getTotalRefundedAttribute()
     {
-        return (float) $this->refunds()->sum('amount');
+        return (float) $this->refunds()->sum('payment_refunds.amount');
     }
 
     public function getNetPaidAttribute()
