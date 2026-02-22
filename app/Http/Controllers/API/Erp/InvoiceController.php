@@ -13,63 +13,15 @@ class InvoiceController extends Controller
         $companyId = $request->user()->company_id;
 
         $invoices = Invoice::with([
-            'customer' => function ($q) use ($companyId) {
-                $q->where('company_id', $companyId);
-            },
-            'payments' => function ($q) use ($companyId) {
-                $q->where('company_id', $companyId);
-            },
-            'payments.refunds' => function ($q) use ($companyId) {
-                $q->where('company_id', $companyId);
-            },
+            'customer',
+            'payments.refunds',
         ])
-
             ->where('company_id', $companyId)
-            ->orderBy('issued_at', 'desc')
+            ->orderByDesc('issued_at')
             ->get()
-            ->map(function ($invoice) {
+            ->map(fn($invoice) => $this->transformInvoice($invoice));
 
-                $totalPaid = $invoice->payments->sum('amount');
-
-                $totalRefunded = $invoice->payments->sum(function ($p) {
-                    return $p->refunds->sum('amount');
-                });
-
-                $remaining = $invoice->total - ($totalPaid - $totalRefunded);
-
-                if ($remaining < 0) {
-                    $remaining = 0;
-                }
-
-                return [
-                    'id' => $invoice->id,
-                    'number' => $invoice->number,
-                    'issued_at' => $invoice->issued_at,
-                    'total' => $invoice->total,
-                    'status' => $invoice->status,
-
-                    'customer' => $invoice->customer,
-
-                    'total_paid' => $totalPaid - $totalRefunded,
-                    'total_refunded' => $totalRefunded,
-                    'remaining' => $remaining,
-
-                    'payments' => $invoice->payments->map(function ($p) {
-
-                        $refunded = $p->refunds->sum('amount');
-
-                        return [
-                            'id' => $p->id,
-                            'amount' => $p->amount,
-                            'method' => $p->method,
-                            'paid_at' => $p->paid_at,
-                            'refunded_amount' => $refunded,
-                        ];
-                    }),
-                ];
-            });
-
-        return response()->json($invoices);
+        return response()->json($invoices->values());
     }
 
     public function show(Request $request, $id)
@@ -77,16 +29,18 @@ class InvoiceController extends Controller
         $companyId = $request->user()->company_id;
 
         $invoice = Invoice::with([
-            'items' => fn($q) => $q->where('company_id', $companyId),
-            'items.product' => fn($q) => $q->where('company_id', $companyId),
-
-            'payments' => fn($q) => $q->where('company_id', $companyId),
-            'payments.refunds' => fn($q) => $q->where('company_id', $companyId),
+            'customer',
+            'items.product',
+            'payments.refunds',
         ])
             ->where('company_id', $companyId)
             ->findOrFail($id);
 
-        return response()->json($invoice);
+        // ✅ نوحد نفس شكل indexErp + نضيف items
+        $payload = $this->transformInvoice($invoice);
+        $payload['items'] = $invoice->items->values();
+
+        return response()->json($payload);
     }
 
     public function showFullInvoice(Request $request, $id)
@@ -94,22 +48,64 @@ class InvoiceController extends Controller
         $companyId = $request->user()->company_id;
 
         $invoice = Invoice::with([
-            'items' => fn($q) => $q->where('company_id', $companyId),
-            'items.product' => fn($q) => $q->where('company_id', $companyId),
-
-            'payments' => fn($q) => $q->where('company_id', $companyId),
-            'payments.refunds' => fn($q) => $q->where('company_id', $companyId),
-
-            'journalEntries' => fn($q) => $q->where('company_id', $companyId),
-            'journalEntries.lines',
-            'journalEntries.lines.account' => fn($q) => $q->where('company_id', $companyId),
+            'customer',
+            'items.product',
+            'payments.refunds',
+            'journalEntries.lines.account',
         ])
-
             ->where('company_id', $companyId)
             ->findOrFail($id);
 
+        $payload = $this->transformInvoice($invoice);
+        $payload['items'] = $invoice->items->values();
+        $payload['journal_entries'] = $invoice->journalEntries->values();
+
         return response()->json([
-            'invoice' => $invoice
+            'invoice' => $payload
         ]);
+    }
+
+    /**
+     * ✅ توحيد شكل الفاتورة في كل endpoints
+     */
+    private function transformInvoice(Invoice $invoice): array
+    {
+        $totalPaid = $invoice->payments->sum('amount');
+
+        $totalRefunded = $invoice->payments->sum(function ($p) {
+            return $p->refunds->sum('amount');
+        });
+
+        $netPaid = $totalPaid - $totalRefunded;
+        $remaining = max(0, $invoice->total - $netPaid);
+
+        return [
+            'id' => $invoice->id,
+            'number' => $invoice->number,
+            'issued_at' => $invoice->issued_at,
+            'total' => $invoice->total,
+            'status' => $invoice->status,
+
+            'customer' => $invoice->customer,
+
+            // ✅ computed for UI
+            'total_paid' => $netPaid,
+            'total_refunded' => $totalRefunded,
+            'net_paid' => $netPaid,
+            'remaining' => $remaining,
+
+            // ✅ payments + refunded_amount (UI needs it)
+            'payments' => $invoice->payments->map(function ($p) {
+                $refunded = $p->refunds->sum('amount');
+
+                return [
+                    'id' => $p->id,
+                    'amount' => $p->amount,
+                    'method' => $p->method,
+                    'paid_at' => $p->paid_at,
+                    'refunded_amount' => $refunded,
+                ];
+            })->values(),
+        ];
     }
 }

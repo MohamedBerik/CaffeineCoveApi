@@ -2,24 +2,26 @@
 
 namespace App\Http\Controllers\API\Erp;
 
+use App\Http\Controllers\Controller;
+use App\Models\CustomerLedgerEntry;
+use App\Models\Invoice;
+use App\Models\InvoiceItem;
 use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\Product;
 use App\Models\StockMovement;
-use App\Models\Invoice;
-use App\Models\InvoiceItem;
-use App\Models\CustomerLedgerEntry;
-use Illuminate\Support\Facades\DB;
-use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 
 class OrderController extends Controller
 {
     public function indexErp(Request $request)
     {
-        // ✅ لا نحتاج company_id هنا لأن CompanyScope سيعزل تلقائيًا
+        $companyId = $request->user()->company_id;
+
         $orders = Order::with(['customer', 'items.product', 'invoice'])
+            ->where('company_id', $companyId)
             ->latest()
             ->get();
 
@@ -28,12 +30,15 @@ class OrderController extends Controller
 
     public function showErp(Request $request, $id)
     {
-        // ✅ CompanyScope سيمنع مشاهدة أوردر من شركة أخرى
+        $companyId = $request->user()->company_id;
+
         $order = Order::with([
             'customer',
             'items.product',
-            'invoice.payments.refunds', // ✅ تأكد refunds مربوطة على payments
-        ])->findOrFail($id);
+            'invoice.payments.refunds',
+        ])
+            ->where('company_id', $companyId)
+            ->findOrFail($id);
 
         return response()->json($order);
     }
@@ -42,7 +47,6 @@ class OrderController extends Controller
     {
         $companyId = $request->user()->company_id;
 
-        // ✅ validation مهم جدًا هنا لأنه بيمنع اختيار customer/product من شركة أخرى
         $data = $request->validate([
             'customer_id' => [
                 'required',
@@ -56,16 +60,16 @@ class OrderController extends Controller
             'items.*.quantity' => ['required', 'integer', 'min:1'],
         ]);
 
-        return DB::transaction(function () use ($data, $request) {
+        return DB::transaction(function () use ($data, $request, $companyId) {
 
-            // ✅ لا تكتب company_id يدويًا طالما BelongsToCompanyTrait يملأه تلقائيًا
             $order = Order::create([
-                'customer_id'    => $data['customer_id'],
-                'status'         => 'pending',
-                'total'          => 0,
-                'created_by'     => $request->user()->id,
-                'title_en'       => $request->input('title_en'),
-                'title_ar'       => $request->input('title_ar'),
+                'company_id'    => $companyId,
+                'customer_id'   => $data['customer_id'],
+                'status'        => 'pending',
+                'total'         => 0,
+                'created_by'    => $request->user()->id,
+                'title_en'      => $request->input('title_en'),
+                'title_ar'      => $request->input('title_ar'),
                 'description_en' => $request->input('description_en'),
                 'description_ar' => $request->input('description_ar'),
             ]);
@@ -74,26 +78,31 @@ class OrderController extends Controller
 
             foreach ($data['items'] as $row) {
 
-                // ✅ CompanyScope سيحصر المنتج داخل شركة المستخدم تلقائيًا
-                $product = Product::lockForUpdate()->findOrFail($row['product_id']);
+                $product = Product::where('company_id', $companyId)
+                    ->lockForUpdate()
+                    ->findOrFail($row['product_id']);
 
                 if ($product->quantity < $row['quantity']) {
-                    abort(422, "Insufficient stock for product {$product->id}");
+                    return response()->json([
+                        'msg' => "Insufficient stock for product {$product->id}"
+                    ], 422);
                 }
 
                 $lineTotal = $product->unit_price * $row['quantity'];
 
                 OrderItem::create([
-                    'order_id'   => $order->id,
-                    'product_id' => $product->id,
-                    'quantity'   => $row['quantity'],
-                    'unit_price' => $product->unit_price,
-                    'total'      => $lineTotal,
+                    'company_id'  => $companyId,
+                    'order_id'    => $order->id,
+                    'product_id'  => $product->id,
+                    'quantity'    => $row['quantity'],
+                    'unit_price'  => $product->unit_price,
+                    'total'       => $lineTotal,
                 ]);
 
                 $product->decrement('quantity', $row['quantity']);
 
                 StockMovement::create([
+                    'company_id'     => $companyId,
                     'product_id'     => $product->id,
                     'type'           => 'out',
                     'quantity'       => $row['quantity'],
@@ -116,43 +125,47 @@ class OrderController extends Controller
 
     public function confirm(Request $request, $id)
     {
-        // ✅ lockForUpdate لمنع سباق إنشاء فاتورة مرتين في نفس اللحظة
-        $order = Order::with(['items', 'invoice'])
-            ->lockForUpdate()
-            ->findOrFail($id);
+        $companyId = $request->user()->company_id;
 
-        if ($order->invoice) {
-            return response()->json([
-                'msg' => 'Invoice already exists for this order',
-            ], 422);
-        }
+        return DB::transaction(function () use ($request, $id, $companyId) {
 
-        if ($order->status === 'cancelled') {
-            return response()->json([
-                'msg' => 'Cannot confirm a cancelled order',
-            ], 422);
-        }
+            // ✅ القفل داخل الـ transaction
+            $order = Order::with(['items', 'invoice'])
+                ->where('company_id', $companyId)
+                ->lockForUpdate()
+                ->findOrFail($id);
 
-        if ($order->status === 'confirmed') {
-            return response()->json([
-                'msg' => 'Order already confirmed',
-            ], 422);
-        }
+            if ($order->invoice) {
+                return response()->json([
+                    'msg' => 'Invoice already exists for this order',
+                    'invoice_id' => $order->invoice->id
+                ], 422);
+            }
 
-        if ($order->items->isEmpty()) {
-            return response()->json([
-                'msg' => 'Order has no items',
-            ], 422);
-        }
+            if ($order->status === 'cancelled') {
+                return response()->json([
+                    'msg' => 'Cannot confirm a cancelled order',
+                ], 422);
+            }
 
-        return DB::transaction(function () use ($order, $request) {
+            if ($order->status === 'confirmed') {
+                return response()->json([
+                    'msg' => 'Order already confirmed',
+                ], 422);
+            }
+
+            if ($order->items->isEmpty()) {
+                return response()->json([
+                    'msg' => 'Order has no items',
+                ], 422);
+            }
 
             $total = $order->items->sum(fn($item) => $item->quantity * $item->unit_price);
 
-            $order->update(['status' => 'confirmed']);
+            $order->update(['status' => 'confirmed', 'total' => $total]);
 
-            // ✅ لا تكتب company_id يدويًا
             $invoice = Invoice::create([
+                'company_id'  => $companyId,
                 'number'      => 'INV-' . now()->format('YmdHis') . '-' . $order->id,
                 'order_id'    => $order->id,
                 'customer_id' => $order->customer_id,
@@ -162,6 +175,7 @@ class OrderController extends Controller
             ]);
 
             CustomerLedgerEntry::create([
+                'company_id'  => $companyId,
                 'customer_id' => $invoice->customer_id,
                 'invoice_id'  => $invoice->id,
                 'type'        => 'invoice',
@@ -173,6 +187,7 @@ class OrderController extends Controller
 
             foreach ($order->items as $item) {
                 InvoiceItem::create([
+                    'company_id' => $companyId,
                     'invoice_id' => $invoice->id,
                     'product_id' => $item->product_id,
                     'quantity'   => $item->quantity,
@@ -181,7 +196,8 @@ class OrderController extends Controller
                 ]);
             }
 
-            activity('order.confirmed', $order);
+            // ✅ توحيد اللوج للشركة
+            activity('order.confirmed', $order, [], $companyId);
 
             return response()->json([
                 'msg' => 'Order confirmed and invoice created',
@@ -192,23 +208,38 @@ class OrderController extends Controller
 
     public function cancel(Request $request, $id)
     {
-        $order = Order::with('items')->findOrFail($id);
+        $companyId = $request->user()->company_id;
 
-        if ($order->status === 'cancelled') {
-            return response()->json([
-                'msg' => 'Order already cancelled',
-            ], 422);
-        }
+        return DB::transaction(function () use ($request, $id, $companyId) {
 
-        return DB::transaction(function () use ($order, $request) {
+            $order = Order::with(['items', 'invoice'])
+                ->where('company_id', $companyId)
+                ->lockForUpdate()
+                ->findOrFail($id);
+
+            if ($order->status === 'cancelled') {
+                return response()->json([
+                    'msg' => 'Order already cancelled',
+                ], 422);
+            }
+
+            // ✅ مهم جدًا: منع إلغاء أوردر confirmed عليه فاتورة (إلا لو هتعمل Credit Note / void invoice)
+            if ($order->status === 'confirmed' || $order->invoice) {
+                return response()->json([
+                    'msg' => 'Cannot cancel a confirmed order with an invoice. Create a proper return/credit note flow instead.',
+                ], 422);
+            }
 
             foreach ($order->items as $item) {
 
-                $product = Product::lockForUpdate()->findOrFail($item->product_id);
+                $product = Product::where('company_id', $companyId)
+                    ->lockForUpdate()
+                    ->findOrFail($item->product_id);
 
                 $product->increment('quantity', $item->quantity);
 
                 StockMovement::create([
+                    'company_id'     => $companyId,
                     'product_id'     => $product->id,
                     'type'           => 'in',
                     'quantity'       => $item->quantity,
@@ -220,7 +251,7 @@ class OrderController extends Controller
 
             $order->update(['status' => 'cancelled']);
 
-            activity('order.cancelled', $order);
+            activity('order.cancelled', $order, [], $companyId);
 
             return response()->json([
                 'msg' => 'Order cancelled and stock restored',

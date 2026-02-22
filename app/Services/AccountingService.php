@@ -24,7 +24,7 @@ class AccountingService
         }
 
         if (! $sourceModel || ! isset($sourceModel->company_id)) {
-            throw new \Exception('Source model must have company_id');
+            throw new \Exception('Source model (' . get_class($sourceModel) . ') must have company_id');
         }
 
         $companyId = $sourceModel->company_id;

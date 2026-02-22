@@ -19,32 +19,41 @@ class Invoice extends Model
         'issued_at'
     ];
 
-    /* =====================================================
-     | Relations (company safe)
-     * ===================================================== */
+    protected $casts = [
+        'issued_at' => 'datetime',
+        'total'     => 'float',
+    ];
+
+    // اختياري: لو حابب الخصائص المحسوبة تظهر في JSON تلقائيًا
+    protected $appends = [
+        'total_paid',
+        'total_refunded',
+        'net_paid',
+        'remaining',
+    ];
+
+    /* =========================
+     | Relations
+     * ========================= */
 
     public function customer()
     {
-        return $this->belongsTo(Customer::class, 'customer_id')
-            ->where('company_id', $this->company_id);
+        return $this->belongsTo(Customer::class, 'customer_id');
     }
 
     public function items()
     {
-        return $this->hasMany(InvoiceItem::class)
-            ->where('company_id', $this->company_id);
+        return $this->hasMany(InvoiceItem::class);
     }
 
     public function order()
     {
-        return $this->belongsTo(Order::class)
-            ->where('company_id', $this->company_id);
+        return $this->belongsTo(Order::class);
     }
 
     public function payments()
     {
-        return $this->hasMany(Payment::class)
-            ->where('company_id', $this->company_id);
+        return $this->hasMany(Payment::class);
     }
 
     public function refunds()
@@ -52,25 +61,21 @@ class Invoice extends Model
         return $this->hasManyThrough(
             PaymentRefund::class,
             Payment::class,
-            'invoice_id',   // FK on payments table
-            'payment_id',   // FK on payment_refunds table
+            'invoice_id',
+            'payment_id',
             'id',
             'id'
-        )
-            ->where('payments.company_id', $this->company_id)
-            ->where('payment_refunds.company_id', $this->company_id);
+        );
     }
 
     public function journalEntries()
     {
-        return $this->morphMany(JournalEntry::class, 'source')
-            ->where('company_id', $this->company_id);
+        return $this->morphMany(JournalEntry::class, 'source');
     }
 
     public function customerLedgerEntries()
     {
-        return $this->hasMany(CustomerLedgerEntry::class)
-            ->where('company_id', $this->company_id);
+        return $this->hasMany(CustomerLedgerEntry::class);
     }
 
     public function company()
@@ -78,27 +83,27 @@ class Invoice extends Model
         return $this->belongsTo(Company::class);
     }
 
-    /* =====================================================
+    /* =========================
      | Computed attributes
-     * ===================================================== */
+     * ========================= */
 
     public function getTotalPaidAttribute()
     {
-        return $this->payments()->sum('amount');
+        return (float) $this->payments()->sum('amount');
     }
 
     public function getTotalRefundedAttribute()
     {
-        return $this->refunds()->sum('amount');
+        return (float) $this->refunds()->sum('amount');
     }
 
     public function getNetPaidAttribute()
     {
-        return $this->total_paid - $this->total_refunded;
+        return (float) ($this->total_paid - $this->total_refunded);
     }
 
     public function getRemainingAttribute()
     {
-        return max(0, $this->total - $this->net_paid);
+        return (float) max(0, $this->total - $this->net_paid);
     }
 }

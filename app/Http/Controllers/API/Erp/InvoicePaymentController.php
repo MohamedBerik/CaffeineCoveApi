@@ -3,13 +3,13 @@
 namespace App\Http\Controllers\API\Erp;
 
 use App\Http\Controllers\Controller;
+use App\Models\Account;
+use App\Models\CustomerLedgerEntry;
 use App\Models\Invoice;
 use App\Models\Payment;
-use App\Models\JournalEntry;
-use App\Models\JournalLine;
+use App\Services\AccountingService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use App\Models\CustomerLedgerEntry;
 
 class InvoicePaymentController extends Controller
 {
@@ -23,123 +23,135 @@ class InvoicePaymentController extends Controller
             'paid_at' => ['nullable', 'date'],
         ]);
 
-        $invoice = Invoice::with([
-            'payments' => function ($q) use ($companyId) {
-                $q->where('company_id', $companyId);
-            },
-            'payments.refunds' => function ($q) use ($companyId) {
-                $q->where('company_id', $companyId);
+        $amount = (float) $data['amount'];
+
+        return DB::transaction(function () use ($request, $invoiceId, $companyId, $data, $amount) {
+
+            // ✅ Lock invoice to prevent race conditions
+            $invoice = Invoice::where('company_id', $companyId)
+                ->lockForUpdate()
+                ->findOrFail($invoiceId);
+
+            if ($invoice->status === 'cancelled') {
+                return response()->json([
+                    'msg' => 'Cannot receive payment for cancelled invoice'
+                ], 422);
             }
-        ])
-            ->where('company_id', $companyId)
-            ->findOrFail($invoiceId);
 
-        // لا يمكن الدفع على فاتورة ملغاة
-        if ($invoice->status === 'cancelled') {
-            return response()->json([
-                'msg' => 'Cannot receive payment for cancelled invoice'
-            ], 422);
-        }
+            // ✅ Calculate totals from DB (safe + no pluck)
+            $totalPaid = (float) Payment::where('company_id', $companyId)
+                ->where('invoice_id', $invoice->id)
+                ->sum('amount');
 
-        return DB::transaction(function () use ($invoice, $data, $request, $companyId) {
+            $totalRefunded = (float) DB::table('payment_refunds')
+                ->join('payments', 'payments.id', '=', 'payment_refunds.payment_id')
+                ->where('payments.company_id', $companyId)
+                ->where('payments.invoice_id', $invoice->id)
+                ->sum('payment_refunds.amount');
 
+            $netPaid   = $totalPaid - $totalRefunded;
+            $remaining = max(0, (float) $invoice->total - $netPaid);
+
+            if ($remaining <= 0) {
+                return response()->json([
+                    'msg' => 'Invoice is already fully paid',
+                    'remaining' => 0
+                ], 422);
+            }
+
+            // ✅ Prevent overpayment
+            if ($amount > $remaining) {
+                return response()->json([
+                    'msg' => 'Payment exceeds remaining amount',
+                    'remaining' => $remaining
+                ], 422);
+            }
+
+            // ✅ Create payment (received_by is correct per your schema)
             $payment = Payment::create([
-                'company_id' => $companyId,
-                'invoice_id' => $invoice->id,
-                'amount'     => $data['amount'],
-                'method'     => $data['method'],
-                'paid_at'    => $data['paid_at'] ?? now(),
-                'created_by' => $request->user()->id ?? null,
+                'company_id'  => $companyId,
+                'invoice_id'  => $invoice->id,
+                'amount'      => $amount,
+                'method'      => $data['method'],
+                'paid_at'     => $data['paid_at'] ?? now(),
+                'received_by' => $request->user()->id ?? null,
             ]);
 
+            // ✅ Customer ledger entry (credit)
             CustomerLedgerEntry::create([
                 'company_id'  => $companyId,
                 'customer_id' => $invoice->customer_id,
                 'invoice_id'  => $invoice->id,
                 'payment_id'  => $payment->id,
+                'refund_id'   => null,
                 'type'        => 'payment',
                 'debit'       => 0,
                 'credit'      => $payment->amount,
-                'entry_date'  => now(),
+                'entry_date'  => now()->toDateString(),
                 'description' => 'Payment #' . $payment->id,
             ]);
 
             /*
              |--------------------------------------------------------------------------
-             | Accounting entry
-             | Dr Cash/Bank
-             | Cr Accounts Receivable
+             | Accounting Entry (multi-tenant safe)
+             | Dr Cash/Bank (1000)
+             | Cr Accounts Receivable (1100)
              |--------------------------------------------------------------------------
              */
+            $cashAccount = Account::where('company_id', $companyId)
+                ->where('code', '1000')
+                ->firstOrFail();
 
-            $entry = JournalEntry::create([
-                'company_id'  => $companyId,
-                'entry_date'  => now()->toDateString(),
-                'source_type' => Payment::class,
-                'source_id'   => $payment->id,
-                'description' => 'Invoice payment #' . $payment->id,
-                'created_by'  => $request->user()->id ?? null,
-            ]);
+            $arAccount = Account::where('company_id', $companyId)
+                ->where('code', '1100')
+                ->firstOrFail();
 
-            // لاحقاً يتم ربطها بجدول accounts حسب الشركة
-            $cashAccountId = 1;
-            $arAccountId   = 2;
+            AccountingService::createEntry(
+                $invoice, // ✅ source = invoice (عشان InvoiceJournal يعرض كل القيود الخاصة بالفاتورة)
+                'Invoice payment #' . $payment->id,
+                [
+                    [
+                        'account_id' => $cashAccount->id,
+                        'debit'      => $payment->amount,
+                        'credit'     => 0,
+                    ],
+                    [
+                        'account_id' => $arAccount->id,
+                        'debit'      => 0,
+                        'credit'     => $payment->amount,
+                    ],
+                ],
+                $request->user()->id ?? null,
+                now()->toDateString()
+            );
 
-            JournalLine::create([
-                'company_id'       => $companyId,
-                'journal_entry_id' => $entry->id,
-                'account_id'       => $cashAccountId,
-                'debit'            => $payment->amount,
-                'credit'           => 0,
-            ]);
+            // ✅ Recalculate AFTER inserting payment (بدون re-query)
+            $totalPaidAfter = $totalPaid + (float) $payment->amount;
+            $netAfter       = $totalPaidAfter - $totalRefunded;
+            $remainingAfter = max(0, (float) $invoice->total - $netAfter);
 
-            JournalLine::create([
-                'company_id'       => $companyId,
-                'journal_entry_id' => $entry->id,
-                'account_id'       => $arAccountId,
-                'debit'            => 0,
-                'credit'           => $payment->amount,
-            ]);
-
-            /*
-             |--------------------------------------------------------------------------
-             | Recalculate invoice status
-             |--------------------------------------------------------------------------
-             */
-
-            $paid = $invoice->payments()
-                ->where('company_id', $companyId)
-                ->sum('amount');
-
-            $refunded = $invoice->payments()
-                ->where('company_id', $companyId)
-                ->withSum(
-                    ['refunds as refunded_amount' => function ($q) use ($companyId) {
-                        $q->where('company_id', $companyId);
-                    }],
-                    'amount'
-                )
-                ->get()
-                ->sum('refunded_amount');
-
-            $net = $paid - $refunded;
-
-            if ($net <= 0) {
+            if ($netAfter <= 0) {
                 $status = 'unpaid';
-            } elseif ($net < $invoice->total) {
+            } elseif ($netAfter < (float) $invoice->total) {
                 $status = 'partially_paid';
             } else {
                 $status = 'paid';
             }
 
-            $invoice->update([
-                'status' => $status
-            ]);
+            $invoice->update(['status' => $status]);
+
+            activity('invoice.paid', $invoice, [
+                'amount'     => $payment->amount,
+                'payment_id' => $payment->id,
+                'invoice_id' => $invoice->id,
+            ], $companyId);
 
             return response()->json([
                 'msg'            => 'Payment recorded successfully',
                 'payment_id'     => $payment->id,
-                'invoice_status' => $status
+                'invoice_status' => $status,
+                'net_paid'       => $netAfter,
+                'remaining'      => $remainingAfter,
             ], 201);
         });
     }

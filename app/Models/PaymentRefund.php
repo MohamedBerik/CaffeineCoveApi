@@ -19,14 +19,14 @@ class PaymentRefund extends Model
 
     public function payment()
     {
-        return $this->belongsTo(Payment::class)
-            ->where('company_id', $this->company_id);
+        return $this->belongsTo(Payment::class);
     }
+
     public function customerLedgerEntry()
     {
-        return $this->hasOne(CustomerLedgerEntry::class)
-            ->where('company_id', $this->company_id);
+        return $this->hasOne(CustomerLedgerEntry::class);
     }
+
     public function company()
     {
         return $this->belongsTo(Company::class);
