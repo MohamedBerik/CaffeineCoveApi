@@ -78,16 +78,18 @@ class InvoiceController extends Controller
     {
         $companyId = $request->user()->company_id;
 
-        $invoice = Invoice::with(['customer', 'items.product', 'payments.refunds'])
-            ->where('company_id', $companyId)
-            ->findOrFail($id);
+        $invoice = Invoice::with([
+            'customer',
+            'items.product',
+        ])->where('company_id', $companyId)->findOrFail($id);
 
-        // نفس حسابات DB لضمان الدقة
-        $totalPaid = DB::table('payments')
-            ->where('company_id', $companyId)
+        $payments = Payment::where('company_id', $companyId)
             ->where('invoice_id', $invoice->id)
-            ->sum('amount');
+            ->with(['refunds' => fn($q) => $q->where('company_id', $companyId)])
+            ->orderBy('id')
+            ->get();
 
+        $totalPaid = $payments->sum('amount');
         $totalRefunded = DB::table('payment_refunds')
             ->join('payments', 'payments.id', '=', 'payment_refunds.payment_id')
             ->where('payments.company_id', $companyId)
@@ -96,6 +98,9 @@ class InvoiceController extends Controller
             ->sum('payment_refunds.amount');
 
         $netPaid = $totalPaid - $totalRefunded;
+
+        // ✅ ركبنا payments (ومعاها refunds) يدويًا لضمان ظهورهم
+        $invoice->setRelation('payments', $payments);
 
         return response()->json([
             'invoice' => $invoice,
