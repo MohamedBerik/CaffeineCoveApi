@@ -28,7 +28,6 @@ class Order extends Model
         'description_ar' => '',
     ];
 
-    // ✅ علاقات بدون where(company_id) — CompanyScope يكفي
     public function items()
     {
         return $this->hasMany(OrderItem::class);

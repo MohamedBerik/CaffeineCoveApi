@@ -18,7 +18,6 @@ class OrderItem extends Model
         'total',
     ];
 
-    // ✅ علاقات بدون where(company_id)
     public function order()
     {
         return $this->belongsTo(Order::class);
