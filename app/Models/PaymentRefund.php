@@ -14,12 +14,12 @@ class PaymentRefund extends Model
         'payment_id',
         'amount',
         'refunded_at',
-        'created_by',
+        'created_by'
     ];
 
     public function payment()
     {
-        return $this->belongsTo(Payment::class);
+        return $this->belongsTo(Payment::class, 'payment_id'); // ✅ بدون where
     }
 
     public function customerLedgerEntry()

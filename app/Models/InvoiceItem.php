@@ -21,8 +21,7 @@ class InvoiceItem extends Model
     ];
     public function product()
     {
-        return $this->belongsTo(Product::class)
-            ->where('company_id', $this->company_id);
+        return $this->belongsTo(Product::class);
     }
     public function company()
     {
