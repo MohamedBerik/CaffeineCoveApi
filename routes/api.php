@@ -219,3 +219,7 @@ Route::prefix('erp')
         Route::middleware('permission:finance.view')
             ->get('/activity-logs', [ActivityLogController::class, 'index']);
     });
+
+Route::middleware('auth:sanctum')->get('/debug/je/{id}', function ($id) {
+    return \App\Models\JournalEntry::with('lines')->findOrFail($id);
+});
