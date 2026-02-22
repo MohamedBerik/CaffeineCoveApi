@@ -12,24 +12,20 @@ class JournalEntry extends Model
     protected $fillable = [
         'company_id',
         'entry_date',
+        'description',
         'source_type',
         'source_id',
-        'description',
         'created_by',
     ];
 
     public function lines()
     {
-        return $this->hasMany(JournalLine::class)
-            ->where('company_id', $this->company_id);
+        return $this->hasMany(JournalLine::class, 'journal_entry_id');
+        // ❌ ممنوع where('company_id', $this->company_id)
     }
 
     public function source()
     {
         return $this->morphTo();
-    }
-    public function company()
-    {
-        return $this->belongsTo(Company::class);
     }
 }
