@@ -83,7 +83,7 @@ class OrderController extends Controller
                     ->lockForUpdate()
                     ->findOrFail($row['product_id']);
 
-                if ($product->quantity < $row['quantity']) {
+                if ($product->stock_quantity < $row['quantity']) {
                     abort(422, "Insufficient stock for product {$product->id}");
                 }
 
@@ -98,6 +98,7 @@ class OrderController extends Controller
                     'total'      => $lineTotal,
                 ]);
 
+                $product->decrement('stock_quantity', $row['quantity']);
                 $product->decrement('quantity', $row['quantity']);
 
                 StockMovement::create([
@@ -226,6 +227,7 @@ class OrderController extends Controller
                     ->lockForUpdate()
                     ->findOrFail($item->product_id);
 
+                $product->increment('stock_quantity', $item->quantity);
                 $product->increment('quantity', $item->quantity);
 
                 StockMovement::create([
