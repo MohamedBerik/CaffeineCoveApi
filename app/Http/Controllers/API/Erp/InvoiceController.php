@@ -120,17 +120,32 @@ class InvoiceController extends Controller
             'customer',
             'items.product',
             'payments.refunds',
-            'journalEntries.lines.account',
+
+            'journalEntries' => function ($q) use ($companyId) {
+                $q->where('company_id', $companyId)
+                    ->orderBy('id')
+                    ->with([
+                        'lines' => function ($q2) use ($companyId) {
+                            $q2->where('company_id', $companyId)
+                                ->orderBy('id')
+                                ->with([
+                                    'account' => function ($q3) use ($companyId) {
+                                        $q3->where('company_id', $companyId);
+                                    }
+                                ]);
+                        }
+                    ]);
+            },
         ])
             ->where('company_id', $companyId)
             ->findOrFail($id);
 
-        $payload = $this->transformInvoice($invoice);
-        $payload['items'] = $invoice->items->values();
-        $payload['journal_entries'] = $invoice->journalEntries->values();
-
         return response()->json([
-            'invoice' => $payload
+            'invoice' => $invoice,
+            'total_paid' => $invoice->total_paid,
+            'total_refunded' => $invoice->total_refunded,
+            'net_paid' => $invoice->net_paid,
+            'remaining' => $invoice->remaining,
         ]);
     }
 
