@@ -83,8 +83,9 @@ class OrderController extends Controller
 
                 $product = Product::lockForUpdate()->findOrFail($row['product_id']);
 
-                // ✅ المخزون الرسمي
-                if ((int)$product->stock_quantity < (int)$row['quantity']) {
+                $onHand = (int) $product->stock_quantity;
+
+                if ($onHand < (int)$row['quantity']) {
                     abort(422, "Insufficient stock for product {$product->id}");
                 }
 
@@ -99,7 +100,7 @@ class OrderController extends Controller
                 ]);
 
                 // ✅ خصم من stock_quantity فقط
-                $product->decrement('stock_quantity', $row['quantity']);
+                $product->decrement('stock_quantity', (int)$row['quantity']);
 
                 StockMovement::create([
                     'product_id'     => $product->id,
@@ -225,7 +226,7 @@ class OrderController extends Controller
                 $product = Product::lockForUpdate()->findOrFail($item->product_id);
 
                 // ✅ رجّع على stock_quantity فقط
-                $product->increment('stock_quantity', $item->quantity);
+                $product->increment('stock_quantity', (int) $item->quantity);
 
                 StockMovement::create([
                     'product_id'     => $product->id,

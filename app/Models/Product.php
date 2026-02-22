@@ -21,6 +21,12 @@ class Product extends Model
         "quantity",
         "category_id"
     ];
+    protected $appends = ['on_hand'];
+
+    public function getOnHandAttribute()
+    {
+        return (int) $this->stock_quantity;
+    }
 
     public function orderItems()
     {
