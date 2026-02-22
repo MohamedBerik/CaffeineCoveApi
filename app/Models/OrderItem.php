@@ -18,21 +18,17 @@ class OrderItem extends Model
         'total',
     ];
 
-    // =======================
-    // Relations
-    // =======================
-
+    // ✅ علاقات بدون where(company_id)
     public function order()
     {
-        return $this->belongsTo(Order::class)
-            ->where('company_id', $this->company_id);
+        return $this->belongsTo(Order::class);
     }
 
     public function product()
     {
-        return $this->belongsTo(Product::class)
-            ->where('company_id', $this->company_id);
+        return $this->belongsTo(Product::class);
     }
+
     public function company()
     {
         return $this->belongsTo(Company::class);

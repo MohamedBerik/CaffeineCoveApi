@@ -3,14 +3,8 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
-use App\Models\OrderItem;
-use App\Models\User;
-use App\Models\Invoice;
 use App\Models\Concerns\BelongsToCompanyTrait;
 
-/**
- * @property \Illuminate\Database\Eloquent\Collection|\App\Models\OrderItem[] $items
- */
 class Order extends Model
 {
     use BelongsToCompanyTrait;
@@ -34,11 +28,10 @@ class Order extends Model
         'description_ar' => '',
     ];
 
-    // Relations
+    // ✅ علاقات بدون where(company_id) — CompanyScope يكفي
     public function items()
     {
-        return $this->hasMany(OrderItem::class)
-            ->where('company_id', $this->company_id);
+        return $this->hasMany(OrderItem::class);
     }
 
     public function customer()
@@ -48,15 +41,14 @@ class Order extends Model
 
     public function creator()
     {
-        return $this->belongsTo(User::class, 'created_by')
-            ->where('company_id', $this->company_id);
+        return $this->belongsTo(User::class, 'created_by');
     }
 
     public function invoice()
     {
-        return $this->hasOne(Invoice::class)
-            ->where('company_id', $this->company_id);
+        return $this->hasOne(Invoice::class);
     }
+
     public function company()
     {
         return $this->belongsTo(Company::class);
