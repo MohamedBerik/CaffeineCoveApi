@@ -13,11 +13,14 @@ class Payment extends Model
         'company_id',
         'invoice_id',
         'amount',
-        'applied_amount',
-        'credit_amount',
         'method',
         'paid_at',
         'received_by'
+    ];
+
+    protected $casts = [
+        'amount' => 'decimal:2',
+        'paid_at' => 'datetime',
     ];
 
     public function invoice()
@@ -27,12 +30,12 @@ class Payment extends Model
 
     public function refunds()
     {
-        return $this->hasMany(PaymentRefund::class, 'payment_id'); // ✅ بدون where
+        return $this->hasMany(PaymentRefund::class, 'payment_id');
     }
 
-    public function customerLedgerEntry()
+    public function customerLedgerEntries()
     {
-        return $this->hasOne(CustomerLedgerEntry::class);
+        return $this->hasMany(CustomerLedgerEntry::class);
     }
 
     public function company()

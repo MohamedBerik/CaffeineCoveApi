@@ -37,26 +37,30 @@ class InvoicePaymentController extends Controller
                 return response()->json(['msg' => 'Cannot receive payment for cancelled invoice'], 422);
             }
 
-            // remaining based on applied/refunded(invoice only)
-            $totalApplied = Payment::where('company_id', $companyId)->where('invoice_id', $invoice->id)->sum('applied_amount');
-
-            $totalRefundedInvoice = PaymentRefund::where('company_id', $companyId)
-                ->where('applies_to', 'invoice')
-                ->whereHas('payment', function ($q) use ($companyId, $invoice) {
-                    $q->where('company_id', $companyId)->where('invoice_id', $invoice->id);
-                })
+            // 1) total paid (sum payments.amount)
+            $totalPaid = Payment::where('company_id', $companyId)
+                ->where('invoice_id', $invoice->id)
                 ->sum('amount');
 
-            $netPaid = $totalApplied - $totalRefundedInvoice;
+            // 2) total refunded (sum payment_refunds.amount join payments)
+            $totalRefunded = DB::table('payment_refunds')
+                ->join('payments', 'payments.id', '=', 'payment_refunds.payment_id')
+                ->where('payments.company_id', $companyId)
+                ->where('payments.invoice_id', $invoice->id)
+                ->where('payment_refunds.company_id', $companyId)
+                ->sum('payment_refunds.amount');
+
+            // 3) total credit applied to this invoice (customer_credits type=debit)
+            $totalCreditApplied = DB::table('customer_credits')
+                ->where('company_id', $companyId)
+                ->where('invoice_id', $invoice->id)
+                ->where('type', 'debit')
+                ->sum('amount');
+
+            $netPaid = (float)$totalPaid - (float)$totalRefunded + (float)$totalCreditApplied;
             $remaining = max(0, (float)$invoice->total - (float)$netPaid);
 
-            if (!$allowOverpayment && (float)$data['amount'] > $remaining) {
-                return response()->json([
-                    'msg' => 'Payment exceeds remaining amount',
-                    'remaining' => $remaining
-                ], 422);
-            }
-
+            // منع الدفع لو الفاتورة paid بالكامل (إلا لو allow_overpayment)
             if (!$allowOverpayment && $remaining <= 0) {
                 return response()->json([
                     'msg' => 'Invoice is already fully paid',
@@ -64,22 +68,30 @@ class InvoicePaymentController extends Controller
                 ], 422);
             }
 
-            $amount = (float)$data['amount'];
+            // منع overpayment لو مش مسموح
+            if (!$allowOverpayment && (float)$data['amount'] > $remaining) {
+                return response()->json([
+                    'msg' => 'Payment exceeds remaining amount',
+                    'remaining' => $remaining
+                ], 422);
+            }
+
+            $amount  = (float)$data['amount'];
             $applied = min($amount, $remaining);
             $credit  = max(0, $amount - $applied);
 
+            // إنشاء payment (amount = full)
             $payment = Payment::create([
-                'company_id'     => $companyId,
-                'invoice_id'     => $invoice->id,
-                'amount'         => $amount,
-                'applied_amount' => $applied,
-                'credit_amount'  => $credit,
-                'method'         => $data['method'],
-                'paid_at'        => $data['paid_at'] ?? now(),
-                'received_by'    => $request->user()->id ?? null,
+                'company_id'  => $companyId,
+                'invoice_id'  => $invoice->id,
+                'amount'      => $amount,
+                'method'      => $data['method'],
+                'paid_at'     => $data['paid_at'] ?? now(),
+                'received_by' => $request->user()->id ?? null,
             ]);
 
-            // Ledger: payment applied to invoice
+            // Customer Ledger (AR ledger):
+            // credit = applied فقط (لأن ده اللي سدد الفاتورة فعلاً)
             if ($applied > 0) {
                 CustomerLedgerEntry::create([
                     'company_id'  => $companyId,
@@ -95,39 +107,41 @@ class InvoicePaymentController extends Controller
                 ]);
             }
 
-            // Ledger: credit issued from overpayment
+            // Customer Credit Ledger: credit issued (overpayment)
+            // (ده هو مصدر الحقيقة لرصيد العميل)
             if ($credit > 0) {
-                CustomerLedgerEntry::create([
-                    'company_id'  => $companyId,
-                    'customer_id' => $invoice->customer_id,
-                    'invoice_id'  => null,
-                    'payment_id'  => $payment->id,
-                    'refund_id'   => null,
-                    'type'        => 'credit_issued',
-                    'debit'       => 0,
-                    'credit'      => $credit,
-                    'entry_date'  => now()->toDateString(),
-                    'description' => 'Customer credit issued from payment #' . $payment->id,
+                DB::table('customer_credits')->insert([
+                    'company_id'   => $companyId,
+                    'customer_id'  => $invoice->customer_id,
+                    'invoice_id'   => null,              // credit مش مربوط بفاتورة
+                    'payment_id'   => $payment->id,
+                    'type'         => 'credit',
+                    'amount'       => $credit,
+                    'entry_date'   => now()->toDateString(),
+                    'description'  => 'Overpayment credit from payment #' . $payment->id,
+                    'created_by'   => $request->user()->id ?? null,
+                    'created_at'   => now(),
+                    'updated_at'   => now(),
                 ]);
             }
 
             // Accounts
-            $cashAccount = Account::where('company_id', $companyId)->where('code', '1000')->firstOrFail();
-            $arAccount   = Account::where('company_id', $companyId)->where('code', '1100')->firstOrFail();
+            $cashAccount   = Account::where('company_id', $companyId)->where('code', '1000')->firstOrFail();
+            $arAccount     = Account::where('company_id', $companyId)->where('code', '1100')->firstOrFail();
             $creditAccount = Account::where('company_id', $companyId)->where('code', '2100')->firstOrFail();
 
-            // Accounting: split
-            $lines = [];
+            // Accounting entry:
+            // Dr Cash = full amount
+            // Cr AR = applied
+            // Cr Customer Credit = credit (if any)
+            $lines = [
+                ['account_id' => $cashAccount->id, 'debit' => $amount, 'credit' => 0],
+            ];
 
-            // Dr Cash full amount
-            $lines[] = ['account_id' => $cashAccount->id, 'debit' => $amount, 'credit' => 0];
-
-            // Cr AR applied
             if ($applied > 0) {
                 $lines[] = ['account_id' => $arAccount->id, 'debit' => 0, 'credit' => $applied];
             }
 
-            // Cr Customer Credit for extra
             if ($credit > 0) {
                 $lines[] = ['account_id' => $creditAccount->id, 'debit' => 0, 'credit' => $credit];
             }
@@ -140,13 +154,17 @@ class InvoicePaymentController extends Controller
                 now()->toDateString()
             );
 
-            // Update invoice status using applied only
-            $netAfter = ($netPaid + $applied);
+            // Recalc invoice status based on netPaid + applied (applied only adds to AR settlement)
+            $netAfter = $netPaid + $applied;
             $remainingAfter = max(0, (float)$invoice->total - (float)$netAfter);
 
-            if ($netAfter <= 0) $status = 'unpaid';
-            elseif ($netAfter < (float)$invoice->total) $status = 'partially_paid';
-            else $status = 'paid';
+            if ($netAfter <= 0) {
+                $status = 'unpaid';
+            } elseif ($netAfter < (float)$invoice->total) {
+                $status = 'partially_paid';
+            } else {
+                $status = 'paid';
+            }
 
             $invoice->update(['status' => $status]);
 
