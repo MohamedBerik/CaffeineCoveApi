@@ -127,50 +127,45 @@ class OrderController extends Controller
     {
         $companyId = $request->user()->company_id;
 
-        return DB::transaction(function () use ($id, $companyId) {
+        return DB::transaction(function () use ($id, $companyId, $request) {
 
             $order = Order::where('company_id', $companyId)
                 ->lockForUpdate()
-                ->with(['items', 'invoice'])
+                ->with(['invoice'])       // هنجيب invoice بس هنا
+                ->withCount('items')      // ✅ الأهم
                 ->findOrFail($id);
 
             if ($order->invoice) {
-                return response()->json([
-                    'msg' => 'Invoice already exists for this order',
-                ], 422);
+                return response()->json(['msg' => 'Invoice already exists for this order'], 422);
             }
 
             if ($order->status === 'cancelled') {
-                return response()->json([
-                    'msg' => 'Cannot confirm a cancelled order',
-                ], 422);
+                return response()->json(['msg' => 'Cannot confirm a cancelled order'], 422);
             }
 
             if ($order->status === 'confirmed') {
-                return response()->json([
-                    'msg' => 'Order already confirmed',
-                ], 422);
+                return response()->json(['msg' => 'Order already confirmed'], 422);
             }
 
-            // ✅ هنا السبب اللي بيطلع عندك
-            if ($order->items->isEmpty()) {
-                return response()->json([
-                    'msg' => 'Order has no items',
-                ], 422);
+            if ($order->items_count <= 0) {
+                return response()->json(['msg' => 'Order has no items'], 422);
             }
+
+            // ✅ الآن حمّل items بعد ما اتأكدنا إن فيه items فعلاً
+            $order->load('items');
 
             $total = $order->items->sum(fn($item) => $item->quantity * $item->unit_price);
 
             $order->update(['status' => 'confirmed', 'total' => $total]);
 
             $invoice = Invoice::create([
-                'company_id'   => $companyId,
-                'number'       => 'INV-' . now()->format('YmdHis') . '-' . $order->id,
-                'order_id'     => $order->id,
-                'customer_id'  => $order->customer_id,
-                'total'        => $total,
-                'status'       => 'unpaid',
-                'issued_at'    => now(),
+                'company_id'  => $companyId,
+                'number'      => 'INV-' . now()->format('YmdHis') . '-' . $order->id,
+                'order_id'    => $order->id,
+                'customer_id' => $order->customer_id,
+                'total'       => $total,
+                'status'      => 'unpaid',
+                'issued_at'   => now(),
             ]);
 
             CustomerLedgerEntry::create([
@@ -195,10 +190,15 @@ class OrderController extends Controller
                 ]);
             }
 
+            // ✅ (بما إنك قلت نعم) قيد محاسبي عند إصدار الفاتورة
+            // Dr Accounts Receivable (1100)
+            // Cr Sales/Revenue (4000)  ← لازم يكون موجود كـ account
+            // هنعمله في خطوة منفصلة لو تحب، بس ده مكانه الصحيح بعد Create invoice مباشرة.
+
             activity('order.confirmed', $order, [], $companyId);
 
             return response()->json([
-                'msg' => 'Order confirmed and invoice created',
+                'msg'        => 'Order confirmed and invoice created',
                 'invoice_id' => $invoice->id,
             ]);
         });

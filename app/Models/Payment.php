@@ -13,6 +13,8 @@ class Payment extends Model
         'company_id',
         'invoice_id',
         'amount',
+        'applied_amount',
+        'credit_amount',
         'method',
         'paid_at',
         'received_by'
