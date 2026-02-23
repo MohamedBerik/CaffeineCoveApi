@@ -13,6 +13,7 @@ class PaymentRefund extends Model
         'company_id',
         'payment_id',
         'amount',
+        'applies_to',
         'refunded_at',
         'created_by'
     ];
