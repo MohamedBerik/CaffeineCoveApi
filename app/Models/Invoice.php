@@ -89,21 +89,23 @@ class Invoice extends Model
 
     public function getTotalPaidAttribute()
     {
-        return (float) $this->payments()->sum('amount');
+        return $this->payments()->sum('applied_amount');
     }
 
     public function getTotalRefundedAttribute()
     {
-        return (float) $this->refunds()->sum('payment_refunds.amount');
+        return $this->refunds()
+            ->where('applies_to', 'invoice')
+            ->sum('amount');
     }
 
     public function getNetPaidAttribute()
     {
-        return (float) ($this->total_paid - $this->total_refunded);
+        return $this->total_paid - $this->total_refunded;
     }
 
     public function getRemainingAttribute()
     {
-        return (float) max(0, $this->total - $this->net_paid);
+        return max(0, (float)$this->total - (float)$this->net_paid);
     }
 }
