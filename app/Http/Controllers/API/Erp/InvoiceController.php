@@ -14,63 +14,11 @@ class InvoiceController extends Controller
     {
         $companyId = $request->user()->company_id;
 
-        $invoices = Invoice::with(['customer'])
+        $invoices = Invoice::with('customer')
             ->where('company_id', $companyId)
             ->orderByDesc('issued_at')
             ->get()
-            ->map(function ($invoice) use ($companyId) {
-
-                $totalPaid = DB::table('payments')
-                    ->where('company_id', $companyId)
-                    ->where('invoice_id', $invoice->id)
-                    ->sum('amount');
-
-                $totalRefunded = DB::table('payment_refunds')
-                    ->join('payments', 'payments.id', '=', 'payment_refunds.payment_id')
-                    ->where('payments.company_id', $companyId)
-                    ->where('payment_refunds.company_id', $companyId)
-                    ->where('payments.invoice_id', $invoice->id)
-                    ->sum('payment_refunds.amount'); // ✅ حل مشكلة ambiguous amount
-
-                $netPaid = $totalPaid - $totalRefunded;
-                $remaining = max(0, $invoice->total - $netPaid);
-
-                $payments = DB::table('payments')
-                    ->where('company_id', $companyId)
-                    ->where('invoice_id', $invoice->id)
-                    ->orderBy('id')
-                    ->get()
-                    ->map(function ($p) use ($companyId) {
-                        $refunded = DB::table('payment_refunds')
-                            ->where('company_id', $companyId)
-                            ->where('payment_id', $p->id)
-                            ->sum('amount');
-
-                        return [
-                            'id' => $p->id,
-                            'amount' => $p->amount,
-                            'method' => $p->method,
-                            'paid_at' => $p->paid_at,
-                            'refunded_amount' => $refunded,
-                        ];
-                    });
-
-                return [
-                    'id' => $invoice->id,
-                    'number' => $invoice->number,
-                    'issued_at' => $invoice->issued_at,
-                    'total' => $invoice->total,
-                    'status' => $invoice->status,
-                    'customer' => $invoice->customer,
-
-                    'total_paid' => $totalPaid,
-                    'total_refunded' => $totalRefunded,
-                    'net_paid' => $netPaid,
-                    'remaining' => $remaining,
-
-                    'payments' => $payments,
-                ];
-            });
+            ->map(fn($invoice) => $this->buildInvoiceResponse($invoice, $companyId));
 
         return response()->json($invoices);
     }
@@ -82,34 +30,14 @@ class InvoiceController extends Controller
         $invoice = Invoice::with([
             'customer',
             'items.product',
-        ])->where('company_id', $companyId)->findOrFail($id);
+            'payments.refunds'
+        ])
+            ->where('company_id', $companyId)
+            ->findOrFail($id);
 
-        $payments = Payment::where('company_id', $companyId)
-            ->where('invoice_id', $invoice->id)
-            ->with(['refunds' => fn($q) => $q->where('company_id', $companyId)])
-            ->orderBy('id')
-            ->get();
-
-        $totalPaid = $payments->sum('amount');
-        $totalRefunded = DB::table('payment_refunds')
-            ->join('payments', 'payments.id', '=', 'payment_refunds.payment_id')
-            ->where('payments.company_id', $companyId)
-            ->where('payment_refunds.company_id', $companyId)
-            ->where('payments.invoice_id', $invoice->id)
-            ->sum('payment_refunds.amount');
-
-        $netPaid = $totalPaid - $totalRefunded;
-
-        // ✅ ركبنا payments (ومعاها refunds) يدويًا لضمان ظهورهم
-        $invoice->setRelation('payments', $payments);
-
-        return response()->json([
-            'invoice' => $invoice,
-            'total_paid' => $totalPaid,
-            'total_refunded' => $totalRefunded,
-            'net_paid' => $netPaid,
-            'remaining' => max(0, $invoice->total - $netPaid),
-        ]);
+        return response()->json(
+            $this->buildInvoiceResponse($invoice, $companyId)
+        );
     }
 
     public function showFullInvoice(Request $request, $id)
@@ -120,74 +48,86 @@ class InvoiceController extends Controller
             'customer',
             'items.product',
             'payments.refunds',
-
-            'journalEntries' => function ($q) use ($companyId) {
-                $q->where('company_id', $companyId)
-                    ->orderBy('id')
-                    ->with([
-                        'lines' => function ($q2) use ($companyId) {
-                            $q2->where('company_id', $companyId)
-                                ->orderBy('id')
-                                ->with([
-                                    'account' => function ($q3) use ($companyId) {
-                                        $q3->where('company_id', $companyId);
-                                    }
-                                ]);
-                        }
-                    ]);
-            },
+            'journalEntries.lines.account'
         ])
             ->where('company_id', $companyId)
             ->findOrFail($id);
 
-        return response()->json([
-            'invoice' => $invoice,
-            'total_paid' => $invoice->total_paid,
-            'total_refunded' => $invoice->total_refunded,
-            'net_paid' => $invoice->net_paid,
-            'remaining' => $invoice->remaining,
-        ]);
+        return response()->json(
+            $this->buildInvoiceResponse($invoice, $companyId)
+        );
     }
 
     /**
-     * ✅ توحيد شكل الفاتورة في كل endpoints
+     * 🔥 القلب المحاسبي — الحساب الموحد لكل endpoints
      */
-    private function transformInvoice(Invoice $invoice): array
+    private function buildInvoiceResponse(Invoice $invoice, int $companyId): array
     {
-        $totalPaid = $invoice->payments->sum('amount');
+        $payments = Payment::where('company_id', $companyId)
+            ->where('invoice_id', $invoice->id)
+            ->with(['refunds' => fn($q) => $q->where('company_id', $companyId)])
+            ->orderBy('id')
+            ->get();
 
-        $totalRefunded = $invoice->payments->sum(function ($p) {
-            return $p->refunds->sum('amount');
-        });
+        // إجمالي المدفوع (full payments)
+        $totalPaid = $payments->sum('amount');
+
+        // إجمالي المرتجع (من payment_refunds)
+        $totalRefunded = DB::table('payment_refunds')
+            ->join('payments', 'payments.id', '=', 'payment_refunds.payment_id')
+            ->where('payments.company_id', $companyId)
+            ->where('payment_refunds.company_id', $companyId)
+            ->where('payments.invoice_id', $invoice->id)
+            ->sum('payment_refunds.amount'); // ✅ fully qualified
 
         $netPaid = $totalPaid - $totalRefunded;
-        $remaining = max(0, $invoice->total - $netPaid);
+
+        $remaining = max(0, (float)$invoice->total - (float)$netPaid);
 
         return [
-            'id' => $invoice->id,
-            'number' => $invoice->number,
-            'issued_at' => $invoice->issued_at,
-            'total' => $invoice->total,
-            'status' => $invoice->status,
+            'invoice' => [
+                'id' => $invoice->id,
+                'number' => $invoice->number,
+                'issued_at' => $invoice->issued_at,
+                'total' => $invoice->total,
+                'status' => $invoice->status,
+                'customer' => $invoice->customer,
+                'items' => $invoice->items ?? [],
+                'journal_entries' => $invoice->journalEntries ?? [],
+            ],
 
-            'customer' => $invoice->customer,
+            // computed
+            'total_paid' => (float)$totalPaid,
+            'total_refunded' => (float)$totalRefunded,
+            'net_paid' => (float)$netPaid,
+            'remaining' => (float)$remaining,
 
-            // ✅ computed for UI
-            'total_paid' => $netPaid,
-            'total_refunded' => $totalRefunded,
-            'net_paid' => $netPaid,
-            'remaining' => $remaining,
+            'payments' => $payments->map(function ($p) {
 
-            // ✅ payments + refunded_amount (UI needs it)
-            'payments' => $invoice->payments->map(function ($p) {
-                $refunded = $p->refunds->sum('amount');
+                $refundedInvoice = $p->refunds
+                    ->where('applies_to', 'invoice')
+                    ->sum('amount');
+
+                $refundedCredit = $p->refunds
+                    ->where('applies_to', 'credit')
+                    ->sum('amount');
 
                 return [
                     'id' => $p->id,
-                    'amount' => $p->amount,
+                    'amount' => (float)$p->amount,
+                    'applied_amount' => (float)$p->applied_amount,
+                    'credit_amount' => (float)$p->credit_amount,
                     'method' => $p->method,
                     'paid_at' => $p->paid_at,
-                    'refunded_amount' => $refunded,
+
+                    'refunded_invoice' => (float)$refundedInvoice,
+                    'refunded_credit' => (float)$refundedCredit,
+
+                    'available_invoice_refund' =>
+                    max(0, (float)$p->applied_amount - (float)$refundedInvoice),
+
+                    'available_credit_refund' =>
+                    max(0, (float)$p->credit_amount - (float)$refundedCredit),
                 ];
             })->values(),
         ];
