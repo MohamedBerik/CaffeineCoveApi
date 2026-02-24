@@ -22,48 +22,42 @@ class ClinicOnboardingController extends Controller
 
         return DB::transaction(function () use ($data) {
 
+            // ✅ توليد slug فريد داخل transaction
             $slugBase = Str::slug($data['clinic_name']);
             $slug = $slugBase;
             $i = 1;
+
             while (Company::where('slug', $slug)->exists()) {
-                $slug = $slugBase . '-' . $i++;
+                $slug = $slugBase . '-' . $i;
+                $i++;
             }
 
             $company = Company::create([
-                'name' => $data['clinic_name'],
-                'slug' => $slug,
-                'status' => 'trial',
+                'name'         => $data['clinic_name'],
+                'slug'         => $slug,
+                'status'       => 'trial',
                 'trial_ends_at' => now()->addDays(14),
-                'branding' => json_encode([
-                    'app_name' => $data['clinic_name'],
-                    'primary_color' => '#0ea5e9',
-                ]),
+                'branding'     => [
+                    'app_name'       => $data['clinic_name'],
+                    'logo'           => null,
+                    'primary_color'  => '#0ea5e9',
+                ],
             ]);
 
             $user = User::create([
-                'name' => 'Clinic Admin',
-                'email' => $data['email'],
-                'password' => bcrypt($data['password']),
-                'company_id' => $company->id,
-                'role' => 'admin',
-                'status' => 1,
+                'name'           => 'Clinic Admin',
+                'email'          => $data['email'],
+                'password'       => bcrypt($data['password']),
+                'company_id'     => $company->id,
+                'role'           => 'admin',
+                'status'         => 1,
                 'is_super_admin' => 0,
             ]);
 
             return response()->json([
                 'msg' => 'Clinic registered successfully',
-                'clinic' => [
-                    'id' => $company->id,
-                    'name' => $company->name,
-                    'slug' => $company->slug,
-                    'status' => $company->status,
-                    'trial_ends_at' => $company->trial_ends_at,
-                ],
-                'admin_user' => [
-                    'id' => $user->id,
-                    'email' => $user->email,
-                    'company_id' => $user->company_id,
-                ],
+                'clinic' => $company->only(['id', 'name', 'slug', 'status', 'trial_ends_at']),
+                'admin_user' => $user->only(['id', 'email', 'company_id']),
             ], 201);
         });
     }
