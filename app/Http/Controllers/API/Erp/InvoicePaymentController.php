@@ -80,15 +80,22 @@ class InvoicePaymentController extends Controller
             $applied = min($amount, $remaining);
             $credit  = max(0, $amount - $applied);
 
-            // إنشاء payment (amount = full)
             $payment = Payment::create([
-                'company_id'  => $companyId,
-                'invoice_id'  => $invoice->id,
-                'amount'      => $amount,
-                'method'      => $data['method'],
-                'paid_at'     => $data['paid_at'] ?? now(),
-                'received_by' => $request->user()->id ?? null,
+                'company_id'     => $companyId,
+                'invoice_id'     => $invoice->id,
+                'amount'         => $amount,
+                'applied_amount' => $applied,
+                'credit_amount'  => $credit,
+                'method'         => $data['method'],
+                'paid_at'        => $data['paid_at'] ?? now(),
+                'received_by'    => $request->user()->id ?? null,
             ]);
+
+            // ✅ Hotfix: اضمن إن القيم اتكتبت فعلاً
+            $payment->forceFill([
+                'applied_amount' => $applied,
+                'credit_amount'  => $credit,
+            ])->save();
 
             // Customer Ledger (AR ledger):
             // credit = applied فقط (لأن ده اللي سدد الفاتورة فعلاً)
