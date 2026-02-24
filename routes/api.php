@@ -26,6 +26,7 @@ use App\Http\Controllers\API\Erp\CustomerStatementController;
 use App\Http\Controllers\API\Erp\PaymentRefundController;
 use App\Http\Controllers\API\Erp\SupplierStatementController;
 use App\Http\Controllers\API\Erp\InvoiceJournalController;
+use App\Http\Controllers\API\SaaS\ClinicOnboardingController;
 
 /*
 |--------------------------------------------------------------------------
@@ -220,6 +221,4 @@ Route::prefix('erp')
             ->get('/activity-logs', [ActivityLogController::class, 'index']);
     });
 
-Route::middleware('auth:sanctum')->get('/debug/je/{id}', function ($id) {
-    return \App\Models\JournalEntry::with('lines')->findOrFail($id);
-});
+Route::post('/saas/register-clinic', [ClinicOnboardingController::class, 'register']);
