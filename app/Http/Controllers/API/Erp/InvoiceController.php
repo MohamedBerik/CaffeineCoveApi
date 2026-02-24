@@ -14,6 +14,8 @@ class InvoiceController extends Controller
     {
         $companyId = $request->user()->company_id;
 
+        // ملاحظة: ده بيعمل N+1 لأن buildInvoiceResponse بيجيب payments لكل فاتورة.
+        // لو عايز Optimized بعدين نعمل eager-load + grouping.
         $invoices = Invoice::with('customer')
             ->where('company_id', $companyId)
             ->orderByDesc('issued_at')
@@ -27,10 +29,10 @@ class InvoiceController extends Controller
     {
         $companyId = $request->user()->company_id;
 
+        // لا نعمل payments.refunds هنا، هنجيبهم باستعلام صريح لضمان select + company filter
         $invoice = Invoice::with([
             'customer',
             'items.product',
-            'payments.refunds'
         ])
             ->where('company_id', $companyId)
             ->findOrFail($id);
@@ -47,8 +49,21 @@ class InvoiceController extends Controller
         $invoice = Invoice::with([
             'customer',
             'items.product',
-            'payments.refunds',
-            'journalEntries.lines.account'
+            'journalEntries' => function ($q) use ($companyId) {
+                $q->where('company_id', $companyId)
+                    ->orderBy('id')
+                    ->with([
+                        'lines' => function ($q2) use ($companyId) {
+                            $q2->where('company_id', $companyId)
+                                ->orderBy('id')
+                                ->with([
+                                    'account' => function ($q3) use ($companyId) {
+                                        $q3->where('company_id', $companyId);
+                                    }
+                                ]);
+                        }
+                    ]);
+            },
         ])
             ->where('company_id', $companyId)
             ->findOrFail($id);
@@ -59,30 +74,76 @@ class InvoiceController extends Controller
     }
 
     /**
-     * 🔥 القلب المحاسبي — الحساب الموحد لكل endpoints
+     * 🔥 القلب المحاسبي — response موحّد + محاسبي صح مع Overpayment (Customer Credit)
+     *
+     * قواعد الحساب:
+     * - total_paid (toward invoice) = SUM(applied_amount)
+     * - total_refunded (invoice) = SUM(refunds.amount WHERE applies_to='invoice')
+     * - net_paid = applied - refunded_invoice
+     * - remaining = total - net_paid
+     *
+     * - credit_issued = SUM(credit_amount)
+     * - refunded_credit = SUM(refunds.amount WHERE applies_to='credit')
+     * - net_credit = credit_issued - refunded_credit
      */
     private function buildInvoiceResponse(Invoice $invoice, int $companyId): array
     {
-        $payments = Payment::where('company_id', $companyId)
+        // ✅ Payments query صريح لضمان إن applied_amount/credit_amount موجودين في JSON
+        $payments = Payment::query()
+            ->where('company_id', $companyId)
             ->where('invoice_id', $invoice->id)
-            ->with(['refunds' => fn($q) => $q->where('company_id', $companyId)])
+            ->select([
+                'id',
+                'company_id',
+                'invoice_id',
+                'amount',
+                'applied_amount',
+                'credit_amount',
+                'method',
+                'paid_at',
+                'received_by',
+                'created_at',
+            ])
+            ->with(['refunds' => function ($q) use ($companyId) {
+                $q->where('company_id', $companyId)
+                    ->select([
+                        'id',
+                        'company_id',
+                        'payment_id',
+                        'amount',
+                        'applies_to',
+                        'refunded_at',
+                        'created_at',
+                    ])
+                    ->orderBy('id');
+            }])
             ->orderBy('id')
             ->get();
 
-        // إجمالي المدفوع (full payments)
-        $totalPaid = $payments->sum('amount');
+        // اربطهم بالـ invoice عشان أي مكان يعتمد على relation
+        $invoice->setRelation('payments', $payments);
 
-        // إجمالي المرتجع (من payment_refunds)
-        $totalRefunded = DB::table('payment_refunds')
-            ->join('payments', 'payments.id', '=', 'payment_refunds.payment_id')
-            ->where('payments.company_id', $companyId)
-            ->where('payment_refunds.company_id', $companyId)
-            ->where('payments.invoice_id', $invoice->id)
-            ->sum('payment_refunds.amount'); // ✅ fully qualified
+        // ✅ حسابات invoice (Applied فقط)
+        $totalApplied = $payments->sum(fn($p) => (float) $p->applied_amount);
 
-        $netPaid = $totalPaid - $totalRefunded;
+        $totalRefundedInvoice = $payments->sum(function ($p) {
+            return (float) $p->refunds->where('applies_to', 'invoice')->sum('amount');
+        });
 
-        $remaining = max(0, (float)$invoice->total - (float)$netPaid);
+        $netPaid = $totalApplied - $totalRefundedInvoice;
+        $remaining = max(0, (float) $invoice->total - $netPaid);
+
+        // ✅ حسابات Customer Credit
+        $totalCreditIssued = $payments->sum(fn($p) => (float) $p->credit_amount);
+
+        $totalRefundedCredit = $payments->sum(function ($p) {
+            return (float) $p->refunds->where('applies_to', 'credit')->sum('amount');
+        });
+
+        $netCredit = $totalCreditIssued - $totalRefundedCredit;
+
+        // (اختياري) لو تحب تعرض إجمالي cash دخل فعليًا:
+        $totalCashReceived = $payments->sum(fn($p) => (float) $p->amount);
 
         return [
             'invoice' => [
@@ -91,43 +152,50 @@ class InvoiceController extends Controller
                 'issued_at' => $invoice->issued_at,
                 'total' => $invoice->total,
                 'status' => $invoice->status,
+
                 'customer' => $invoice->customer,
                 'items' => $invoice->items ?? [],
+
+                // في full endpoint هتكون loaded، في show العادي ممكن تكون [] وده طبيعي
                 'journal_entries' => $invoice->journalEntries ?? [],
             ],
 
-            // computed
-            'total_paid' => (float)$totalPaid,
-            'total_refunded' => (float)$totalRefunded,
-            'net_paid' => (float)$netPaid,
-            'remaining' => (float)$remaining,
+            // ✅ invoice computed (صح)
+            'total_paid' => (float) $totalApplied,              // paid toward invoice ONLY
+            'total_refunded' => (float) $totalRefundedInvoice,  // refunded from invoice portion ONLY
+            'net_paid' => (float) $netPaid,
+            'remaining' => (float) $remaining,
+
+            // ✅ credit computed (لو الـ UI محتاجه)
+            'credit_issued' => (float) $totalCreditIssued,
+            'credit_refunded' => (float) $totalRefundedCredit,
+            'net_credit' => (float) $netCredit,
+
+            // (اختياري للـ UI/Debug)
+            'cash_received' => (float) $totalCashReceived,
 
             'payments' => $payments->map(function ($p) {
+                $refInv = (float) $p->refunds->where('applies_to', 'invoice')->sum('amount');
+                $refCr  = (float) $p->refunds->where('applies_to', 'credit')->sum('amount');
 
-                $refundedInvoice = $p->refunds
-                    ->where('applies_to', 'invoice')
-                    ->sum('amount');
-
-                $refundedCredit = $p->refunds
-                    ->where('applies_to', 'credit')
-                    ->sum('amount');
+                $availableInv = max(0, (float) $p->applied_amount - $refInv);
+                $availableCr  = max(0, (float) $p->credit_amount - $refCr);
 
                 return [
                     'id' => $p->id,
-                    'amount' => (float)$p->amount,
-                    'applied_amount' => (float)$p->applied_amount,
-                    'credit_amount' => (float)$p->credit_amount,
+                    'amount' => (float) $p->amount,
+                    'applied_amount' => (float) $p->applied_amount,
+                    'credit_amount' => (float) $p->credit_amount,
                     'method' => $p->method,
                     'paid_at' => $p->paid_at,
 
-                    'refunded_invoice' => (float)$refundedInvoice,
-                    'refunded_credit' => (float)$refundedCredit,
+                    'refunded_invoice' => $refInv,
+                    'refunded_credit' => $refCr,
+                    'available_invoice_refund' => $availableInv,
+                    'available_credit_refund' => $availableCr,
 
-                    'available_invoice_refund' =>
-                    max(0, (float)$p->applied_amount - (float)$refundedInvoice),
-
-                    'available_credit_refund' =>
-                    max(0, (float)$p->credit_amount - (float)$refundedCredit),
+                    // لو تحب ترجع refunds نفسها للـ UI:
+                    'refunds' => $p->refunds->values(),
                 ];
             })->values(),
         ];
