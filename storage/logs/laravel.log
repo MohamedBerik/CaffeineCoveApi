@@ -5626,3 +5626,23 @@ Did you mean one of these?
 #31 C:\\Laravel\\Api\\CaffeineCove\\artisan(35): Illuminate\\Foundation\\Console\\Kernel->handle(Object(Symfony\\Component\\Console\\Input\\ArgvInput), Object(Symfony\\Component\\Console\\Output\\ConsoleOutput))
 #32 {main}
 "} 
+[2026-02-24 07:41:28] production.ERROR: There are no commands defined in the "reset" namespace. {"exception":"[object] (Symfony\\Component\\Console\\Exception\\NamespaceNotFoundException(code: 0): There are no commands defined in the \"reset\" namespace. at C:\\Laravel\\Api\\CaffeineCove\\vendor\\symfony\\console\\Application.php:650)
+[stacktrace]
+#0 C:\\Laravel\\Api\\CaffeineCove\\vendor\\symfony\\console\\Application.php(701): Symfony\\Component\\Console\\Application->findNamespace('reset')
+#1 C:\\Laravel\\Api\\CaffeineCove\\vendor\\symfony\\console\\Application.php(259): Symfony\\Component\\Console\\Application->find('reset:accountin...')
+#2 C:\\Laravel\\Api\\CaffeineCove\\vendor\\symfony\\console\\Application.php(171): Symfony\\Component\\Console\\Application->doRun(Object(Symfony\\Component\\Console\\Input\\ArgvInput), Object(Symfony\\Component\\Console\\Output\\ConsoleOutput))
+#3 C:\\Laravel\\Api\\CaffeineCove\\vendor\\laravel\\framework\\src\\Illuminate\\Console\\Application.php(94): Symfony\\Component\\Console\\Application->run(Object(Symfony\\Component\\Console\\Input\\ArgvInput), Object(Symfony\\Component\\Console\\Output\\ConsoleOutput))
+#4 C:\\Laravel\\Api\\CaffeineCove\\vendor\\laravel\\framework\\src\\Illuminate\\Foundation\\Console\\Kernel.php(129): Illuminate\\Console\\Application->run(Object(Symfony\\Component\\Console\\Input\\ArgvInput), Object(Symfony\\Component\\Console\\Output\\ConsoleOutput))
+#5 C:\\Laravel\\Api\\CaffeineCove\\artisan(35): Illuminate\\Foundation\\Console\\Kernel->handle(Object(Symfony\\Component\\Console\\Input\\ArgvInput), Object(Symfony\\Component\\Console\\Output\\ConsoleOutput))
+#6 {main}
+"} 
+[2026-02-24 07:42:45] production.ERROR: There are no commands defined in the "reset" namespace. {"exception":"[object] (Symfony\\Component\\Console\\Exception\\NamespaceNotFoundException(code: 0): There are no commands defined in the \"reset\" namespace. at C:\\Laravel\\Api\\CaffeineCove\\vendor\\symfony\\console\\Application.php:650)
+[stacktrace]
+#0 C:\\Laravel\\Api\\CaffeineCove\\vendor\\symfony\\console\\Application.php(701): Symfony\\Component\\Console\\Application->findNamespace('reset')
+#1 C:\\Laravel\\Api\\CaffeineCove\\vendor\\symfony\\console\\Application.php(259): Symfony\\Component\\Console\\Application->find('reset:accountin...')
+#2 C:\\Laravel\\Api\\CaffeineCove\\vendor\\symfony\\console\\Application.php(171): Symfony\\Component\\Console\\Application->doRun(Object(Symfony\\Component\\Console\\Input\\ArgvInput), Object(Symfony\\Component\\Console\\Output\\ConsoleOutput))
+#3 C:\\Laravel\\Api\\CaffeineCove\\vendor\\laravel\\framework\\src\\Illuminate\\Console\\Application.php(94): Symfony\\Component\\Console\\Application->run(Object(Symfony\\Component\\Console\\Input\\ArgvInput), Object(Symfony\\Component\\Console\\Output\\ConsoleOutput))
+#4 C:\\Laravel\\Api\\CaffeineCove\\vendor\\laravel\\framework\\src\\Illuminate\\Foundation\\Console\\Kernel.php(129): Illuminate\\Console\\Application->run(Object(Symfony\\Component\\Console\\Input\\ArgvInput), Object(Symfony\\Component\\Console\\Output\\ConsoleOutput))
+#5 C:\\Laravel\\Api\\CaffeineCove\\artisan(35): Illuminate\\Foundation\\Console\\Kernel->handle(Object(Symfony\\Component\\Console\\Input\\ArgvInput), Object(Symfony\\Component\\Console\\Output\\ConsoleOutput))
+#6 {main}
+"} 
