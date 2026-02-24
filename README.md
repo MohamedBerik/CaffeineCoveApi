@@ -1,119 +1,302 @@
-Caffeine Cove API – Laravel Backend & ERP
+# Caffeine Cove API 🏗️
 
-RESTful API built with Laravel to manage Caffeine Cove café system. Supports Orders, Invoices, Payments, Refunds, and Accounting (Journal Entries). Integrated with React frontend.
+**Core Backend for ERP & Accounting System**  
+A robust REST API powering café management with double-entry accounting logic.
 
-🚀 Features
-Authentication
+[![Laravel](https://img.shields.io/badge/Laravel-10.x-red)](https://laravel.com)
+[![PHP](https://img.shields.io/badge/PHP-8.1+-purple)](https://php.net)
+[![MySQL](https://img.shields.io/badge/MySQL-8.0-blue)](https://mysql.com)
 
-Laravel Sanctum token-based authentication
+## 📋 Overview
 
-Role-based access (Admin, Finance, User)
+This API serves as the **independent backend core** for the Caffeine Cove ecosystem. Built with clean architecture principles, it handles all business logic including order processing, invoice management, payment tracking, and double-entry accounting.
 
-Protected routes for ERP operations
+## ✨ Key Features
 
-Orders Management
+- **Authentication**: Laravel Sanctum with token-based auth
+- **Order Management**: Full CRUD with stock validation
+- **Invoice Engine**: Automatic status calculation (paid/partial/unpaid)
+- **Payment System**: Support partial & multiple payments
+- **Refund Engine**: Smart refund with invoice/credit separation
+- **Double-Entry Accounting**: Balanced journal entries
+- **Customer Ledger**: Complete transaction history
+- **Role-Based Access**: Admin/User separation
 
-Create / Update / Delete / Confirm / Cancel orders
+## 🛠️ Tech Stack
 
-Track status: pending, confirmed, cancelled
+- **Framework**: Laravel 10+
+- **Database**: MySQL 8.0
+- **Authentication**: Laravel Sanctum
+- **API Style**: RESTful
+- **Documentation**: Postman/OpenAPI
 
-Validate stock availability before confirming orders
+## 🚀 Quick Start
 
-Automatic stock movements logged
+### Prerequisites
 
-Invoices & Payments
+- PHP ≥ 8.1
+- Composer
+- MySQL ≥ 8.0
+- Node.js & NPM (for Laravel Mix)
 
-Generate invoices from orders
+### Installation
 
-Record partial or full payments
+```bash
+# Clone repository
+git clone https://github.com/yourusername/caffeine-cove-api.git
 
-Automatic invoice status update: partial, paid
+# Install dependencies
+composer install
 
-Refund management for overpayments or cancellations
+# Environment setup
+cp .env.example .env
+php artisan key:generate
 
-Linked journal entries for accounting
-
-Accounting / Journal Entries
-
-Double-entry accounting
-
-Create Journal Entries automatically for payments and refunds
-
-Each entry has lines for debit/credit
-
-Prevent unbalanced entries
-
-Customers & Products
-
-CRUD for products
-
-Track stock quantities
-
-Link orders and invoices to customers
-
-API Structure
-
-RESTful routes with middleware protection
-
-Resource controllers with validation
-
-Transaction-safe operations using DB::transaction
-
-📂 Project Structure (Backend)
-app/
-├── Http/Controllers/API/
-│ ├── OrderController.php
-│ ├── InvoiceController.php
-│ ├── InvoicePaymentController.php
-│ └── PaymentRefundController.php
-├── Models/
-│ ├── Order.php
-│ ├── OrderItem.php
-│ ├── Invoice.php
-│ ├── Payment.php
-│ ├── Refund.php
-│ ├── JournalEntry.php
-│ ├── JournalLine.php
-│ └── Product.php
-├── Services/
-│ └── AccountingService.php
-
-🔧 Environment Setup
+# Database configuration
+# Edit .env file with your database credentials
 DB_CONNECTION=mysql
-DB_HOST=<host>
+DB_HOST=127.0.0.1
 DB_PORT=3306
-DB_DATABASE=<database>
-DB_USERNAME=<user>
-DB_PASSWORD=<password>
+DB_DATABASE=caffeine_cove
+DB_USERNAME=root
+DB_PASSWORD=
 
-Run Migrations
-php artisan migrate
+# Run migrations & seeders
+php artisan migrate --seed
 
-Start Server
+# Start server
 php artisan serve
+API will be available at: http://localhost:8000
 
-🔒 Permissions & Roles
+📚 API Documentation
+Authentication
+text
+POST   /api/login          - User login
+POST   /api/logout         - User logout
+GET    /api/user           - Get authenticated user
+Core Endpoints
+Orders
+text
+GET    /api/orders         - List orders (paginated)
+POST   /api/orders         - Create order
+GET    /api/orders/{id}    - Get order details
+PUT    /api/orders/{id}    - Update order
+DELETE /api/orders/{id}    - Cancel order
+Invoices
+text
+GET    /api/invoices       - List invoices
+GET    /api/invoices/{id}  - Invoice details
+POST   /api/invoices/{id}/pay - Process payment
+Payments
+text
+GET    /api/payments       - List payments
+POST   /api/payments/refund/{id} - Process refund
+Accounting
+text
+GET    /api/journal-entries - View journal entries
+GET    /api/ledger/{customer} - Customer ledger
+🗄️ Database Schema
+Core Tables
+users - System users
 
-Use Laravel permissions to restrict access to ERP features
+orders - Customer orders
 
-Example: permission:finance.view for finance routes
+invoices - Generated invoices
 
-📌 Testing API
+payments - Payment records
 
-Use Postman to test endpoints
+refunds - Refund transactions
 
-Ensure you pass Authorization: Bearer <token> header
+journal_entries - Accounting entries
 
-⚙️ Future Improvements
+journal_lines - Debit/credit lines
 
-Export reports (Excel / PDF)
+customer_ledger - Customer balance tracking
 
-Advanced filters on Orders/Invoices
+Relationships
+text
+Order → Invoice → Payments → Refunds
+      ↘ JournalEntries
+            ↘ CustomerLedger
+🔒 Security Features
+Token Authentication: Bearer tokens via Sanctum
 
-Real-time notifications for payments/refunds
+CORS: Properly configured for frontend domains
 
-Multi-currency support
+Rate Limiting: API throttle protection
+
+Input Validation: Strict request validation
+
+SQL Injection Prevention: Eloquent ORM protection
+
+🧪 Testing
+bash
+# Run all tests
+php artisan test
+
+# Run specific test suite
+php artisan test --testsuite=Feature
+php artisan test --testsuite=Unit
+
+# With coverage (requires XDebug)
+php artisan test --coverage
+📊 Business Logic Highlights
+Invoice Status Calculation
+php
+// Auto-calculated based on payments
+- unpaid    (total_paid = 0)
+- partial   (0 < total_paid < total)
+- paid      (total_paid >= total)
+Refund Protection
+Prevents over-refunding
+
+Tracks refund per payment
+
+Auto-updates available balances
+
+Maintains ledger consistency
+
+Double-Entry Validation
+sql
+-- Every transaction maintains balance
+SELECT SUM(debit) - SUM(credit)
+FROM journal_lines
+WHERE journal_entry_id = ?
+-- Must equal 0
+🚦 Error Handling
+Standardized JSON responses:
+
+json
+{
+  "success": false,
+  "message": "Error description",
+  "errors": {
+    "field": ["Validation error"]
+  }
+}
+📈 Performance Optimizations
+Eager Loading: Prevents N+1 queries
+
+Caching: Config caching for routes/config
+
+Pagination: All list endpoints paginated
+
+Indexed Columns: Optimized database indexes
+
+🔧 Configuration
+Environment Variables
+env
+APP_NAME="Caffeine Cove API"
+APP_ENV=production
+APP_DEBUG=false
+APP_URL=http://localhost
+
+SANCTUM_STATEFUL_DOMAINS=localhost:3000
+SESSION_DOMAIN=localhost
+CORS Setup
+php
+// config/cors.php
+'paths' => ['api/*'],
+'allowed_origins' => ['http://localhost:3000'],
+🤝 Integration Guide
+For Frontend Developers
+Base URL: http://localhost:8000/api
+
+Authentication: Bearer token in headers
+
+All requests require Accept: application/json
+
+Pagination metadata in response headers
+
+Example Request (JavaScript)
+javascript
+const response = await fetch('http://localhost:8000/api/orders', {
+  headers: {
+    'Authorization': `Bearer ${token}`,
+    'Accept': 'application/json'
+  }
+})
+📝 API Response Format
+Success Response
+json
+{
+  "success": true,
+  "data": {},
+  "message": "Operation successful"
+}
+Paginated Response
+json
+{
+  "data": [],
+  "links": {},
+  "meta": {
+    "current_page": 1,
+    "last_page": 10,
+    "per_page": 15,
+    "total": 150
+  }
+}
+🐛 Known Issues & Limitations
+Rate limiting per user not implemented
+
+File export (PDF/Excel) pending
+
+Webhook notifications not included
+
+🗺️ Roadmap
+Core CRUD operations
+
+Authentication & Authorization
+
+Payment & Refund Engine
+
+Double-Entry Accounting
+
+Unit & Feature Tests (80%+ coverage)
+
+API Documentation (Swagger/OpenAPI)
+
+OAuth2 Support
+
+Webhook System
+
+GraphQL Support (optional)
+
+🤝 Contributing
+Fork the repository
+
+Create feature branch (git checkout -b feature/amazing)
+
+Commit changes (git commit -m 'Add amazing feature')
+
+Push branch (git push origin feature/amazing)
+
+Open Pull Request
+
+Coding Standards
+PSR-12 coding style
+
+DocBlocks for all methods
+
+Feature tests for new endpoints
+
+Update API documentation
+
+📄 License
+MIT License - feel free to use in your projects
 
 👨‍💻 Author
+Mohamed Berik
+Full Stack Developer
+GitHub | LinkedIn
 
-Mohamed Berik – Junior Full Stack Developer (Laravel | React | REST API | ERP)
+🙏 Acknowledgments
+Laravel community
+
+Double-entry accounting principles
+
+Open source ERP systems inspiration
+
+⭐ Found this helpful? Star the repository!
+🐛 Found a bug? Open an issue
+```
