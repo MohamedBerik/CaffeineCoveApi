@@ -5,6 +5,7 @@ namespace App\Http\Controllers\API\SaaS;
 use App\Http\Controllers\Controller;
 use App\Models\Company;
 use App\Models\User;
+use App\Services\CompanyAccountingInitializer;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -43,6 +44,7 @@ class ClinicOnboardingController extends Controller
                     'primary_color' => '#0ea5e9',
                 ],
             ]);
+            CompanyAccountingInitializer::init($company->id);
 
             // 3) create admin user
             $user = User::create([
