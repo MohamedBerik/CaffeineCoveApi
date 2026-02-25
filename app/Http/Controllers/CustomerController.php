@@ -39,8 +39,8 @@ class CustomerController extends Controller
         $validated = $request->validate([
             'id' => 'required|unique:customers|max:20',
             'name' => 'required|min:3|max:255',
-            'email' => 'nullable|min:3|max:255',
-            'password' => 'nullable|min:3|max:255',
+            'email' => 'required|min:3|max:255',
+            'password' => 'required|min:3|max:255',
         ]);
 
         Customer::create([
@@ -66,8 +66,8 @@ class CustomerController extends Controller
         $request->validate([
             "id" => ['required', Rule::unique('customers')->ignore($old_id)],
             "name" => "required|min:3|max:255",
-            "email" => "nullable|min:3|max:255",
-            "password" => "nullable|min:3|max:255",
+            "email" => "required|min:3|max:255",
+            "password" => "required|min:3|max:255",
         ]);
 
         $customer->update([
