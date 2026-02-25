@@ -160,7 +160,7 @@ class AppointmentController extends Controller
             'doctor_name'       => ['sometimes', 'required', 'string', 'max:190'],
             'appointment_date'  => ['sometimes', 'date'],
             'appointment_time'  => ['sometimes', 'date_format:H:i'],
-            'status'            => ['sometimes', Rule::in(['scheduled', 'completed', 'cancelled', 'no_show'])],
+            // 'status'            => ['sometimes', Rule::in(['scheduled', 'completed', 'cancelled', 'no_show'])],
             'notes'             => ['nullable', 'string'],
         ]);
 
@@ -312,5 +312,77 @@ class AppointmentController extends Controller
             'status' => 201,
             'data' => $appointment->load('patient:id,name,email,company_id'),
         ], 201);
+    }
+
+    public function cancel(Request $request, $id)
+    {
+        $companyId = $request->user()->company_id;
+
+        $appointment = Appointment::where('company_id', $companyId)
+            ->findOrFail($id);
+
+        if ($appointment->status === 'completed') {
+            throw ValidationException::withMessages([
+                'status' => ['Completed appointments cannot be cancelled.']
+            ]);
+        }
+
+        $appointment->update([
+            'status' => 'cancelled'
+        ]);
+
+        return response()->json([
+            'msg' => 'Appointment cancelled',
+            'status' => 200,
+            'data' => $appointment->fresh()->load('patient:id,name,email,company_id'),
+        ]);
+    }
+
+    public function complete(Request $request, $id)
+    {
+        $companyId = $request->user()->company_id;
+
+        $appointment = Appointment::where('company_id', $companyId)
+            ->findOrFail($id);
+
+        if ($appointment->status === 'cancelled') {
+            throw ValidationException::withMessages([
+                'status' => ['Cancelled appointment cannot be completed.']
+            ]);
+        }
+
+        $appointment->update([
+            'status' => 'completed'
+        ]);
+
+        return response()->json([
+            'msg' => 'Appointment completed',
+            'status' => 200,
+            'data' => $appointment->fresh()->load('patient:id,name,email,company_id'),
+        ]);
+    }
+
+    public function noShow(Request $request, $id)
+    {
+        $companyId = $request->user()->company_id;
+
+        $appointment = Appointment::where('company_id', $companyId)
+            ->findOrFail($id);
+
+        if ($appointment->status !== 'scheduled') {
+            throw ValidationException::withMessages([
+                'status' => ['Only scheduled appointments can be marked as no-show.']
+            ]);
+        }
+
+        $appointment->update([
+            'status' => 'no_show'
+        ]);
+
+        return response()->json([
+            'msg' => 'Appointment marked as no-show',
+            'status' => 200,
+            'data' => $appointment->fresh()->load('patient:id,name,email,company_id'),
+        ]);
     }
 }
