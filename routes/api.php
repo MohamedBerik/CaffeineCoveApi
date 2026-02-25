@@ -14,7 +14,7 @@ use App\Http\Controllers\API\SaleController;
 use App\Http\Controllers\API\ReservationController;
 use App\Http\Controllers\API\AdminDashboardController;
 use App\Http\Controllers\API\AdminCrudController;
-
+use App\Http\Controllers\API\AppointmentController;
 // ERP
 use App\Http\Controllers\API\Erp\OrderController;
 use App\Http\Controllers\API\Erp\InvoicePaymentController;
@@ -93,6 +93,7 @@ Route::middleware([
         Route::apiResource('users',       UserController::class);
         Route::apiResource('products',    ProductController::class);
         Route::apiResource('sales',       SaleController::class);
+        Route::apiResource('appointments', AppointmentController::class);
 
         Route::get('/reservations',                [ReservationController::class, 'index']);
         Route::post('/reservations',               [ReservationController::class, 'store']);
