@@ -14,12 +14,12 @@ class Customer extends Model
         'company_id',
         "name",
         "email",
-        "password",
+        // "password",
         "status",
     ];
 
     protected $hidden = [
-        'password',
+        // 'password',
         'remember_token',
     ];
 
