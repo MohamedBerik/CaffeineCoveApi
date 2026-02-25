@@ -14,6 +14,7 @@ use App\Http\Controllers\API\SaleController;
 use App\Http\Controllers\API\ReservationController;
 use App\Http\Controllers\API\AdminDashboardController;
 use App\Http\Controllers\API\AdminCrudController;
+use App\Http\Controllers\API\AppointmentAvailabilityController;
 use App\Http\Controllers\API\AppointmentController;
 // ERP
 use App\Http\Controllers\API\Erp\OrderController;
@@ -221,6 +222,8 @@ Route::prefix('erp')
 
         Route::middleware('permission:finance.view')
             ->get('/activity-logs', [ActivityLogController::class, 'index']);
+
+        Route::get('/appointments/available-slots', [AppointmentAvailabilityController::class, 'index']);
     });
 
 Route::middleware('auth:sanctum')->prefix('saas')->group(function () {
