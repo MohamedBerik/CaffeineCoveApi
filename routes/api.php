@@ -14,8 +14,6 @@ use App\Http\Controllers\API\SaleController;
 use App\Http\Controllers\API\ReservationController;
 use App\Http\Controllers\API\AdminDashboardController;
 use App\Http\Controllers\API\AdminCrudController;
-use App\Http\Controllers\API\AppointmentAvailabilityController;
-use App\Http\Controllers\API\AppointmentController;
 // ERP
 use App\Http\Controllers\API\Erp\OrderController;
 use App\Http\Controllers\API\Erp\InvoicePaymentController;
@@ -27,6 +25,8 @@ use App\Http\Controllers\API\Erp\CustomerStatementController;
 use App\Http\Controllers\API\Erp\PaymentRefundController;
 use App\Http\Controllers\API\Erp\SupplierStatementController;
 use App\Http\Controllers\API\Erp\InvoiceJournalController;
+use App\Http\Controllers\API\Erp\AppointmentController;
+use App\Http\Controllers\API\Erp\AppointmentAvailabilityController;
 use App\Http\Controllers\API\SaaS\ClinicOnboardingController;
 use App\Http\Controllers\API\SaaS\TenantController;
 
@@ -94,7 +94,6 @@ Route::middleware([
         Route::apiResource('users',       UserController::class);
         Route::apiResource('products',    ProductController::class);
         Route::apiResource('sales',       SaleController::class);
-        Route::apiResource('appointments', AppointmentController::class);
 
         Route::get('/reservations',                [ReservationController::class, 'index']);
         Route::post('/reservations',               [ReservationController::class, 'store']);
@@ -223,7 +222,7 @@ Route::prefix('erp')
         Route::middleware('permission:finance.view')
             ->get('/activity-logs', [ActivityLogController::class, 'index']);
 
-
+        Route::apiResource('appointments', AppointmentController::class);
         Route::get('/appointments/available-slots', [AppointmentAvailabilityController::class, 'index']);
         Route::post('/appointments/book', [AppointmentController::class, 'book']);
         Route::post('/appointments/{id}/cancel', [AppointmentController::class, 'cancel']);
