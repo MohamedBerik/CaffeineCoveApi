@@ -77,7 +77,10 @@ class Invoice extends Model
     {
         return $this->hasMany(CustomerLedgerEntry::class);
     }
-
+    public function appointment()
+    {
+        return $this->belongsTo(\App\Models\Appointment::class);
+    }
     public function company()
     {
         return $this->belongsTo(Company::class);

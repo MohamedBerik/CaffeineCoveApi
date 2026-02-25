@@ -3,7 +3,12 @@
 namespace App\Http\Controllers\API;
 
 use App\Http\Controllers\Controller;
+use App\Models\Account;
 use App\Models\Appointment;
+use App\Models\CustomerLedgerEntry;
+use App\Models\Invoice;
+use App\Models\JournalEntry;
+use App\Models\JournalLine;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
@@ -342,24 +347,123 @@ class AppointmentController extends Controller
     {
         $companyId = $request->user()->company_id;
 
-        $appointment = Appointment::where('company_id', $companyId)
-            ->findOrFail($id);
+        // v1: نخلي السعر يجي من الطلب (اختياري) أو default = 0
+        $payload = $request->validate([
+            'total' => ['required', 'numeric', 'min:0'],
+        ]);
 
-        if ($appointment->status === 'cancelled') {
-            throw ValidationException::withMessages([
-                'status' => ['Cancelled appointment cannot be completed.']
+        return DB::transaction(function () use ($request, $companyId, $id, $payload) {
+
+            $appointment = Appointment::where('company_id', $companyId)->findOrFail($id);
+
+            if ($appointment->status === 'cancelled') {
+                throw ValidationException::withMessages([
+                    'status' => ['Cancelled appointment cannot be completed.']
+                ]);
+            }
+
+            // لو اتعمله invoice قبل كده (re-try safe)
+            $existingInvoice = Invoice::where('company_id', $companyId)
+                ->where('appointment_id', $appointment->id)
+                ->first();
+
+            if ($existingInvoice) {
+                // تأكد الحالة completed
+                if ($appointment->status !== 'completed') {
+                    $appointment->update(['status' => 'completed']);
+                }
+
+                return response()->json([
+                    'msg' => 'Appointment already completed (invoice exists)',
+                    'status' => 200,
+                    'invoice_id' => $existingInvoice->id,
+                    'invoice_number' => $existingInvoice->number,
+                    'data' => $appointment->fresh()->load('patient:id,name,email,company_id'),
+                ]);
+            }
+
+            // 1) complete appointment
+            $appointment->update(['status' => 'completed']);
+
+            // 2) create invoice
+            $amount = (float)($payload['total'] ?? 0);
+
+            $invoiceNumber = 'INV-APPT-' . now()->format('YmdHis') . '-' . $appointment->id;
+
+            $invoice = Invoice::create([
+                'company_id'     => $companyId,
+                'appointment_id' => $appointment->id,
+                'customer_id'    => $appointment->patient_id,
+                'number'         => $invoiceNumber,
+                'issued_at'      => now(),
+                'total'          => $amount,
+                'status'         => $amount > 0 ? 'unpaid' : 'unpaid', // v1: نفس الحالة
             ]);
-        }
 
-        $appointment->update([
-            'status' => 'completed'
-        ]);
+            // لو الفاتورة 0، ممكن تتجاهل القيود المحاسبية (بس الأفضل تسيبها)
+            if ($amount > 0) {
+                // 3) Accounting: Journal Entry (AR Dr / Sales Cr)
+                $ar = Account::where('company_id', $companyId)->where('code', 1100)->first();
+                $sales = Account::where('company_id', $companyId)->where('code', 4000)->first();
 
-        return response()->json([
-            'msg' => 'Appointment completed',
-            'status' => 200,
-            'data' => $appointment->fresh()->load('patient:id,name,email,company_id'),
-        ]);
+                if (!$ar || !$sales) {
+                    throw ValidationException::withMessages([
+                        'accounts' => ['Missing accounting accounts (1100 AR / 4000 Sales) for this company.']
+                    ]);
+                }
+
+                $je = JournalEntry::create([
+                    'company_id'  => $companyId,
+                    'entry_date'  => now()->toDateString(),
+                    'description' => "Appointment invoice #{$invoice->id}",
+                    'source_type' => Invoice::class,
+                    'source_id'   => $invoice->id,
+                    'created_by'  => $request->user()->id,
+                ]);
+
+                JournalLine::insert([
+                    [
+                        'company_id' => $companyId,
+                        'journal_entry_id' => $je->id,
+                        'account_id' => $ar->id,
+                        'debit' => $amount,
+                        'credit' => 0,
+                        'created_at' => now(),
+                        'updated_at' => now(),
+                    ],
+                    [
+                        'company_id' => $companyId,
+                        'journal_entry_id' => $je->id,
+                        'account_id' => $sales->id,
+                        'debit' => 0,
+                        'credit' => $amount,
+                        'created_at' => now(),
+                        'updated_at' => now(),
+                    ],
+                ]);
+
+                // 4) Customer Ledger: invoice debit
+                CustomerLedgerEntry::create([
+                    'company_id'   => $companyId,
+                    'customer_id'  => $appointment->patient_id,
+                    'invoice_id'   => $invoice->id,
+                    'payment_id'   => null,
+                    'refund_id'    => null,
+                    'type'         => 'invoice',
+                    'debit'        => $amount,
+                    'credit'       => 0,
+                    'entry_date'   => now(),
+                    'description'  => "Appointment invoice #{$invoice->id}",
+                ]);
+            }
+
+            return response()->json([
+                'msg' => 'Appointment completed + invoice created',
+                'status' => 200,
+                'invoice' => $invoice->only(['id', 'number', 'total', 'status', 'issued_at', 'appointment_id', 'customer_id']),
+                'appointment' => $appointment->fresh()->load('patient:id,name,email,company_id'),
+            ]);
+        });
     }
 
     public function noShow(Request $request, $id)
