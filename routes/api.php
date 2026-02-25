@@ -27,6 +27,7 @@ use App\Http\Controllers\API\Erp\PaymentRefundController;
 use App\Http\Controllers\API\Erp\SupplierStatementController;
 use App\Http\Controllers\API\Erp\InvoiceJournalController;
 use App\Http\Controllers\API\SaaS\ClinicOnboardingController;
+use App\Http\Controllers\API\SaaS\TenantController;
 
 /*
 |--------------------------------------------------------------------------
@@ -221,4 +222,7 @@ Route::prefix('erp')
             ->get('/activity-logs', [ActivityLogController::class, 'index']);
     });
 
-Route::post('/saas/register-clinic', [ClinicOnboardingController::class, 'register']);
+Route::middleware('auth:sanctum')->prefix('saas')->group(function () {
+    Route::get('/me', [TenantController::class, 'me']);
+    Route::post('/register-clinic', [ClinicOnboardingController::class, 'register']);
+});
