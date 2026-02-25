@@ -223,7 +223,9 @@ Route::prefix('erp')
         Route::middleware('permission:finance.view')
             ->get('/activity-logs', [ActivityLogController::class, 'index']);
 
+
         Route::get('/appointments/available-slots', [AppointmentAvailabilityController::class, 'index']);
+        Route::post('/appointments/book', [AppointmentController::class, 'book']);
     });
 
 Route::middleware('auth:sanctum')->prefix('saas')->group(function () {

@@ -9,6 +9,9 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
 use Illuminate\Database\QueryException;
+use Carbon\Carbon;
+use Illuminate\Validation\ValidationException;
+
 
 class AppointmentController extends Controller
 {
@@ -231,5 +234,83 @@ class AppointmentController extends Controller
             'status' => 200,
             'data' => null,
         ]);
+    }
+
+    public function book(Request $request)
+    {
+        $companyId = $request->user()->company_id;
+
+        $data = $request->validate([
+            'patient_id' => ['required', 'integer'],
+            'doctor_name' => ['required', 'string', 'max:190'],
+            'appointment_date' => ['required', 'date'],       // YYYY-MM-DD
+            'appointment_time' => ['required', 'date_format:H:i'],
+            'notes' => ['nullable', 'string'],
+        ]);
+
+        $doctor = trim($data['doctor_name']);
+        $date = Carbon::parse($data['appointment_date'])->toDateString();
+        $time = $data['appointment_time'];
+
+        // V1 working hours (نفس defaults بتاعة availability)
+        $startTime = '09:00';
+        $endTime = '17:00';
+        $slotMinutes = 30;
+
+        $start = Carbon::parse("$date $startTime");
+        $end   = Carbon::parse("$date $endTime");
+        $requested = Carbon::parse("$date $time");
+
+        // 1) time داخل حدود ساعات العمل
+        if ($requested->lt($start) || $requested->gte($end)) {
+            throw ValidationException::withMessages([
+                'appointment_time' => ['Time is outside working hours.']
+            ]);
+        }
+
+        // 2) time aligned to slot step
+        $diff = $start->diffInMinutes($requested);
+        if ($diff % $slotMinutes !== 0) {
+            throw ValidationException::withMessages([
+                'appointment_time' => ['Time must match slot interval.']
+            ]);
+        }
+
+        // 3) check collision (مع نفس شروطك: scheduled/completed/no_show)
+        $exists = Appointment::where('company_id', $companyId)
+            ->where('doctor_name', $doctor)
+            ->whereDate('appointment_date', $date)
+            ->where('appointment_time', $time)
+            ->whereIn('status', ['scheduled', 'completed', 'no_show'])
+            ->exists();
+
+        if ($exists) {
+            return response()->json([
+                "msg" => "Time slot already booked",
+                "status" => 422,
+                "errors" => [
+                    "appointment_time" => [
+                        "This time slot is already booked for this doctor."
+                    ]
+                ]
+            ], 422);
+        }
+
+        $appointment = Appointment::create([
+            'company_id' => $companyId,
+            'patient_id' => $data['patient_id'],
+            'doctor_name' => $doctor,
+            'appointment_date' => $date,
+            'appointment_time' => $time,
+            'status' => 'scheduled',
+            'notes' => $data['notes'] ?? null,
+            'created_by' => $request->user()->id,
+        ]);
+
+        return response()->json([
+            'msg' => 'Appointment booked',
+            'status' => 201,
+            'data' => $appointment->load('patient:id,name,email,company_id'),
+        ], 201);
     }
 }
