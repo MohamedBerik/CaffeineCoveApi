@@ -5,7 +5,10 @@ namespace App\Http\Controllers\API;
 use App\Http\Controllers\Controller;
 use App\Models\Appointment;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
+use Illuminate\Database\QueryException;
 
 class AppointmentController extends Controller
 {
@@ -13,23 +16,25 @@ class AppointmentController extends Controller
     {
         $companyId = $request->user()->company_id;
 
-        $query = Appointment::where('company_id', $companyId)
+        $query = Appointment::query()
+            ->where('company_id', $companyId)
             ->with(['patient:id,name,email,company_id'])
             ->orderByDesc('appointment_date')
             ->orderByDesc('appointment_time');
 
-        // optional search
-        if ($search = $request->get('search')) {
+        // ✅ safe scoped search (no leakage due to OR)
+        if ($search = trim((string) $request->get('search', ''))) {
             $query->where(function ($q) use ($search) {
-                $q->where('doctor_name', 'like', "%$search%")
-                    ->orWhere('notes', 'like', "%$search%");
-            })->orWhereHas('patient', function ($q) use ($search) {
-                $q->where('name', 'like', "%$search%")
-                    ->orWhere('email', 'like', "%$search%");
+                $q->where('doctor_name', 'like', "%{$search}%")
+                    ->orWhere('notes', 'like', "%{$search}%")
+                    ->orWhereHas('patient', function ($p) use ($search) {
+                        $p->where('name', 'like', "%{$search}%")
+                            ->orWhere('email', 'like', "%{$search}%");
+                    });
             });
         }
 
-        $perPage = (int)($request->get('per_page', 20));
+        $perPage = (int) ($request->get('per_page', 20));
         $data = $query->paginate($perPage);
 
         return response()->json([
@@ -38,10 +43,10 @@ class AppointmentController extends Controller
             'data' => $data->items(),
             'meta' => [
                 'current_page' => $data->currentPage(),
-                'last_page' => $data->lastPage(),
-                'per_page' => $data->perPage(),
-                'total' => $data->total(),
-            ]
+                'last_page'    => $data->lastPage(),
+                'per_page'     => $data->perPage(),
+                'total'        => $data->total(),
+            ],
         ]);
     }
 
@@ -49,20 +54,67 @@ class AppointmentController extends Controller
     {
         $companyId = $request->user()->company_id;
 
-        $data = $request->validate([
-            'patient_id' => ['required', 'integer'],
-            'doctor_name' => ['nullable', 'string', 'max:190'],
-            'appointment_date' => ['required', 'date'],
-            'appointment_time' => ['required', 'date_format:H:i'],
-            'status' => ['nullable', Rule::in(['scheduled', 'completed', 'cancelled', 'no_show'])],
-            'notes' => ['nullable', 'string'],
+        $v = Validator::make($request->all(), [
+            'patient_id'        => [
+                'required',
+                'integer',
+                // ✅ patient must belong to same company
+                Rule::exists('customers', 'id')->where(fn($q) => $q->where('company_id', $companyId)),
+            ],
+            'doctor_name'       => ['required', 'string', 'max:190'], // ✅ NOT NULL now
+            'appointment_date'  => ['required', 'date'],              // could be Y-m-d or full date string
+            'appointment_time'  => ['required', 'date_format:H:i'],
+            'status'            => ['nullable', Rule::in(['scheduled', 'completed', 'cancelled', 'no_show'])],
+            'notes'             => ['nullable', 'string'],
         ]);
 
-        $appointment = Appointment::create([
-            ...$data,
-            'company_id' => $companyId,
-            'created_by' => $request->user()->id,
-        ]);
+        if ($v->fails()) {
+            return response()->json([
+                'msg' => 'Validation required',
+                'status' => 422,
+                'errors' => $v->errors(),
+            ], 422);
+        }
+
+        $data = $v->validated();
+
+        // ✅ prevent duplicate slot (friendly 422 instead of SQL exception)
+        $slotTaken = Appointment::query()
+            ->where('company_id', $companyId)
+            ->where('doctor_name', $data['doctor_name'])
+            ->whereDate('appointment_date', $data['appointment_date'])
+            ->where('appointment_time', $data['appointment_time'])
+            ->exists();
+
+        if ($slotTaken) {
+            return response()->json([
+                'msg' => 'Time slot already booked',
+                'status' => 422,
+                'errors' => [
+                    'appointment_time' => ['This time slot is already booked for this doctor.'],
+                ],
+            ], 422);
+        }
+
+        try {
+            $appointment = Appointment::create([
+                ...$data,
+                'company_id'  => $companyId,
+                'created_by'  => $request->user()->id,
+            ]);
+        } catch (QueryException $e) {
+            // ✅ fallback in case of race condition (two requests same time)
+            if ((string) $e->getCode() === '23000') {
+                return response()->json([
+                    'msg' => 'Time slot already booked',
+                    'status' => 422,
+                    'errors' => [
+                        'appointment_time' => ['This time slot is already booked for this doctor.'],
+                    ],
+                ], 422);
+            }
+            throw $e;
+        }
 
         return response()->json([
             'msg' => 'Appointment created',
@@ -75,7 +127,8 @@ class AppointmentController extends Controller
     {
         $companyId = $request->user()->company_id;
 
-        $appointment = Appointment::where('company_id', $companyId)
+        $appointment = Appointment::query()
+            ->where('company_id', $companyId)
             ->with('patient:id,name,email,company_id')
             ->findOrFail($id);
 
@@ -90,18 +143,71 @@ class AppointmentController extends Controller
     {
         $companyId = $request->user()->company_id;
 
-        $appointment = Appointment::where('company_id', $companyId)->findOrFail($id);
+        $appointment = Appointment::query()
+            ->where('company_id', $companyId)
+            ->findOrFail($id);
 
-        $data = $request->validate([
-            'patient_id' => ['sometimes', 'integer'],
-            'doctor_name' => ['nullable', 'string', 'max:190'],
-            'appointment_date' => ['sometimes', 'date'],
-            'appointment_time' => ['sometimes', 'date_format:H:i'],
-            'status' => ['sometimes', Rule::in(['scheduled', 'completed', 'cancelled', 'no_show'])],
-            'notes' => ['nullable', 'string'],
+        $v = Validator::make($request->all(), [
+            'patient_id'        => [
+                'sometimes',
+                'integer',
+                Rule::exists('customers', 'id')->where(fn($q) => $q->where('company_id', $companyId)),
+            ],
+            // ✅ keep it required if sent, but allow partial update without sending it
+            'doctor_name'       => ['sometimes', 'required', 'string', 'max:190'],
+            'appointment_date'  => ['sometimes', 'date'],
+            'appointment_time'  => ['sometimes', 'date_format:H:i'],
+            'status'            => ['sometimes', Rule::in(['scheduled', 'completed', 'cancelled', 'no_show'])],
+            'notes'             => ['nullable', 'string'],
         ]);
 
-        $appointment->update($data);
+        if ($v->fails()) {
+            return response()->json([
+                'msg' => 'Validation required',
+                'status' => 422,
+                'errors' => $v->errors(),
+            ], 422);
+        }
+
+        $data = $v->validated();
+
+        // ✅ if any of the slot fields updated, re-check uniqueness (ignore current id)
+        $newDoctor = $data['doctor_name'] ?? $appointment->doctor_name;
+        $newDate   = $data['appointment_date'] ?? $appointment->appointment_date;
+        $newTime   = $data['appointment_time'] ?? $appointment->appointment_time;
+
+        $slotTaken = Appointment::query()
+            ->where('company_id', $companyId)
+            ->where('doctor_name', $newDoctor)
+            ->whereDate('appointment_date', $newDate)
+            ->where('appointment_time', $newTime)
+            ->where('id', '!=', $appointment->id)
+            ->exists();
+
+        if ($slotTaken) {
+            return response()->json([
+                'msg' => 'Time slot already booked',
+                'status' => 422,
+                'errors' => [
+                    'appointment_time' => ['This time slot is already booked for this doctor.'],
+                ],
+            ], 422);
+        }
+
+        try {
+            $appointment->update($data);
+        } catch (QueryException $e) {
+            if ((string) $e->getCode() === '23000') {
+                return response()->json([
+                    'msg' => 'Time slot already booked',
+                    'status' => 422,
+                    'errors' => [
+                        'appointment_time' => ['This time slot is already booked for this doctor.'],
+                    ],
+                ], 422);
+            }
+            throw $e;
+        }
 
         return response()->json([
             'msg' => 'Appointment updated',
@@ -114,7 +220,10 @@ class AppointmentController extends Controller
     {
         $companyId = $request->user()->company_id;
 
-        $appointment = Appointment::where('company_id', $companyId)->findOrFail($id);
+        $appointment = Appointment::query()
+            ->where('company_id', $companyId)
+            ->findOrFail($id);
+
         $appointment->delete();
 
         return response()->json([
