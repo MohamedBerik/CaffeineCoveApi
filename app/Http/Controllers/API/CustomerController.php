@@ -17,32 +17,40 @@ class CustomerController extends Controller
 
         $customers = Customer::where('company_id', $companyId)
             ->orderByDesc('id')
-            ->get();
+            ->paginate(20);
 
         return response()->json([
-            "msg" => "Customers fetched successfully",
-            "status" => 200,
-            "data" => CustomerResource::collection($customers),
-        ], 200);
+            'msg' => 'Customers list',
+            'status' => 200,
+            'data' => CustomerResource::collection($customers),
+            'meta' => [
+                'current_page' => $customers->currentPage(),
+                'last_page' => $customers->lastPage(),
+                'per_page' => $customers->perPage(),
+                'total' => $customers->total(),
+            ]
+        ]);
     }
 
-    public function show(Request $request, Customer $customer)
+    public function show(Request $request, $id)
     {
         $companyId = $request->user()->company_id;
 
-        if ($customer->company_id !== $companyId) {
+        $customer = Customer::where('company_id', $companyId)->find($id);
+
+        if (!$customer) {
             return response()->json([
-                "msg" => "Customer not found",
-                "status" => 404,
-                "data" => null
+                'msg' => 'Customer not found',
+                'status' => 404,
+                'data' => null
             ], 404);
         }
 
         return response()->json([
-            "msg" => "Customer fetched successfully",
-            "status" => 200,
-            "data" => new CustomerResource($customer),
-        ], 200);
+            'msg' => 'Customer details',
+            'status' => 200,
+            'data' => new CustomerResource($customer)
+        ]);
     }
 
     public function store(Request $request)
@@ -50,85 +58,111 @@ class CustomerController extends Controller
         $companyId = $request->user()->company_id;
 
         $data = $request->validate([
-            'name'     => ['required', 'string', 'min:3', 'max:255'],
-            'email'    => ['nullable', 'email', 'max:255'],
-            // optional password (لو هتعمل patient portal لاحقًا)
-            'password' => ['nullable', 'string', 'min:8', 'max:255'],
-            'status'   => ['nullable', Rule::in([0, 1])],
+            'name'  => ['required', 'string', 'min:3', 'max:255'],
+            'email' => [
+                'nullable',
+                'email',
+                'max:255',
+                // لو عايز تمنع تكرار نفس الإيميل داخل نفس الشركة فقط
+                Rule::unique('customers', 'email')->where(fn($q) => $q->where('company_id', $companyId)),
+            ],
+            // Customer عادة مش محتاج password. نخليه اختياري (لو ناوي تعمل portal لاحقًا)
+            'password' => ['nullable', 'string', 'min:6', 'max:255'],
+            'status' => ['nullable', 'in:active,inactive'],
+            'phone' => ['nullable', 'string', 'max:50'],
         ]);
 
-        if (!empty($data['password'])) {
-            $data['password'] = Hash::make($data['password']);
-        } else {
-            unset($data['password']);
-        }
-
-        $customer = Customer::create(array_merge($data, [
+        $customer = Customer::create([
             'company_id' => $companyId,
-        ]));
+            'name' => $data['name'],
+            'email' => $data['email'] ?? null,
+            'password' => !empty($data['password']) ? Hash::make($data['password']) : null,
+            'status' => $data['status'] ?? 1, // عدّل حسب جدولك (string/boolean)
+            'phone' => $data['phone'] ?? null,
+        ]);
 
         return response()->json([
-            "msg" => "Customer created successfully",
-            "status" => 201,
-            "data" => new CustomerResource($customer),
+            'msg' => 'Created successfully',
+            'status' => 201,
+            'data' => new CustomerResource($customer)
         ], 201);
     }
 
-    public function update(Request $request, Customer $customer)
+    public function update(Request $request, $id)
     {
         $companyId = $request->user()->company_id;
 
-        if ($customer->company_id !== $companyId) {
+        $customer = Customer::where('company_id', $companyId)->find($id);
+
+        if (!$customer) {
             return response()->json([
-                "msg" => "Customer not found",
-                "status" => 404,
-                "data" => null
+                'msg' => 'Customer not found',
+                'status' => 404,
+                'data' => null
             ], 404);
         }
 
         $data = $request->validate([
-            'name'     => ['sometimes', 'required', 'string', 'min:3', 'max:255'],
-            'email'    => ['nullable', 'email', 'max:255'],
-            'password' => ['nullable', 'string', 'min:8', 'max:255'],
-            'status'   => ['nullable', Rule::in([0, 1])],
+            'name'  => ['sometimes', 'required', 'string', 'min:3', 'max:255'],
+            'email' => [
+                'sometimes',
+                'nullable',
+                'email',
+                'max:255',
+                Rule::unique('customers', 'email')
+                    ->where(fn($q) => $q->where('company_id', $companyId))
+                    ->ignore($customer->id),
+            ],
+            'password' => ['sometimes', 'nullable', 'string', 'min:6', 'max:255'],
+            'status' => ['sometimes', 'nullable', 'in:active,inactive'],
+            'phone' => ['sometimes', 'nullable', 'string', 'max:50'],
         ]);
 
-        // update password only if provided (and not empty)
+        if (array_key_exists('name', $data)) {
+            $customer->name = $data['name'];
+        }
+        if (array_key_exists('email', $data)) {
+            $customer->email = $data['email'];
+        }
+        if (array_key_exists('status', $data)) {
+            $customer->status = $data['status'] ?? $customer->status;
+        }
+        if (array_key_exists('phone', $data)) {
+            $customer->phone = $data['phone'];
+        }
         if (array_key_exists('password', $data)) {
-            if (!empty($data['password'])) {
-                $data['password'] = Hash::make($data['password']);
-            } else {
-                unset($data['password']);
-            }
+            $customer->password = !empty($data['password']) ? Hash::make($data['password']) : null;
         }
 
-        $customer->update($data);
+        $customer->save();
 
         return response()->json([
-            "msg" => "Customer updated successfully",
-            "status" => 200,
-            "data" => new CustomerResource($customer->fresh()),
-        ], 200);
+            'msg' => 'Updated successfully',
+            'status' => 200,
+            'data' => new CustomerResource($customer)
+        ]);
     }
 
-    public function destroy(Request $request, Customer $customer)
+    public function destroy(Request $request, $id)
     {
         $companyId = $request->user()->company_id;
 
-        if ($customer->company_id !== $companyId) {
+        $customer = Customer::where('company_id', $companyId)->find($id);
+
+        if (!$customer) {
             return response()->json([
-                "msg" => "Customer not found",
-                "status" => 404,
-                "data" => null
+                'msg' => 'Customer not found',
+                'status' => 404,
+                'data' => null
             ], 404);
         }
 
         $customer->delete();
 
         return response()->json([
-            "msg" => "Customer deleted successfully",
-            "status" => 200,
-            "data" => null
-        ], 200);
+            'msg' => 'Deleted successfully',
+            'status' => 200,
+            'data' => null
+        ]);
     }
 }
