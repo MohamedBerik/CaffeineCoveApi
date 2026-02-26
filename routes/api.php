@@ -27,6 +27,7 @@ use App\Http\Controllers\API\Erp\PaymentRefundController;
 use App\Http\Controllers\API\Erp\SupplierStatementController;
 use App\Http\Controllers\API\Erp\InvoiceJournalController;
 use App\Http\Controllers\API\Erp\AppointmentAvailabilityController;
+use App\Http\Controllers\API\Erp\CustomerCreditController;
 use App\Http\Controllers\API\SaaS\ClinicOnboardingController;
 use App\Http\Controllers\API\SaaS\TenantController;
 
@@ -228,6 +229,8 @@ Route::prefix('erp')
         Route::post('/appointments/{id}/cancel', [AppointmentController::class, 'cancel']);
         Route::post('/appointments/{id}/complete', [AppointmentController::class, 'complete']);
         Route::post('/appointments/{id}/no-show', [AppointmentController::class, 'noShow']);
+
+        Route::get('/customers/{customerId}/credit-balance', [CustomerCreditController::class, 'show']);
     });
 
 Route::middleware('auth:sanctum')->prefix('saas')->group(function () {
