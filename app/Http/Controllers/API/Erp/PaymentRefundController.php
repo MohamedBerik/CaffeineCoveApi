@@ -25,14 +25,13 @@ class PaymentRefundController extends Controller
         $amountReq = (float) $request->amount;
 
         return DB::transaction(function () use ($request, $paymentId, $companyId, $appliesTo, $amountReq) {
-
             // 1) lock payment + load refunds
             $payment = Payment::where('company_id', $companyId)
                 ->lockForUpdate()
                 ->with(['refunds'])
                 ->findOrFail($paymentId);
 
-            // 2) invoice is REQUIRED for both invoice-refund & credit-refund (to know customer_id)
+            // 2) invoice is REQUIRED (حتى للـ credit refund عشان نعرف customer_id)
             $invoice = null;
             if ($payment->invoice_id) {
                 $invoice = Invoice::where('company_id', $companyId)->find($payment->invoice_id);
@@ -94,7 +93,7 @@ class PaymentRefundController extends Controller
                     'type'        => 'refund_invoice',
                     'debit'       => $refund->amount,
                     'credit'      => 0,
-                    'entry_date'  => now(), // datetime
+                    'entry_date'  => now()->toDateString(),
                     'description' => 'Invoice refund for payment #' . $payment->id,
                 ]);
 
@@ -137,37 +136,36 @@ class PaymentRefundController extends Controller
                 $invoice->update(['status' => $status]);
 
                 return response()->json([
-                    'msg'          => 'Refund recorded',
-                    'refund_id'    => $refund->id,
-                    'applies_to'   => 'invoice',
+                    'msg'           => 'Refund recorded',
+                    'refund_id'     => $refund->id,
+                    'applies_to'    => 'invoice',
                     'invoice_status' => $status,
-                    'net_paid'     => $net,
-                    'remaining'    => $remaining,
+                    'net_paid'      => $net,
+                    'remaining'     => $remaining,
                 ]);
             } else {
-                // appliesTo === 'credit'
 
-                // ✅ Ledger: refund credit (debit)
+                // ✅ CREDIT REFUND (لازم invoice_id = null)
                 CustomerLedgerEntry::create([
                     'company_id'  => $companyId,
                     'customer_id' => $invoice->customer_id,
-                    'invoice_id'  => $invoice->id, // اختياري: ممكن null لو عايز تفصل
+                    'invoice_id'  => null, // ✅ fix: ممنوع يتربط بفاتورة
                     'payment_id'  => $payment->id,
                     'refund_id'   => $refund->id,
                     'type'        => 'refund_credit',
                     'debit'       => $refund->amount,
                     'credit'      => 0,
-                    'entry_date'  => now(), // datetime
+                    'entry_date'  => now()->toDateString(),
                     'description' => 'Credit refund for payment #' . $payment->id,
                 ]);
 
-                // ✅ IMPORTANT: reduce customer credit balance in customer_credits (type=debit)
+                // ✅ reduce customer credit balance in customer_credits (type=debit)
                 DB::table('customer_credits')->insert([
                     'company_id'   => $companyId,
                     'customer_id'  => $invoice->customer_id,
                     'invoice_id'   => null,
                     'payment_id'   => $payment->id,
-                    'type'         => 'debit', // يقلل الرصيد
+                    'type'         => 'debit',
                     'amount'       => $refund->amount,
                     'entry_date'   => now()->toDateString(),
                     'description'  => 'Credit refunded from payment #' . $payment->id,
