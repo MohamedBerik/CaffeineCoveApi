@@ -99,7 +99,7 @@ class Invoice extends Model
     {
         return $this->refunds()
             ->where('applies_to', 'invoice')
-            ->sum('amount');
+            ->sum('payment_refunds.amount');
     }
 
     public function getNetPaidAttribute()
