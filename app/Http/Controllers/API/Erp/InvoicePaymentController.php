@@ -37,17 +37,18 @@ class InvoicePaymentController extends Controller
                 return response()->json(['msg' => 'Cannot receive payment for cancelled invoice'], 422);
             }
 
-            // 1) total paid (sum payments.amount)
-            $totalPaid = Payment::where('company_id', $companyId)
+            // 1) total applied (sum payments.applied_amount)
+            $totalApplied = Payment::where('company_id', $companyId)
                 ->where('invoice_id', $invoice->id)
-                ->sum('amount');
+                ->sum('applied_amount');
 
-            // 2) total refunded (sum payment_refunds.amount join payments)
+            // 2) total refunded for invoice portion only
             $totalRefunded = DB::table('payment_refunds')
                 ->join('payments', 'payments.id', '=', 'payment_refunds.payment_id')
                 ->where('payments.company_id', $companyId)
                 ->where('payments.invoice_id', $invoice->id)
                 ->where('payment_refunds.company_id', $companyId)
+                ->where('payment_refunds.applies_to', 'invoice')
                 ->sum('payment_refunds.amount');
 
             // 3) total credit applied to this invoice (customer_credits type=debit)
@@ -57,7 +58,7 @@ class InvoicePaymentController extends Controller
                 ->where('type', 'debit')
                 ->sum('amount');
 
-            $netPaid = (float)$totalPaid - (float)$totalRefunded + (float)$totalCreditApplied;
+            $netPaid = (float)$totalApplied - (float)$totalRefunded + (float)$totalCreditApplied;
             $remaining = max(0, (float)$invoice->total - (float)$netPaid);
 
             // منع الدفع لو الفاتورة paid بالكامل (إلا لو allow_overpayment)
@@ -124,7 +125,7 @@ class InvoicePaymentController extends Controller
                     'payment_id'   => $payment->id,
                     'type'         => 'credit',
                     'amount'       => $credit,
-                    'entry_date'   => now()->toDateString(),
+                    'entry_date'   => $payment->created_at,
                     'description'  => 'Overpayment credit from payment #' . $payment->id,
                     'created_by'   => $request->user()->id ?? null,
                     'created_at'   => now(),
