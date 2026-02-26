@@ -19,7 +19,7 @@ class Customer extends Model
     ];
 
     protected $hidden = [
-        // 'password',
+        'password',
         'remember_token',
     ];
 
