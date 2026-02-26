@@ -420,6 +420,25 @@ class AppointmentController extends Controller
                 'total'       => $data['total'],
             ]);
 
+            $exists = CustomerLedgerEntry::where('company_id', $companyId)
+                ->where('invoice_id', $invoice->id)
+                ->where('type', 'invoice')
+                ->exists();
+
+            if (!$exists) {
+                CustomerLedgerEntry::create([
+                    'company_id'   => $companyId,
+                    'customer_id'  => $invoice->customer_id,
+                    'invoice_id'   => $invoice->id,
+                    'payment_id'   => null,
+                    'refund_id'    => null,
+                    'type'         => 'invoice',
+                    'debit'        => $invoice->total,
+                    'credit'       => 0,
+                    'entry_date'   => $invoice->issued_at ?? now(),
+                    'description'  => 'Invoice issued #' . $invoice->number,
+                ]);
+            }
             // 6) Mark appointment completed
             $appointment->update([
                 'status' => 'completed',
