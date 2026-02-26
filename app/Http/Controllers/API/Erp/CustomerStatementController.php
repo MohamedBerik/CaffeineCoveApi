@@ -18,8 +18,8 @@ class CustomerStatementController extends Controller
         $customer = Customer::where('company_id', $companyId)->findOrFail($customerId);
 
         // Parse filters safely (date only)
-        $from = $request->query('from'); // expected: YYYY-MM-DD
-        $to   = $request->query('to');   // expected: YYYY-MM-DD
+        $from = $request->query('from'); // YYYY-MM-DD
+        $to   = $request->query('to');   // YYYY-MM-DD
 
         $fromDate = $from ? Carbon::parse($from)->toDateString() : null;
         $toDate   = $to   ? Carbon::parse($to)->toDateString()   : null;
@@ -33,7 +33,6 @@ class CustomerStatementController extends Controller
             ->where('customer_id', $customerId);
 
         if ($fromDate) {
-            // whereDate works whether entry_date is DATE or DATETIME/TIMESTAMP
             $openingQuery->whereDate('entry_date', '<', $fromDate);
         }
 
@@ -57,9 +56,10 @@ class CustomerStatementController extends Controller
             $entriesQuery->whereDate('entry_date', '<=', $toDate);
         }
 
-        // IMPORTANT: stable ordering (oldest -> newest)
+        // Stable ordering (oldest -> newest)
         $entries = $entriesQuery
             ->orderBy('entry_date', 'asc')
+            ->orderBy('created_at', 'asc')
             ->orderBy('id', 'asc')
             ->get();
 
@@ -76,27 +76,31 @@ class CustomerStatementController extends Controller
 
             $running += ($debit - $credit);
 
-            // entry_date might be Carbon OR string depending on casts
-            $entryCarbon = $row->entry_date instanceof Carbon
-                ? $row->entry_date
-                : Carbon::parse($row->entry_date);
+            // entry_date => date-only for display/filtering
+            $entryDate = $row->entry_date instanceof Carbon
+                ? $row->entry_date->toDateString()
+                : Carbon::parse($row->entry_date)->toDateString();
+
+            // entry_datetime => REAL time ordering/display (use created_at)
+            $entryDateTime = $row->created_at
+                ? $row->created_at->toISOString()
+                : null;
 
             return [
-                'id'            => $row->id,
-                'entry_date'    => $entryCarbon->toDateString(),
-                // optional (helpful for debugging / future UI)
-                'entry_datetime' => $entryCarbon->toISOString(),
+                'id'             => $row->id,
+                'entry_date'     => $entryDate,
+                'entry_datetime' => $entryDateTime,
 
-                'description'   => $row->description,
-                'type'          => $row->type,
+                'description'    => $row->description,
+                'type'           => $row->type,
 
-                'debit'         => number_format($debit, 2, '.', ''),
-                'credit'        => number_format($credit, 2, '.', ''),
-                'balance'       => (float) $running,
+                'debit'          => number_format($debit, 2, '.', ''),
+                'credit'         => number_format($credit, 2, '.', ''),
+                'balance'        => (float) $running,
 
-                'invoice_id'    => $row->invoice_id,
-                'payment_id'    => $row->payment_id,
-                'refund_id'     => $row->refund_id,
+                'invoice_id'     => $row->invoice_id,
+                'payment_id'     => $row->payment_id,
+                'refund_id'      => $row->refund_id,
             ];
         });
 
