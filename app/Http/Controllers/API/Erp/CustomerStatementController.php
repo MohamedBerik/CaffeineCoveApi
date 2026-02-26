@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Customer;
 use App\Models\CustomerLedgerEntry;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 
 class CustomerStatementController extends Controller
 {
@@ -13,78 +14,93 @@ class CustomerStatementController extends Controller
     {
         $companyId = $request->user()->company_id;
 
-        // التأكد أن العميل تابع لنفس الشركة
-        $customer = Customer::where('company_id', $companyId)
-            ->findOrFail($customerId);
+        // Ensure customer belongs to tenant
+        $customer = Customer::where('company_id', $companyId)->findOrFail($customerId);
 
-        $from = $request->query('from');
-        $to   = $request->query('to');
+        // Parse filters safely (date only)
+        $from = $request->query('from'); // expected: YYYY-MM-DD
+        $to   = $request->query('to');   // expected: YYYY-MM-DD
 
-        // -----------------------------------------
-        // Opening balance
-        // كل ما قبل from
-        // -----------------------------------------
+        $fromDate = $from ? Carbon::parse($from)->toDateString() : null;
+        $toDate   = $to   ? Carbon::parse($to)->toDateString()   : null;
+
+        /*
+         |---------------------------------------------------------
+         | Opening balance = all entries BEFORE fromDate
+         |---------------------------------------------------------
+         */
         $openingQuery = CustomerLedgerEntry::where('company_id', $companyId)
             ->where('customer_id', $customerId);
 
-        if ($from) {
-            $openingQuery->where('entry_date', '<', $from);
+        if ($fromDate) {
+            // whereDate works whether entry_date is DATE or DATETIME/TIMESTAMP
+            $openingQuery->whereDate('entry_date', '<', $fromDate);
         }
 
-        $openingDebit  = (clone $openingQuery)->sum('debit');
-        $openingCredit = (clone $openingQuery)->sum('credit');
-
+        $openingDebit  = (float) (clone $openingQuery)->sum('debit');
+        $openingCredit = (float) (clone $openingQuery)->sum('credit');
         $openingBalance = $openingDebit - $openingCredit;
 
-        // -----------------------------------------
-        // Entries inside period
-        // -----------------------------------------
+        /*
+         |---------------------------------------------------------
+         | Entries within period
+         |---------------------------------------------------------
+         */
         $entriesQuery = CustomerLedgerEntry::where('company_id', $companyId)
             ->where('customer_id', $customerId);
 
-        if ($from) {
-            $entriesQuery->where('entry_date', '>=', $from);
+        if ($fromDate) {
+            $entriesQuery->whereDate('entry_date', '>=', $fromDate);
         }
 
-        if ($to) {
-            $entriesQuery->where('entry_date', '<=', $to);
+        if ($toDate) {
+            $entriesQuery->whereDate('entry_date', '<=', $toDate);
         }
 
+        // IMPORTANT: stable ordering (oldest -> newest)
         $entries = $entriesQuery
-            ->orderBy('entry_date')
-            ->orderBy('id')
+            ->orderBy('entry_date', 'asc')
+            ->orderBy('id', 'asc')
             ->get();
 
-        // -----------------------------------------
-        // Running balance
-        // -----------------------------------------
+        /*
+         |---------------------------------------------------------
+         | Running balance
+         |---------------------------------------------------------
+         */
         $running = $openingBalance;
 
         $rows = $entries->map(function ($row) use (&$running) {
+            $debit  = (float) $row->debit;
+            $credit = (float) $row->credit;
 
-            $running += ($row->debit - $row->credit);
+            $running += ($debit - $credit);
+
+            // entry_date might be Carbon OR string depending on casts
+            $entryCarbon = $row->entry_date instanceof Carbon
+                ? $row->entry_date
+                : Carbon::parse($row->entry_date);
 
             return [
-                'id'          => $row->id,
-                'entry_date'  => $row->entry_date->toDateString(),
-                'description' => $row->description,
-                'type'        => $row->type,
+                'id'            => $row->id,
+                'entry_date'    => $entryCarbon->toDateString(),
+                // optional (helpful for debugging / future UI)
+                'entry_datetime' => $entryCarbon->toISOString(),
 
-                'debit'       => $row->debit,
-                'credit'      => $row->credit,
+                'description'   => $row->description,
+                'type'          => $row->type,
 
-                'balance'     => $running,
+                'debit'         => number_format($debit, 2, '.', ''),
+                'credit'        => number_format($credit, 2, '.', ''),
+                'balance'       => (float) $running,
 
-                'invoice_id'  => $row->invoice_id,
-                'payment_id'  => $row->payment_id,
-                'refund_id'   => $row->refund_id,
+                'invoice_id'    => $row->invoice_id,
+                'payment_id'    => $row->payment_id,
+                'refund_id'     => $row->refund_id,
             ];
         });
 
-        // -----------------------------------------
-        // Closing balance
-        // -----------------------------------------
-        $closingBalance = $running;
+        $closingBalance = (float) $running;
 
         return response()->json([
             'customer' => [
@@ -94,16 +110,13 @@ class CustomerStatementController extends Controller
                 'phone' => $customer->phone ?? null,
                 'email' => $customer->email ?? null,
             ],
-
             'period' => [
-                'from' => $from ?? 'Beginning',
-                'to'   => $to   ?? now()->toDateString(),
+                'from' => $fromDate ?? 'Beginning',
+                'to'   => $toDate   ?? now()->toDateString(),
             ],
-
-            'opening_balance' => $openingBalance,
-            'closing_balance' => $closingBalance,
-
-            'entries' => $rows
+            'opening_balance' => (float) $openingBalance,
+            'closing_balance' => (float) $closingBalance,
+            'entries' => $rows->values(),
         ]);
     }
 }
