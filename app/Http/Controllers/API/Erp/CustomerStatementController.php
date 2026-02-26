@@ -58,8 +58,8 @@ class CustomerStatementController extends Controller
 
         // Stable ordering (oldest -> newest)
         $entries = $entriesQuery
-            ->orderBy('entry_date', 'asc')
             ->orderBy('created_at', 'asc')
+            // ->orderBy('entry_date', 'asc')
             ->orderBy('id', 'asc')
             ->get();
 
