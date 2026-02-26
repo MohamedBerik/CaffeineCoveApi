@@ -349,7 +349,7 @@ class AppointmentController extends Controller
 
         $data = $request->validate([
             'total' => ['required', 'numeric', 'min:0.01'],
-            'doctor_name' => ['nullable', 'string', 'max:190'], // اختياري
+            'doctor_name' => ['nullable', 'string', 'max:190'],
             'notes' => ['nullable', 'string'],
         ]);
 
@@ -376,16 +376,22 @@ class AppointmentController extends Controller
 
         return DB::transaction(function () use ($request, $companyId, $data, $appointment, $serviceProduct) {
 
+            // (اختياري) تحديث بيانات الموعد قبل الإقفال
+            $appointment->update([
+                'doctor_name' => $data['doctor_name'] ?? $appointment->doctor_name,
+                'notes'       => $data['notes'] ?? $appointment->notes,
+            ]);
+
             // 1) Create Order (internal order for the visit)
             $order = \App\Models\Order::create([
                 'company_id'   => $companyId,
-                'customer_id'  => $appointment->patient_id, // patient stored as customer
+                'customer_id'  => $appointment->patient_id,
                 'status'       => 'confirmed',
                 'total'        => $data['total'],
                 'created_by'   => $request->user()->id,
             ]);
 
-            // 2) Create OrderItem (optional but recommended)
+            // 2) Create OrderItem
             \App\Models\OrderItem::create([
                 'company_id'  => $companyId,
                 'order_id'    => $order->id,
@@ -398,19 +404,19 @@ class AppointmentController extends Controller
             // 3) Generate invoice number
             $number = 'INV-' . now()->format('YmdHis') . '-' . $order->id;
 
-            // 4) Create Invoice (order_id is NOT NULL عندك)
+            // 4) Create Invoice
             $invoice = \App\Models\Invoice::create([
                 'company_id'      => $companyId,
                 'number'          => $number,
                 'order_id'        => $order->id,
-                'appointment_id'  => $appointment->id,
+                'appointment_id'  => $appointment->id, // ✅ هتتسجل بعد ما تضيفها للـ fillable
                 'customer_id'     => $appointment->patient_id,
                 'total'           => $data['total'],
                 'status'          => 'unpaid',
                 'issued_at'       => now(),
             ]);
 
-            // 5) Create InvoiceItem (product_id NOT NULL)
+            // 5) Create InvoiceItem
             \App\Models\InvoiceItem::create([
                 'company_id'  => $companyId,
                 'invoice_id'  => $invoice->id,
@@ -420,6 +426,7 @@ class AppointmentController extends Controller
                 'total'       => $data['total'],
             ]);
 
+            // 5.1) Customer Ledger Entry (Invoice Issued)
             $exists = CustomerLedgerEntry::where('company_id', $companyId)
                 ->where('invoice_id', $invoice->id)
                 ->where('type', 'invoice')
@@ -439,6 +446,7 @@ class AppointmentController extends Controller
                     'description'  => 'Invoice issued #' . $invoice->number,
                 ]);
             }
+
             // 6) Mark appointment completed
             $appointment->update([
                 'status' => 'completed',
