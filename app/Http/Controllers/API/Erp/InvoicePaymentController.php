@@ -109,7 +109,7 @@ class InvoicePaymentController extends Controller
                     'type'        => 'payment',
                     'debit'       => 0,
                     'credit'      => $applied,
-                    'entry_date'  => now()->toDateString(),
+                    'entry_date'  => $payment->created_at,
                     'description' => 'Payment applied #' . $payment->id,
                 ]);
             }
