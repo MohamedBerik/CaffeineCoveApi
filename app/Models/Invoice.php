@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use App\Models\Concerns\BelongsToCompanyTrait;
+use Illuminate\Support\Facades\DB;
 
 class Invoice extends Model
 {
@@ -13,10 +14,11 @@ class Invoice extends Model
         'company_id',
         'number',
         'order_id',
+        'appointment_id',
         'customer_id',
         'total',
         'status',
-        'issued_at'
+        'issued_at',
     ];
 
     protected $casts = [
@@ -24,7 +26,7 @@ class Invoice extends Model
         'total'     => 'decimal:2',
     ];
 
-    // اختياري: لو حابب الخصائص المحسوبة تظهر في JSON تلقائيًا
+    // Optional: computed attributes appear in JSON automatically
     protected $appends = [
         'total_paid',
         'total_refunded',
@@ -61,10 +63,10 @@ class Invoice extends Model
         return $this->hasManyThrough(
             PaymentRefund::class,
             Payment::class,
-            'invoice_id',
-            'payment_id',
-            'id',
-            'id'
+            'invoice_id',   // FK on payments
+            'payment_id',   // FK on payment_refunds
+            'id',           // local key on invoices
+            'id'            // local key on payments
         );
     }
 
@@ -77,10 +79,12 @@ class Invoice extends Model
     {
         return $this->hasMany(CustomerLedgerEntry::class);
     }
+
     public function appointment()
     {
-        return $this->belongsTo(\App\Models\Appointment::class);
+        return $this->belongsTo(Appointment::class);
     }
+
     public function company()
     {
         return $this->belongsTo(Company::class);
@@ -90,25 +94,37 @@ class Invoice extends Model
      | Computed attributes
      * ========================= */
 
-    public function getTotalPaidAttribute()
+    public function getTotalPaidAttribute(): float
     {
-        return $this->payments()->sum('applied_amount');
+        // only applied_amount counts as paid against invoice
+        return (float) $this->payments()
+            ->where('company_id', $this->company_id)
+            ->sum('applied_amount');
     }
 
-    public function getTotalRefundedAttribute()
+    public function getTotalRefundedAttribute(): float
     {
-        return $this->refunds()
-            ->where('applies_to', 'invoice')
+        /**
+         * IMPORTANT:
+         * Avoid ambiguous "amount" because both payments and payment_refunds have "amount".
+         * Use fully-qualified column: payment_refunds.amount
+         */
+        return (float) DB::table('payment_refunds')
+            ->join('payments', 'payments.id', '=', 'payment_refunds.payment_id')
+            ->where('payments.invoice_id', $this->id)
+            ->where('payments.company_id', $this->company_id)
+            ->where('payment_refunds.company_id', $this->company_id)
+            ->where('payment_refunds.applies_to', 'invoice')
             ->sum('payment_refunds.amount');
     }
 
-    public function getNetPaidAttribute()
+    public function getNetPaidAttribute(): float
     {
-        return $this->total_paid - $this->total_refunded;
+        return (float) $this->total_paid - (float) $this->total_refunded;
     }
 
-    public function getRemainingAttribute()
+    public function getRemainingAttribute(): float
     {
-        return max(0, (float)$this->total - (float)$this->net_paid);
+        return max(0, (float) $this->total - (float) $this->net_paid);
     }
 }
