@@ -152,7 +152,8 @@ class InvoiceController extends Controller
                 'issued_at' => $invoice->issued_at,
                 'total' => $invoice->total,
                 'status' => $invoice->status,
-
+                'appointment_id' => $invoice->appointment_id,
+                'order_id'       => $invoice->order_id,
                 'customer' => $invoice->customer,
                 'items' => $invoice->items ?? [],
 
