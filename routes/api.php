@@ -240,6 +240,7 @@ Route::prefix('erp')
         Route::delete('/treatment-plans/{id}', [TreatmentPlanController::class, 'destroy']);
 
         Route::get('/treatment-plans/{id}/summary', [TreatmentPlanController::class, 'summary']);
+        Route::get('/treatment-plans/{id}/cash-summary', [TreatmentPlanController::class, 'cashSummary']);
     });
 
 Route::middleware('auth:sanctum')->prefix('saas')->group(function () {

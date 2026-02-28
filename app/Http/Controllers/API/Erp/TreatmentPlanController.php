@@ -57,9 +57,6 @@ class TreatmentPlanController extends Controller
             'total_cost'  => ['required', 'numeric', 'min:0'],
         ]);
 
-        // ensure customer belongs to company (optional but recommended if you have Customer model scope)
-        // \App\Models\Customer::where('company_id', $companyId)->findOrFail($data['customer_id']);
-
         $plan = TreatmentPlan::create([
             'company_id'  => $companyId,
             'customer_id' => $data['customer_id'],
@@ -118,9 +115,13 @@ class TreatmentPlanController extends Controller
         return response()->json(['msg' => 'Treatment plan deleted']);
     }
 
+    /**
+     * ✅ Invoice-based: totals for plan based on invoices payments (applied_amount)
+     * ✅ refunds counted ONLY when applies_to=invoice
+     * ❌ refunds applies_to=credit NOT included here
+     */
     private function planResponse(TreatmentPlan $plan, int $companyId, bool $withInvoices = false): array
     {
-        // Pull invoices IDs for this plan (if not already loaded)
         $invoiceIds = $withInvoices && $plan->relationLoaded('invoices')
             ? $plan->invoices->pluck('id')->all()
             : Invoice::where('company_id', $companyId)
@@ -128,7 +129,6 @@ class TreatmentPlanController extends Controller
             ->pluck('id')
             ->all();
 
-        // Compute based on payments.applied_amount and refunds(applies_to=invoice)
         $totalApplied = 0.0;
         $totalRefundedInvoice = 0.0;
 
@@ -162,7 +162,7 @@ class TreatmentPlanController extends Controller
 
             'customer'   => $plan->relationLoaded('customer') ? $plan->customer : null,
 
-            // computed
+            // computed (invoice-based)
             'total_paid'     => (float) $totalApplied,
             'total_refunded' => (float) $totalRefundedInvoice,
             'net_paid'       => (float) $netPaid,
@@ -176,14 +176,17 @@ class TreatmentPlanController extends Controller
         return $resp;
     }
 
+    /**
+     * ✅ Plan Summary (Invoice-based)
+     * - paid = payments.applied_amount
+     * - refunded = refunds where applies_to=invoice
+     */
     public function summary(Request $request, $id)
     {
         $companyId = $request->user()->company_id;
 
-        // 1) Load plan (tenant scoped)
         $plan = TreatmentPlan::where('company_id', $companyId)->findOrFail($id);
 
-        // 2) Invoices under this plan
         $invoices = Invoice::query()
             ->where('company_id', $companyId)
             ->where('treatment_plan_id', $plan->id)
@@ -203,7 +206,6 @@ class TreatmentPlanController extends Controller
 
         $invoiceIds = $invoices->pluck('id')->values();
 
-        // If no invoices yet
         if ($invoiceIds->isEmpty()) {
             return response()->json([
                 'msg' => 'Treatment plan summary',
@@ -231,7 +233,6 @@ class TreatmentPlanController extends Controller
             ]);
         }
 
-        // 3) Aggregate paid per invoice (payments.applied_amount)
         $paidByInvoice = DB::table('payments')
             ->where('company_id', $companyId)
             ->whereIn('invoice_id', $invoiceIds)
@@ -239,7 +240,6 @@ class TreatmentPlanController extends Controller
             ->groupBy('invoice_id')
             ->pluck('total_paid', 'invoice_id');
 
-        // 4) Aggregate refunded per invoice (refunds applies_to=invoice)
         $refundedByInvoice = DB::table('payment_refunds')
             ->join('payments', 'payments.id', '=', 'payment_refunds.payment_id')
             ->where('payments.company_id', $companyId)
@@ -250,7 +250,6 @@ class TreatmentPlanController extends Controller
             ->groupBy('payments.invoice_id')
             ->pluck('total_refunded', 'invoice_id');
 
-        // 5) Build invoice rows with per-invoice totals
         $invoiceRows = $invoices->map(function ($inv) use ($paidByInvoice, $refundedByInvoice) {
             $paid = (float) ($paidByInvoice[$inv->id] ?? 0);
             $ref  = (float) ($refundedByInvoice[$inv->id] ?? 0);
@@ -271,7 +270,6 @@ class TreatmentPlanController extends Controller
             ];
         });
 
-        // 6) Plan totals
         $totalInvoiced = (float) $invoices->sum(fn($i) => (float) $i->total);
         $totalPaid     = (float) $invoiceRows->sum('total_paid');
         $totalRefunded = (float) $invoiceRows->sum('total_refunded');
@@ -300,6 +298,124 @@ class TreatmentPlanController extends Controller
                     'remaining_on_plan' => $remainingOnPlan,
                 ],
                 'invoices' => $invoiceRows->values(),
+            ],
+        ]);
+    }
+
+    /**
+     * ✅ NEW: Cash summary for a treatment plan (cash-in / cash-out)
+     *
+     * - cash_in: SUM(payments.amount) for payments on invoices of this plan
+     * - cash_out_invoice_refunds: refunds applies_to=invoice for those payments
+     * - cash_out_credit_refunds: refunds applies_to=credit for those payments
+     * - net_cash = cash_in - (cash_out_invoice_refunds + cash_out_credit_refunds)
+     *
+     * Plus customer wallet balance from customer_credits:
+     * - credit_issued (type=credit)
+     * - credit_used   (type=debit)
+     * - net_credit
+     */
+    public function cashSummary(Request $request, $id)
+    {
+        $companyId = $request->user()->company_id;
+
+        $plan = TreatmentPlan::where('company_id', $companyId)->findOrFail($id);
+
+        $invoiceIds = Invoice::where('company_id', $companyId)
+            ->where('treatment_plan_id', $plan->id)
+            ->pluck('id');
+
+        // No invoices => still return wallet
+        if ($invoiceIds->isEmpty()) {
+            $creditIssued = (float) DB::table('customer_credits')
+                ->where('company_id', $companyId)
+                ->where('customer_id', $plan->customer_id)
+                ->where('type', 'credit')
+                ->sum('amount');
+
+            $creditUsed = (float) DB::table('customer_credits')
+                ->where('company_id', $companyId)
+                ->where('customer_id', $plan->customer_id)
+                ->where('type', 'debit')
+                ->sum('amount');
+
+            return response()->json([
+                'msg' => 'Treatment plan cash summary',
+                'status' => 200,
+                'data' => [
+                    'plan_id' => $plan->id,
+                    'customer_id' => $plan->customer_id,
+                    'cash' => [
+                        'cash_in' => 0.0,
+                        'cash_out_invoice_refunds' => 0.0,
+                        'cash_out_credit_refunds' => 0.0,
+                        'net_cash' => 0.0,
+                    ],
+                    'customer_credit_balance' => [
+                        'credit_issued' => $creditIssued,
+                        'credit_used' => $creditUsed,
+                        'net_credit' => $creditIssued - $creditUsed,
+                    ],
+                ],
+            ]);
+        }
+
+        // cash in = total received money on payments for those invoices
+        $cashIn = (float) DB::table('payments')
+            ->where('company_id', $companyId)
+            ->whereIn('invoice_id', $invoiceIds)
+            ->sum('amount');
+
+        // cash out invoice refunds
+        $cashOutInvoiceRefunds = (float) DB::table('payment_refunds')
+            ->join('payments', 'payments.id', '=', 'payment_refunds.payment_id')
+            ->where('payments.company_id', $companyId)
+            ->where('payment_refunds.company_id', $companyId)
+            ->whereIn('payments.invoice_id', $invoiceIds)
+            ->where('payment_refunds.applies_to', 'invoice')
+            ->sum('payment_refunds.amount');
+
+        // cash out credit refunds (THIS is what we separate)
+        $cashOutCreditRefunds = (float) DB::table('payment_refunds')
+            ->join('payments', 'payments.id', '=', 'payment_refunds.payment_id')
+            ->where('payments.company_id', $companyId)
+            ->where('payment_refunds.company_id', $companyId)
+            ->whereIn('payments.invoice_id', $invoiceIds)
+            ->where('payment_refunds.applies_to', 'credit')
+            ->sum('payment_refunds.amount');
+
+        $netCash = $cashIn - ($cashOutInvoiceRefunds + $cashOutCreditRefunds);
+
+        // wallet
+        $creditIssued = (float) DB::table('customer_credits')
+            ->where('company_id', $companyId)
+            ->where('customer_id', $plan->customer_id)
+            ->where('type', 'credit')
+            ->sum('amount');
+
+        $creditUsed = (float) DB::table('customer_credits')
+            ->where('company_id', $companyId)
+            ->where('customer_id', $plan->customer_id)
+            ->where('type', 'debit')
+            ->sum('amount');
+
+        return response()->json([
+            'msg' => 'Treatment plan cash summary',
+            'status' => 200,
+            'data' => [
+                'plan_id' => $plan->id,
+                'customer_id' => $plan->customer_id,
+                'cash' => [
+                    'cash_in' => $cashIn,
+                    'cash_out_invoice_refunds' => $cashOutInvoiceRefunds,
+                    'cash_out_credit_refunds' => $cashOutCreditRefunds,
+                    'net_cash' => $netCash,
+                ],
+                'customer_credit_balance' => [
+                    'credit_issued' => $creditIssued,
+                    'credit_used' => $creditUsed,
+                    'net_credit' => $creditIssued - $creditUsed,
+                ],
             ],
         ]);
     }
