@@ -238,6 +238,8 @@ Route::prefix('erp')
         Route::get('/treatment-plans/{id}', [TreatmentPlanController::class, 'show']);
         Route::put('/treatment-plans/{id}', [TreatmentPlanController::class, 'update']);
         Route::delete('/treatment-plans/{id}', [TreatmentPlanController::class, 'destroy']);
+
+        Route::get('/treatment-plans/{id}/summary', [TreatmentPlanController::class, 'summary']);
     });
 
 Route::middleware('auth:sanctum')->prefix('saas')->group(function () {
