@@ -171,18 +171,19 @@ class PaymentRefundController extends Controller
                     ->exists();
 
                 if (! $existsCC) {
-                    DB::table('customer_credits')->insert([
-                        'company_id'  => $companyId,
-                        'customer_id' => $invoice->customer_id,
-                        'invoice_id'  => null,
-                        'payment_id'  => $payment->id,
-                        'type'        => 'debit',
-                        'amount'      => $refund->amount,
-                        'entry_date'  => now()->toDateString(),
-                        'description' => $ccDesc,
-                        'created_by'  => $request->user()->id ?? null,
-                        'created_at'  => now(),
-                        'updated_at'  => now(),
+                    DB::table('customer_credits')->insertOrIgnore([
+                        'company_id'   => $companyId,
+                        'customer_id'  => $invoice->customer_id,
+                        'invoice_id'   => null,
+                        'payment_id'   => $payment->id,
+                        'refund_id'    => $refund->id, // ✅ جديد
+                        'type'         => 'debit',
+                        'amount'       => $refund->amount,
+                        'entry_date'   => now()->toDateString(),
+                        'description'  => 'Credit refunded from payment #' . $payment->id . ' (refund #' . $refund->id . ')',
+                        'created_by'   => $request->user()->id ?? null,
+                        'created_at'   => now(),
+                        'updated_at'   => now(),
                     ]);
                 }
 
