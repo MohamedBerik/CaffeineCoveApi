@@ -15,6 +15,7 @@ class Invoice extends Model
         'number',
         'order_id',
         'appointment_id',
+        'treatment_plan_id',
         'customer_id',
         'total',
         'status',
@@ -65,8 +66,6 @@ class Invoice extends Model
             Payment::class,
             'invoice_id',   // FK on payments
             'payment_id',   // FK on payment_refunds
-            'appointment_id',   // FK on payment_refunds
-            'treatment_plan_id',   // FK on payment_refunds
             'id',           // local key on invoices
             'id'            // local key on payments
         );
