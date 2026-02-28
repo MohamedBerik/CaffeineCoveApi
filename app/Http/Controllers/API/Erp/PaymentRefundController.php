@@ -25,6 +25,7 @@ class PaymentRefundController extends Controller
         $amountReq = (float) $request->amount;
 
         return DB::transaction(function () use ($request, $paymentId, $companyId, $appliesTo, $amountReq) {
+
             // 1) lock payment + load refunds
             $payment = Payment::where('company_id', $companyId)
                 ->lockForUpdate()
@@ -37,7 +38,7 @@ class PaymentRefundController extends Controller
                 $invoice = Invoice::where('company_id', $companyId)->find($payment->invoice_id);
             }
 
-            if (!$invoice) {
+            if (! $invoice) {
                 return response()->json([
                     'msg' => 'Invoice not found for this payment',
                     'debug' => [
@@ -50,11 +51,11 @@ class PaymentRefundController extends Controller
             }
 
             // 3) available refund by type
-            $refundedInvoice = (float) $payment->refunds->where('applies_to', 'invoice')->sum('amount');
-            $refundedCredit  = (float) $payment->refunds->where('applies_to', 'credit')->sum('amount');
+            $refundedInvoice   = (float) $payment->refunds->where('applies_to', 'invoice')->sum('amount');
+            $refundedCredit    = (float) $payment->refunds->where('applies_to', 'credit')->sum('amount');
 
-            $availableInvoice = max(0, (float) $payment->applied_amount - $refundedInvoice);
-            $availableCredit  = max(0, (float) $payment->credit_amount  - $refundedCredit);
+            $availableInvoice  = max(0, (float) $payment->applied_amount - $refundedInvoice);
+            $availableCredit   = max(0, (float) $payment->credit_amount  - $refundedCredit);
 
             $available = $appliesTo === 'invoice' ? $availableInvoice : $availableCredit;
 
@@ -93,7 +94,7 @@ class PaymentRefundController extends Controller
                     'type'        => 'refund_invoice',
                     'debit'       => $refund->amount,
                     'credit'      => 0,
-                    'entry_date'  => now()->toDateString(),
+                    'entry_date'  => now(), // ✅ keep datetime
                     'description' => 'Invoice refund for payment #' . $payment->id,
                 ]);
 
@@ -110,11 +111,11 @@ class PaymentRefundController extends Controller
                 );
 
                 // Recalc invoice status (APPLIED - refunded(invoice))
-                $totalApplied = Payment::where('company_id', $companyId)
+                $totalApplied = (float) Payment::where('company_id', $companyId)
                     ->where('invoice_id', $invoice->id)
                     ->sum('applied_amount');
 
-                $totalRefundedInvoice = DB::table('payment_refunds')
+                $totalRefundedInvoice = (float) DB::table('payment_refunds')
                     ->join('payments', 'payments.id', '=', 'payment_refunds.payment_id')
                     ->where('payments.company_id', $companyId)
                     ->where('payments.invoice_id', $invoice->id)
@@ -122,7 +123,7 @@ class PaymentRefundController extends Controller
                     ->where('payment_refunds.applies_to', 'invoice')
                     ->sum('payment_refunds.amount');
 
-                $net = (float) $totalApplied - (float) $totalRefundedInvoice;
+                $net = $totalApplied - $totalRefundedInvoice;
                 $remaining = max(0, (float) $invoice->total - $net);
 
                 if ($net <= 0) {
@@ -136,12 +137,12 @@ class PaymentRefundController extends Controller
                 $invoice->update(['status' => $status]);
 
                 return response()->json([
-                    'msg'           => 'Refund recorded',
-                    'refund_id'     => $refund->id,
-                    'applies_to'    => 'invoice',
-                    'invoice_status' => $status,
-                    'net_paid'      => $net,
-                    'remaining'     => $remaining,
+                    'msg'            => 'Refund recorded',
+                    'refund_id'       => $refund->id,
+                    'applies_to'      => 'invoice',
+                    'invoice_status'  => $status,
+                    'net_paid'        => $net,
+                    'remaining'       => $remaining,
                 ]);
             } else {
 
@@ -149,30 +150,41 @@ class PaymentRefundController extends Controller
                 CustomerLedgerEntry::create([
                     'company_id'  => $companyId,
                     'customer_id' => $invoice->customer_id,
-                    'invoice_id'  => null, // ✅ fix: ممنوع يتربط بفاتورة
+                    'invoice_id'  => null, // ✅ important
                     'payment_id'  => $payment->id,
                     'refund_id'   => $refund->id,
                     'type'        => 'refund_credit',
                     'debit'       => $refund->amount,
                     'credit'      => 0,
-                    'entry_date'  => now()->toDateString(),
+                    'entry_date'  => now(), // ✅ keep datetime
                     'description' => 'Credit refund for payment #' . $payment->id,
                 ]);
 
-                // ✅ reduce customer credit balance in customer_credits (type=debit)
-                DB::table('customer_credits')->insert([
-                    'company_id'   => $companyId,
-                    'customer_id'  => $invoice->customer_id,
-                    'invoice_id'   => null,
-                    'payment_id'   => $payment->id,
-                    'type'         => 'debit',
-                    'amount'       => $refund->amount,
-                    'entry_date'   => now()->toDateString(),
-                    'description'  => 'Credit refunded from payment #' . $payment->id,
-                    'created_by'   => $request->user()->id ?? null,
-                    'created_at'   => now(),
-                    'updated_at'   => now(),
-                ]);
+                // ✅ Idempotent customer_credits debit (prevent duplicates on retry)
+                $ccDesc = "Credit refunded from payment #{$payment->id} (refund #{$refund->id})";
+
+                $existsCC = DB::table('customer_credits')
+                    ->where('company_id', $companyId)
+                    ->where('payment_id', $payment->id)
+                    ->where('type', 'debit')
+                    ->where('description', $ccDesc)
+                    ->exists();
+
+                if (! $existsCC) {
+                    DB::table('customer_credits')->insert([
+                        'company_id'  => $companyId,
+                        'customer_id' => $invoice->customer_id,
+                        'invoice_id'  => null,
+                        'payment_id'  => $payment->id,
+                        'type'        => 'debit',
+                        'amount'      => $refund->amount,
+                        'entry_date'  => now()->toDateString(),
+                        'description' => $ccDesc,
+                        'created_by'  => $request->user()->id ?? null,
+                        'created_at'  => now(),
+                        'updated_at'  => now(),
+                    ]);
+                }
 
                 // Accounting: Dr Customer Credit / Cr Cash
                 AccountingService::createEntry(
