@@ -9,6 +9,7 @@ use App\Models\CustomerLedgerEntry;
 use App\Models\Invoice;
 use App\Models\JournalEntry;
 use App\Models\JournalLine;
+use App\Models\TreatmentPlan;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
@@ -16,7 +17,6 @@ use Illuminate\Validation\Rule;
 use Illuminate\Database\QueryException;
 use Carbon\Carbon;
 use Illuminate\Validation\ValidationException;
-
 
 class AppointmentController extends Controller
 {
@@ -66,11 +66,10 @@ class AppointmentController extends Controller
             'patient_id'        => [
                 'required',
                 'integer',
-                // ✅ patient must belong to same company
                 Rule::exists('customers', 'id')->where(fn($q) => $q->where('company_id', $companyId)),
             ],
-            'doctor_name'       => ['required', 'string', 'max:190'], // ✅ NOT NULL now
-            'appointment_date'  => ['required', 'date'],              // could be Y-m-d or full date string
+            'doctor_name'       => ['required', 'string', 'max:190'],
+            'appointment_date'  => ['required', 'date'],
             'appointment_time'  => ['required', 'date_format:H:i'],
             'status'            => ['nullable', Rule::in(['scheduled', 'completed', 'cancelled', 'no_show'])],
             'notes'             => ['nullable', 'string'],
@@ -86,7 +85,7 @@ class AppointmentController extends Controller
 
         $data = $v->validated();
 
-        // ✅ prevent duplicate slot (friendly 422 instead of SQL exception)
+        // ✅ prevent duplicate slot
         $slotTaken = Appointment::query()
             ->where('company_id', $companyId)
             ->where('doctor_name', $data['doctor_name'])
@@ -111,7 +110,6 @@ class AppointmentController extends Controller
                 'created_by'  => $request->user()->id,
             ]);
         } catch (QueryException $e) {
-            // ✅ fallback in case of race condition (two requests same time)
             if ((string) $e->getCode() === '23000') {
                 return response()->json([
                     'msg' => 'Time slot already booked',
@@ -161,11 +159,9 @@ class AppointmentController extends Controller
                 'integer',
                 Rule::exists('customers', 'id')->where(fn($q) => $q->where('company_id', $companyId)),
             ],
-            // ✅ keep it required if sent, but allow partial update without sending it
             'doctor_name'       => ['sometimes', 'required', 'string', 'max:190'],
             'appointment_date'  => ['sometimes', 'date'],
             'appointment_time'  => ['sometimes', 'date_format:H:i'],
-            // 'status'            => ['sometimes', Rule::in(['scheduled', 'completed', 'cancelled', 'no_show'])],
             'notes'             => ['nullable', 'string'],
         ]);
 
@@ -179,7 +175,6 @@ class AppointmentController extends Controller
 
         $data = $v->validated();
 
-        // ✅ if any of the slot fields updated, re-check uniqueness (ignore current id)
         $newDoctor = $data['doctor_name'] ?? $appointment->doctor_name;
         $newDate   = $data['appointment_date'] ?? $appointment->appointment_date;
         $newTime   = $data['appointment_time'] ?? $appointment->appointment_time;
@@ -248,7 +243,7 @@ class AppointmentController extends Controller
         $data = $request->validate([
             'patient_id' => ['required', 'integer'],
             'doctor_name' => ['required', 'string', 'max:190'],
-            'appointment_date' => ['required', 'date'],       // YYYY-MM-DD
+            'appointment_date' => ['required', 'date'],
             'appointment_time' => ['required', 'date_format:H:i'],
             'notes' => ['nullable', 'string'],
         ]);
@@ -257,7 +252,6 @@ class AppointmentController extends Controller
         $date = Carbon::parse($data['appointment_date'])->toDateString();
         $time = $data['appointment_time'];
 
-        // V1 working hours (نفس defaults بتاعة availability)
         $startTime = '09:00';
         $endTime = '17:00';
         $slotMinutes = 30;
@@ -266,14 +260,12 @@ class AppointmentController extends Controller
         $end   = Carbon::parse("$date $endTime");
         $requested = Carbon::parse("$date $time");
 
-        // 1) time داخل حدود ساعات العمل
         if ($requested->lt($start) || $requested->gte($end)) {
             throw ValidationException::withMessages([
                 'appointment_time' => ['Time is outside working hours.']
             ]);
         }
 
-        // 2) time aligned to slot step
         $diff = $start->diffInMinutes($requested);
         if ($diff % $slotMinutes !== 0) {
             throw ValidationException::withMessages([
@@ -281,7 +273,6 @@ class AppointmentController extends Controller
             ]);
         }
 
-        // 3) check collision (مع نفس شروطك: scheduled/completed/no_show)
         $exists = Appointment::where('company_id', $companyId)
             ->where('doctor_name', $doctor)
             ->whereDate('appointment_date', $date)
@@ -343,6 +334,13 @@ class AppointmentController extends Controller
         ]);
     }
 
+    /**
+     * ✅ COMPLETE APPOINTMENT + CREATE INVOICE (+ optional treatment_plan_id)
+     *
+     * - accepts: treatment_plan_id (nullable)
+     * - validates: plan belongs to same company AND same customer (patient)
+     * - prevents duplicate invoice for same appointment
+     */
     public function complete(Request $request, $id)
     {
         $companyId = $request->user()->company_id;
@@ -351,9 +349,30 @@ class AppointmentController extends Controller
             'total' => ['required', 'numeric', 'min:0.01'],
             'doctor_name' => ['nullable', 'string', 'max:190'],
             'notes' => ['nullable', 'string'],
+
+            // ✅ NEW
+            'treatment_plan_id' => [
+                'nullable',
+                'integer',
+                Rule::exists('treatment_plans', 'id')->where(fn($q) => $q->where('company_id', $companyId)),
+            ],
         ]);
 
         $appointment = Appointment::where('company_id', $companyId)->findOrFail($id);
+
+        // ✅ prevent double creation even if status changed manually
+        $existingInvoice = Invoice::where('company_id', $companyId)
+            ->where('appointment_id', $appointment->id)
+            ->first();
+
+        if ($existingInvoice) {
+            return response()->json([
+                'msg' => 'Invoice already exists for this appointment',
+                'status' => 409,
+                'invoice_id' => $existingInvoice->id,
+                'invoice_number' => $existingInvoice->number,
+            ], 409);
+        }
 
         if ($appointment->status === 'completed') {
             return response()->json([
@@ -362,7 +381,6 @@ class AppointmentController extends Controller
             ], 409);
         }
 
-        // لازم يكون عندك Product للخدمة (Consultation) داخل نفس الشركة
         $serviceProduct = \App\Models\Product::where('company_id', $companyId)
             ->where('title_en', 'Consultation')
             ->first();
@@ -376,13 +394,35 @@ class AppointmentController extends Controller
 
         return DB::transaction(function () use ($request, $companyId, $data, $appointment, $serviceProduct) {
 
+            // ✅ optional: validate treatment plan belongs to same customer
+            $planId = $data['treatment_plan_id'] ?? null;
+            $plan = null;
+
+            if ($planId) {
+                $plan = TreatmentPlan::where('company_id', $companyId)->findOrFail($planId);
+
+                if ((int)$plan->customer_id !== (int)$appointment->patient_id) {
+                    return response()->json([
+                        'msg' => 'Treatment plan does not belong to this customer',
+                        'status' => 422,
+                        'errors' => [
+                            'treatment_plan_id' => ['Treatment plan customer_id mismatch.'],
+                        ],
+                        'debug' => [
+                            'appointment_patient_id' => $appointment->patient_id,
+                            'plan_customer_id' => $plan->customer_id,
+                        ],
+                    ], 422);
+                }
+            }
+
             // (اختياري) تحديث بيانات الموعد قبل الإقفال
             $appointment->update([
                 'doctor_name' => $data['doctor_name'] ?? $appointment->doctor_name,
                 'notes'       => $data['notes'] ?? $appointment->notes,
             ]);
 
-            // 1) Create Order (internal order for the visit)
+            // 1) Create Order
             $order = \App\Models\Order::create([
                 'company_id'   => $companyId,
                 'customer_id'  => $appointment->patient_id,
@@ -404,16 +444,17 @@ class AppointmentController extends Controller
             // 3) Generate invoice number
             $number = 'INV-' . now()->format('YmdHis') . '-' . $order->id;
 
-            // 4) Create Invoice
+            // 4) Create Invoice (+ treatment_plan_id)
             $invoice = \App\Models\Invoice::create([
-                'company_id'      => $companyId,
-                'number'          => $number,
-                'order_id'        => $order->id,
-                'appointment_id'  => $appointment->id, // ✅ هتتسجل بعد ما تضيفها للـ fillable
-                'customer_id'     => $appointment->patient_id,
-                'total'           => $data['total'],
-                'status'          => 'unpaid',
-                'issued_at'       => now(),
+                'company_id'        => $companyId,
+                'number'            => $number,
+                'order_id'          => $order->id,
+                'appointment_id'    => $appointment->id,
+                'treatment_plan_id' => $plan?->id, // ✅ NEW (null if not provided)
+                'customer_id'       => $appointment->patient_id,
+                'total'             => $data['total'],
+                'status'            => 'unpaid',
+                'issued_at'         => now(),
             ]);
 
             // 5) Create InvoiceItem
@@ -458,6 +499,7 @@ class AppointmentController extends Controller
                 'invoice_id' => $invoice->id,
                 'order_id' => $order->id,
                 'invoice_number' => $invoice->number,
+                'treatment_plan_id' => $invoice->treatment_plan_id,
             ]);
         });
     }
