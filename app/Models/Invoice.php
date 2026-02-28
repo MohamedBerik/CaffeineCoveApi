@@ -85,6 +85,11 @@ class Invoice extends Model
         return $this->belongsTo(Appointment::class);
     }
 
+    public function treatmentPlan()
+    {
+        return $this->belongsTo(TreatmentPlan::class, 'treatment_plan_id');
+    }
+
     public function company()
     {
         return $this->belongsTo(Company::class);
