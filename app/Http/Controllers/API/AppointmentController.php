@@ -3,12 +3,9 @@
 namespace App\Http\Controllers\API;
 
 use App\Http\Controllers\Controller;
-use App\Models\Account;
 use App\Models\Appointment;
 use App\Models\CustomerLedgerEntry;
 use App\Models\Invoice;
-use App\Models\JournalEntry;
-use App\Models\JournalLine;
 use App\Models\TreatmentPlan;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -336,51 +333,26 @@ class AppointmentController extends Controller
 
     /**
      * ✅ COMPLETE APPOINTMENT + CREATE INVOICE (+ optional treatment_plan_id)
-     *
-     * - accepts: treatment_plan_id (nullable)
-     * - validates: plan belongs to same company AND same customer (patient)
-     * - prevents duplicate invoice for same appointment
      */
     public function complete(Request $request, $id)
     {
         $companyId = $request->user()->company_id;
+
+        // ✅ fetch appointment first (so we can validate plan belongs to same customer)
+        $appointment = Appointment::where('company_id', $companyId)->findOrFail($id);
 
         $data = $request->validate([
             'total' => ['required', 'numeric', 'min:0.01'],
             'doctor_name' => ['nullable', 'string', 'max:190'],
             'notes' => ['nullable', 'string'],
 
-            // ✅ NEW
+            // ✅ NEW (no $appointment usage here)
             'treatment_plan_id' => [
                 'nullable',
                 'integer',
-                Rule::exists('treatment_plans', 'id')->where(fn($q) => $q->where('company_id', $companyId)->where('customer_id', $appointment->patient_id))
-            ]
-
+                Rule::exists('treatment_plans', 'id')->where(fn($q) => $q->where('company_id', $companyId)),
+            ],
         ]);
-
-        $appointment = Appointment::where('company_id', $companyId)->findOrFail($id);
-
-        // ✅ prevent double creation even if status changed manually
-        $existingInvoice = Invoice::where('company_id', $companyId)
-            ->where('appointment_id', $appointment->id)
-            ->first();
-
-        if ($existingInvoice) {
-            return response()->json([
-                'msg' => 'Invoice already exists for this appointment',
-                'status' => 409,
-                'invoice_id' => $existingInvoice->id,
-                'invoice_number' => $existingInvoice->number,
-            ], 409);
-        }
-
-        if ($appointment->status === 'completed') {
-            return response()->json([
-                'msg' => 'Appointment already completed',
-                'status' => 409,
-            ], 409);
-        }
 
         $serviceProduct = \App\Models\Product::where('company_id', $companyId)
             ->where('title_en', 'Consultation')
@@ -395,13 +367,38 @@ class AppointmentController extends Controller
 
         return DB::transaction(function () use ($request, $companyId, $data, $appointment, $serviceProduct) {
 
-            // ✅ optional: validate treatment plan belongs to same customer
-            $planId = $data['treatment_plan_id'] ?? null;
-            $plan = null;
+            // ✅ lock appointment inside tx to reduce race conditions
+            $appointment = Appointment::where('company_id', $companyId)
+                ->lockForUpdate()
+                ->findOrFail($appointment->id);
 
+            // ✅ prevent double invoice (inside tx)
+            $existingInvoice = Invoice::where('company_id', $companyId)
+                ->where('appointment_id', $appointment->id)
+                ->lockForUpdate()
+                ->first();
+
+            if ($existingInvoice) {
+                return response()->json([
+                    'msg' => 'Invoice already exists for this appointment',
+                    'status' => 409,
+                    'invoice_id' => $existingInvoice->id,
+                    'invoice_number' => $existingInvoice->number,
+                    'treatment_plan_id' => $existingInvoice->treatment_plan_id,
+                ], 409);
+            }
+
+            if ($appointment->status === 'completed') {
+                return response()->json([
+                    'msg' => 'Appointment already completed',
+                    'status' => 409,
+                ], 409);
+            }
+
+            // ✅ validate treatment plan belongs to same customer (patient)
+            $planId = $data['treatment_plan_id'] ?? null;
             if ($planId) {
                 $plan = TreatmentPlan::where('company_id', $companyId)->findOrFail($planId);
-
                 if ((int)$plan->customer_id !== (int)$appointment->patient_id) {
                     return response()->json([
                         'msg' => 'Treatment plan does not belong to this customer',
@@ -417,7 +414,7 @@ class AppointmentController extends Controller
                 }
             }
 
-            // (اختياري) تحديث بيانات الموعد قبل الإقفال
+            // update appointment data before close
             $appointment->update([
                 'doctor_name' => $data['doctor_name'] ?? $appointment->doctor_name,
                 'notes'       => $data['notes'] ?? $appointment->notes,
@@ -432,7 +429,7 @@ class AppointmentController extends Controller
                 'created_by'   => $request->user()->id,
             ]);
 
-            // 2) Create OrderItem
+            // 2) OrderItem
             \App\Models\OrderItem::create([
                 'company_id'  => $companyId,
                 'order_id'    => $order->id,
@@ -442,7 +439,7 @@ class AppointmentController extends Controller
                 'total'       => $data['total'],
             ]);
 
-            // 3) Generate invoice number
+            // 3) invoice number
             $number = 'INV-' . now()->format('YmdHis') . '-' . $order->id;
 
             // 4) Create Invoice (+ treatment_plan_id)
@@ -458,7 +455,7 @@ class AppointmentController extends Controller
                 'issued_at'         => now(),
             ]);
 
-            // 5) Create InvoiceItem
+            // 5) InvoiceItem
             \App\Models\InvoiceItem::create([
                 'company_id'  => $companyId,
                 'invoice_id'  => $invoice->id,
@@ -468,7 +465,7 @@ class AppointmentController extends Controller
                 'total'       => $data['total'],
             ]);
 
-            // 5.1) Customer Ledger Entry (Invoice Issued)
+            // 5.1) Ledger: Invoice Issued
             $exists = CustomerLedgerEntry::where('company_id', $companyId)
                 ->where('invoice_id', $invoice->id)
                 ->where('type', 'invoice')
@@ -489,7 +486,7 @@ class AppointmentController extends Controller
                 ]);
             }
 
-            // 6) Mark appointment completed
+            // 6) close appointment
             $appointment->update([
                 'status' => 'completed',
             ]);
