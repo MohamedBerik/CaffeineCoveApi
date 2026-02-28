@@ -354,8 +354,9 @@ class AppointmentController extends Controller
             'treatment_plan_id' => [
                 'nullable',
                 'integer',
-                Rule::exists('treatment_plans', 'id')->where(fn($q) => $q->where('company_id', $companyId)),
-            ],
+                Rule::exists('treatment_plans', 'id')->where(fn($q) => $q->where('company_id', $companyId)->where('customer_id', $appointment->patient_id))
+            ]
+
         ]);
 
         $appointment = Appointment::where('company_id', $companyId)->findOrFail($id);
@@ -450,7 +451,7 @@ class AppointmentController extends Controller
                 'number'            => $number,
                 'order_id'          => $order->id,
                 'appointment_id'    => $appointment->id,
-                'treatment_plan_id' => $plan?->id, // ✅ NEW (null if not provided)
+                'treatment_plan_id' => $data['treatment_plan_id'] ?? null,
                 'customer_id'       => $appointment->patient_id,
                 'total'             => $data['total'],
                 'status'            => 'unpaid',
