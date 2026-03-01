@@ -43,4 +43,8 @@ class Appointment extends Model
     {
         return $this->hasOne(\App\Models\Invoice::class);
     }
+    public function doctor()
+    {
+        return $this->belongsTo(\App\Models\Doctor::class, 'doctor_id');
+    }
 }

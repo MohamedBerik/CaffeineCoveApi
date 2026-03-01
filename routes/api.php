@@ -241,6 +241,14 @@ Route::prefix('erp')
 
         Route::get('/treatment-plans/{id}/summary', [TreatmentPlanController::class, 'summary']);
         Route::get('/treatment-plans/{id}/cash-summary', [TreatmentPlanController::class, 'cashSummary']);
+
+        Route::get('/doctors', [DoctorController::class, 'index']);
+        Route::post('/doctors', [DoctorController::class, 'store']);
+        Route::get('/doctors/{id}', [DoctorController::class, 'show']);
+        Route::put('/doctors/{id}', [DoctorController::class, 'update']);
+        Route::delete('/doctors/{id}', [DoctorController::class, 'destroy']);
+
+        Route::get('/doctors/{id}/availability', [DoctorController::class, 'availability']);
     });
 
 Route::middleware('auth:sanctum')->prefix('saas')->group(function () {
