@@ -28,6 +28,7 @@ use App\Http\Controllers\API\Erp\SupplierStatementController;
 use App\Http\Controllers\API\Erp\InvoiceJournalController;
 use App\Http\Controllers\API\Erp\AppointmentAvailabilityController;
 use App\Http\Controllers\API\Erp\CustomerCreditController;
+use App\Http\Controllers\API\Erp\DoctorController;
 use App\Http\Controllers\API\Erp\TreatmentPlanController;
 use App\Http\Controllers\API\SaaS\ClinicOnboardingController;
 use App\Http\Controllers\API\SaaS\TenantController;
