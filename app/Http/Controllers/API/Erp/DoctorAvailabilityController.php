@@ -69,8 +69,9 @@ class DoctorAvailabilityController extends Controller
             ->where('doctor_id', $doctor->id)
             ->whereDate('appointment_date', $date)
             ->whereIn('status', $blockedStatuses)
-            ->pluck('appointment_time')
-            ->map(fn($t) => is_string($t) ? substr($t, 0, 5) : (string) $t) // normalize to "HH:MM"
+            ->selectRaw("TIME_FORMAT(appointment_time, '%H:%i') as t")
+            ->pluck('t')
+            ->filter()      // safety
             ->unique()
             ->values()
             ->all();
