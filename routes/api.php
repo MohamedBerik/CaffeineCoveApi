@@ -29,6 +29,7 @@ use App\Http\Controllers\API\Erp\InvoiceJournalController;
 use App\Http\Controllers\API\Erp\AppointmentAvailabilityController;
 use App\Http\Controllers\API\Erp\CustomerCreditController;
 use App\Http\Controllers\API\Erp\DoctorController;
+use App\Http\Controllers\API\Erp\DoctorAvailabilityController;
 use App\Http\Controllers\API\Erp\TreatmentPlanController;
 use App\Http\Controllers\API\SaaS\ClinicOnboardingController;
 use App\Http\Controllers\API\SaaS\TenantController;
@@ -250,6 +251,8 @@ Route::prefix('erp')
         Route::delete('/doctors/{id}', [DoctorController::class, 'destroy']);
 
         Route::get('/doctors/{id}/availability', [DoctorController::class, 'availability']);
+
+        Route::get('/doctors/{doctorId}/availability', [DoctorAvailabilityController::class, 'show']);
     });
 
 Route::middleware('auth:sanctum')->prefix('saas')->group(function () {
