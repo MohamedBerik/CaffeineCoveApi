@@ -257,12 +257,16 @@ class AppointmentController extends Controller
             ], 422);
         }
 
-        // ✅ If doctor changed OR doctor_name empty, derive from doctor
-        if (array_key_exists('doctor_id', $data) || empty($data['doctor_name'])) {
+        // ✅ derive doctor_name only when needed (avoid unintended overrides)
+        if (
+            array_key_exists('doctor_id', $data) ||
+            (array_key_exists('doctor_name', $data) && empty($data['doctor_name']))
+        ) {
             $doctor = Doctor::where('company_id', $companyId)
                 ->where('is_active', true)
                 ->findOrFail($newDoctorId);
 
+            // if doctor_name was not provided, default to doctor's name
             $data['doctor_name'] = trim((string)($data['doctor_name'] ?? '')) ?: ($doctor->name ?? 'Doctor');
         }
 

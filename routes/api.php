@@ -14,7 +14,6 @@ use App\Http\Controllers\API\SaleController;
 use App\Http\Controllers\API\ReservationController;
 use App\Http\Controllers\API\AdminDashboardController;
 use App\Http\Controllers\API\AdminCrudController;
-use App\Http\Controllers\API\AppointmentController;
 // ERP
 use App\Http\Controllers\API\Erp\OrderController;
 use App\Http\Controllers\API\Erp\InvoicePaymentController;
@@ -31,6 +30,7 @@ use App\Http\Controllers\API\Erp\CustomerCreditController;
 use App\Http\Controllers\API\Erp\DoctorController;
 use App\Http\Controllers\API\Erp\DoctorAvailabilityController;
 use App\Http\Controllers\API\Erp\TreatmentPlanController;
+use App\Http\Controllers\API\Erp\AppointmentController;
 use App\Http\Controllers\API\SaaS\ClinicOnboardingController;
 use App\Http\Controllers\API\SaaS\TenantController;
 
