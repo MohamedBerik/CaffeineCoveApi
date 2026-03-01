@@ -250,7 +250,7 @@ Route::prefix('erp')
         Route::put('/doctors/{id}', [DoctorController::class, 'update']);
         Route::delete('/doctors/{id}', [DoctorController::class, 'destroy']);
 
-        Route::get('/doctors/{id}/availability', [DoctorController::class, 'availability']);
+        // Route::get('/doctors/{id}/availability', [DoctorController::class, 'availability']);
 
         Route::get('/doctors/{doctorId}/availability', [DoctorAvailabilityController::class, 'show']);
     });
