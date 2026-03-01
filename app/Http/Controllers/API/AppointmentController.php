@@ -5,6 +5,7 @@ namespace App\Http\Controllers\API;
 use App\Http\Controllers\Controller;
 use App\Models\Appointment;
 use App\Models\CustomerLedgerEntry;
+use App\Models\Doctor;
 use App\Models\Invoice;
 use App\Models\TreatmentPlan;
 use Illuminate\Http\Request;
@@ -23,7 +24,10 @@ class AppointmentController extends Controller
 
         $query = Appointment::query()
             ->where('company_id', $companyId)
-            ->with(['patient:id,name,email,company_id'])
+            ->with([
+                'patient:id,name,email,company_id',
+                'doctor:id,name,company_id'
+            ])
             ->orderByDesc('appointment_date')
             ->orderByDesc('appointment_time');
 
@@ -132,7 +136,10 @@ class AppointmentController extends Controller
 
         $appointment = Appointment::query()
             ->where('company_id', $companyId)
-            ->with('patient:id,name,email,company_id')
+            ->with([
+                'patient:id,name,email,company_id',
+                'doctor:id,name,company_id'
+            ])
             ->findOrFail($id);
 
         return response()->json([
@@ -239,30 +246,39 @@ class AppointmentController extends Controller
 
         $data = $request->validate([
             'patient_id' => ['required', 'integer'],
-            'doctor_name' => ['required', 'string', 'max:190'],
-            'appointment_date' => ['required', 'date'],
+            'doctor_id' => [
+                'required',
+                'integer',
+                Rule::exists('doctors', 'id')->where(fn($q) => $q->where('company_id', $companyId)->where('is_active', 1)),
+            ],
+            'appointment_date' => ['required', 'date'],        // YYYY-MM-DD
             'appointment_time' => ['required', 'date_format:H:i'],
             'notes' => ['nullable', 'string'],
         ]);
 
-        $doctor = trim($data['doctor_name']);
+        // ✅ Load doctor (tenant scoped)
+        $doctor = Doctor::where('company_id', $companyId)->findOrFail($data['doctor_id']);
+
         $date = Carbon::parse($data['appointment_date'])->toDateString();
         $time = $data['appointment_time'];
 
-        $startTime = '09:00';
-        $endTime = '17:00';
-        $slotMinutes = 30;
+        // ✅ Working hours per doctor (V1)
+        $startTime   = $doctor->work_start ?? '09:00';
+        $endTime     = $doctor->work_end ?? '17:00';
+        $slotMinutes = (int) ($doctor->slot_minutes ?? 30);
 
         $start = Carbon::parse("$date $startTime");
         $end   = Carbon::parse("$date $endTime");
         $requested = Carbon::parse("$date $time");
 
+        // 1) time داخل حدود ساعات العمل
         if ($requested->lt($start) || $requested->gte($end)) {
             throw ValidationException::withMessages([
                 'appointment_time' => ['Time is outside working hours.']
             ]);
         }
 
+        // 2) time aligned to slot step
         $diff = $start->diffInMinutes($requested);
         if ($diff % $slotMinutes !== 0) {
             throw ValidationException::withMessages([
@@ -270,8 +286,9 @@ class AppointmentController extends Controller
             ]);
         }
 
+        // 3) check collision
         $exists = Appointment::where('company_id', $companyId)
-            ->where('doctor_name', $doctor)
+            ->where('doctor_id', $doctor->id)
             ->whereDate('appointment_date', $date)
             ->where('appointment_time', $time)
             ->whereIn('status', ['scheduled', 'completed', 'no_show'])
@@ -292,7 +309,11 @@ class AppointmentController extends Controller
         $appointment = Appointment::create([
             'company_id' => $companyId,
             'patient_id' => $data['patient_id'],
-            'doctor_name' => $doctor,
+            'doctor_id'  => $doctor->id,
+
+            // ✅ keep old column for backwards compatibility (if exists in DB)
+            'doctor_name' => $doctor->name,
+
             'appointment_date' => $date,
             'appointment_time' => $time,
             'status' => 'scheduled',
@@ -303,7 +324,10 @@ class AppointmentController extends Controller
         return response()->json([
             'msg' => 'Appointment booked',
             'status' => 201,
-            'data' => $appointment->load('patient:id,name,email,company_id'),
+            'data' => $appointment->load([
+                'patient:id,name,email,company_id',
+                'doctor:id,name,company_id,work_start,work_end,slot_minutes'
+            ]),
         ], 201);
     }
 
