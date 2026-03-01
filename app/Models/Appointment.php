@@ -23,6 +23,8 @@ class Appointment extends Model
 
     protected $casts = [
         'appointment_date' => 'date',
+        'doctor_id' => 'integer',
+        'patient_id' => 'integer',
     ];
 
     public function patient()
@@ -47,5 +49,11 @@ class Appointment extends Model
     public function doctor()
     {
         return $this->belongsTo(\App\Models\Doctor::class, 'doctor_id');
+    }
+
+    public function getAppointmentTimeAttribute($value)
+    {
+        if (!$value) return null;
+        return \Carbon\Carbon::parse($value)->format('H:i');
     }
 }
