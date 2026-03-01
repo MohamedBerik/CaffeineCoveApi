@@ -26,7 +26,7 @@ class AppointmentController extends Controller
             ->where('company_id', $companyId)
             ->with([
                 'patient:id,name,email,company_id',
-                'doctor:id,name,company_id'
+                'doctor:id,name,company_id,work_start,work_end,slot_minutes'
             ])
             ->orderByDesc('appointment_date')
             ->orderByDesc('appointment_time');
@@ -138,7 +138,7 @@ class AppointmentController extends Controller
             ->where('company_id', $companyId)
             ->with([
                 'patient:id,name,email,company_id',
-                'doctor:id,name,company_id'
+                'doctor:id,name,company_id,work_start,work_end,slot_minutes'
             ])
             ->findOrFail($id);
 
@@ -246,23 +246,42 @@ class AppointmentController extends Controller
 
         $data = $request->validate([
             'patient_id' => ['required', 'integer'],
-            'doctor_id' => [
-                'required',
-                'integer',
-                Rule::exists('doctors', 'id')->where(fn($q) => $q->where('company_id', $companyId)->where('is_active', 1)),
-            ],
-            'appointment_date' => ['required', 'date'],        // YYYY-MM-DD
+            'doctor_id'  => ['nullable', 'integer'], // ✅ optional
+            'doctor_name' => ['nullable', 'string', 'max:190'], // optional (fallback/display)
+            'appointment_date' => ['required', 'date'],
             'appointment_time' => ['required', 'date_format:H:i'],
             'notes' => ['nullable', 'string'],
         ]);
 
-        // ✅ Load doctor (tenant scoped)
-        $doctor = Doctor::where('company_id', $companyId)->findOrFail($data['doctor_id']);
-
         $date = Carbon::parse($data['appointment_date'])->toDateString();
         $time = $data['appointment_time'];
 
-        // ✅ Working hours per doctor (V1)
+        // ✅ 1) Resolve doctor (explicit or default active)
+        $doctor = null;
+
+        if (!empty($data['doctor_id'])) {
+            $doctor = \App\Models\Doctor::query()
+                ->where('company_id', $companyId)
+                ->where('is_active', true)
+                ->findOrFail((int)$data['doctor_id']);
+        } else {
+            $doctor = \App\Models\Doctor::query()
+                ->where('company_id', $companyId)
+                ->where('is_active', true)
+                ->orderBy('id', 'asc')
+                ->first();
+
+            if (!$doctor) {
+                return response()->json([
+                    'msg' => 'No active doctor found. Create a doctor first.',
+                    'status' => 422,
+                ], 422);
+            }
+        }
+
+        $doctorId = (int) $doctor->id;
+
+        // ✅ 2) Doctor working settings (fallback defaults)
         $startTime   = $doctor->work_start ?? '09:00';
         $endTime     = $doctor->work_end ?? '17:00';
         $slotMinutes = (int) ($doctor->slot_minutes ?? 30);
@@ -271,14 +290,14 @@ class AppointmentController extends Controller
         $end   = Carbon::parse("$date $endTime");
         $requested = Carbon::parse("$date $time");
 
-        // 1) time داخل حدود ساعات العمل
+        // 3) time داخل ساعات العمل
         if ($requested->lt($start) || $requested->gte($end)) {
             throw ValidationException::withMessages([
                 'appointment_time' => ['Time is outside working hours.']
             ]);
         }
 
-        // 2) time aligned to slot step
+        // 4) aligned to slot step
         $diff = $start->diffInMinutes($requested);
         if ($diff % $slotMinutes !== 0) {
             throw ValidationException::withMessages([
@@ -286,12 +305,13 @@ class AppointmentController extends Controller
             ]);
         }
 
-        // 3) check collision
-        $exists = Appointment::where('company_id', $companyId)
-            ->where('doctor_id', $doctor->id)
+        // ✅ 5) Collision check by doctor_id + date + time
+        $exists = Appointment::query()
+            ->where('company_id', $companyId)
+            ->where('doctor_id', $doctorId)
             ->whereDate('appointment_date', $date)
             ->where('appointment_time', $time)
-            ->whereIn('status', ['scheduled', 'completed', 'no_show'])
+            ->whereIn('status', ['scheduled', 'completed', 'no_show']) // cancelled لا يحجز المكان
             ->exists();
 
         if ($exists) {
@@ -306,14 +326,14 @@ class AppointmentController extends Controller
             ], 422);
         }
 
+        // ✅ 6) Save (store both doctor_id + doctor_name for display)
+        $doctorName = trim((string)($data['doctor_name'] ?? '')) ?: ($doctor->name ?? 'Doctor');
+
         $appointment = Appointment::create([
             'company_id' => $companyId,
             'patient_id' => $data['patient_id'],
-            'doctor_id'  => $doctor->id,
-
-            // ✅ keep old column for backwards compatibility (if exists in DB)
-            'doctor_name' => $doctor->name,
-
+            'doctor_id'  => $doctorId,
+            'doctor_name' => $doctorName, // optional legacy field
             'appointment_date' => $date,
             'appointment_time' => $time,
             'status' => 'scheduled',
@@ -326,7 +346,7 @@ class AppointmentController extends Controller
             'status' => 201,
             'data' => $appointment->load([
                 'patient:id,name,email,company_id',
-                'doctor:id,name,company_id,work_start,work_end,slot_minutes'
+                'doctor:id,name,company_id,work_start,work_end,slot_minutes',
             ]),
         ], 201);
     }
