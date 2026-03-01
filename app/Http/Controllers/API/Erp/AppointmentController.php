@@ -8,12 +8,12 @@ use App\Models\CustomerLedgerEntry;
 use App\Models\Doctor;
 use App\Models\Invoice;
 use App\Models\TreatmentPlan;
+use Carbon\Carbon;
+use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
-use Illuminate\Database\QueryException;
-use Carbon\Carbon;
 use Illuminate\Validation\ValidationException;
 
 class AppointmentController extends Controller
@@ -26,11 +26,12 @@ class AppointmentController extends Controller
             ->where('company_id', $companyId)
             ->with([
                 'patient:id,name,email,company_id',
-                'doctor:id,name,company_id,work_start,work_end,slot_minutes'
+                'doctor:id,name,company_id,work_start,work_end,slot_minutes',
             ])
             ->orderByDesc('appointment_date')
             ->orderByDesc('appointment_time');
 
+        // scoped search
         if ($search = trim((string) $request->get('search', ''))) {
             $query->where(function ($q) use ($search) {
                 $q->where('doctor_name', 'like', "%{$search}%")
@@ -60,7 +61,9 @@ class AppointmentController extends Controller
 
     /**
      * ERP-style create (admin/internal)
-     * ✅ required doctor_id + tenant scoped patient/doctor + collision check by doctor_id + whereTime
+     * ✅ required doctor_id + tenant scoped patient/doctor
+     * ✅ collision check by doctor_id + whereTime (10:00 vs 10:00:00)
+     * ✅ REBOOK if existing slot is cancelled (update same row)
      */
     public function store(Request $request)
     {
@@ -77,7 +80,7 @@ class AppointmentController extends Controller
                 'integer',
                 Rule::exists('doctors', 'id')->where(fn($q) => $q->where('company_id', $companyId)->where('is_active', true)),
             ],
-            'doctor_name' => ['nullable', 'string', 'max:190'], // optional display override
+            'doctor_name' => ['nullable', 'string', 'max:190'],
             'appointment_date' => ['required', 'date'],
             'appointment_time' => ['required', 'date_format:H:i'],
             'status' => ['nullable', Rule::in(['scheduled', 'completed', 'cancelled', 'no_show'])],
@@ -93,69 +96,100 @@ class AppointmentController extends Controller
         }
 
         $data = $v->validated();
-
         $date = Carbon::parse($data['appointment_date'])->toDateString();
         $time = $data['appointment_time'];
 
-        $doctor = Doctor::where('company_id', $companyId)
+        $doctor = Doctor::query()
+            ->where('company_id', $companyId)
             ->where('is_active', true)
             ->findOrFail((int) $data['doctor_id']);
 
-        // ✅ prevent duplicate slot (doctor_id + date + time) + whereTime solves 10:00 vs 10:00:00
-        $slotTaken = Appointment::query()
-            ->where('company_id', $companyId)
-            ->where('doctor_id', $doctor->id)
-            ->whereDate('appointment_date', $date)
-            ->whereTime('appointment_time', $time)
-            ->whereIn('status', ['scheduled', 'completed', 'no_show'])
-            ->exists();
-
-        if ($slotTaken) {
-            return response()->json([
-                'msg' => 'Time slot already booked',
-                'status' => 422,
-                'errors' => [
-                    'appointment_time' => ['This time slot is already booked for this doctor.'],
-                ],
-            ], 422);
-        }
-
         $doctorName = trim((string)($data['doctor_name'] ?? '')) ?: ($doctor->name ?? 'Doctor');
+        $blockedStatuses = ['scheduled', 'completed', 'no_show'];
+        $requestedStatus = $data['status'] ?? 'scheduled';
 
-        try {
-            $appointment = Appointment::create([
-                'company_id' => $companyId,
-                'patient_id' => $data['patient_id'],
-                'doctor_id'  => $doctor->id,
-                'doctor_name' => $doctorName,
-                'appointment_date' => $date,
-                'appointment_time' => $time,
-                'status' => $data['status'] ?? 'scheduled',
-                'notes' => $data['notes'] ?? null,
-                'created_by' => $request->user()->id,
-            ]);
-        } catch (QueryException $e) {
-            // fallback for race conditions
-            if ((string) $e->getCode() === '23000') {
-                return response()->json([
-                    'msg' => 'Time slot already booked',
-                    'status' => 422,
-                    'errors' => [
-                        'appointment_time' => ['This time slot is already booked for this doctor.'],
-                    ],
-                ], 422);
+        return DB::transaction(function () use ($request, $companyId, $data, $date, $time, $doctor, $doctorName, $blockedStatuses, $requestedStatus) {
+
+            // lock existing slot row (if any)
+            $existing = Appointment::query()
+                ->where('company_id', $companyId)
+                ->where('doctor_id', $doctor->id)
+                ->whereDate('appointment_date', $date)
+                ->whereTime('appointment_time', $time)
+                ->lockForUpdate()
+                ->first();
+
+            if ($existing) {
+                if (in_array($existing->status, $blockedStatuses, true)) {
+                    return response()->json([
+                        'msg' => 'Time slot already booked',
+                        'status' => 422,
+                        'errors' => [
+                            'appointment_time' => ['This time slot is already booked for this doctor.'],
+                        ],
+                    ], 422);
+                }
+
+                // ✅ REBOOK cancelled slot by updating same row
+                if ($existing->status === 'cancelled') {
+                    $existing->update([
+                        'patient_id' => $data['patient_id'],
+                        'doctor_name' => $doctorName,
+                        'status' => $requestedStatus, // عادة scheduled
+                        'notes' => $data['notes'] ?? null,
+                        'created_by' => $request->user()->id,
+                        // (اختياري) لو تحب تحديث التاريخ/الوقت لو نفسهم مش لازم
+                        'appointment_date' => $date,
+                        'appointment_time' => $time,
+                    ]);
+
+                    return response()->json([
+                        'msg' => 'Appointment rebooked',
+                        'status' => 200,
+                        'data' => $existing->fresh()->load([
+                            'patient:id,name,email,company_id',
+                            'doctor:id,name,company_id,work_start,work_end,slot_minutes',
+                        ]),
+                    ], 200);
+                }
             }
-            throw $e;
-        }
 
-        return response()->json([
-            'msg' => 'Appointment created',
-            'status' => 201,
-            'data' => $appointment->load([
-                'patient:id,name,email,company_id',
-                'doctor:id,name,company_id,work_start,work_end,slot_minutes',
-            ]),
-        ], 201);
+            // no existing row => create new
+            try {
+                $appointment = Appointment::create([
+                    'company_id' => $companyId,
+                    'patient_id' => $data['patient_id'],
+                    'doctor_id'  => $doctor->id,
+                    'doctor_name' => $doctorName,
+                    'appointment_date' => $date,
+                    'appointment_time' => $time,
+                    'status' => $requestedStatus,
+                    'notes' => $data['notes'] ?? null,
+                    'created_by' => $request->user()->id,
+                ]);
+            } catch (QueryException $e) {
+                // fallback for race condition duplicate
+                if ((string) $e->getCode() === '23000') {
+                    return response()->json([
+                        'msg' => 'Time slot already booked',
+                        'status' => 422,
+                        'errors' => [
+                            'appointment_time' => ['This time slot is already booked for this doctor.'],
+                        ],
+                    ], 422);
+                }
+                throw $e;
+            }
+
+            return response()->json([
+                'msg' => 'Appointment created',
+                'status' => 201,
+                'data' => $appointment->load([
+                    'patient:id,name,email,company_id',
+                    'doctor:id,name,company_id,work_start,work_end,slot_minutes',
+                ]),
+            ], 201);
+        });
     }
 
     public function show(Request $request, $id)
@@ -166,7 +200,7 @@ class AppointmentController extends Controller
             ->where('company_id', $companyId)
             ->with([
                 'patient:id,name,email,company_id',
-                'doctor:id,name,company_id,work_start,work_end,slot_minutes'
+                'doctor:id,name,company_id,work_start,work_end,slot_minutes',
             ])
             ->findOrFail($id);
 
@@ -179,6 +213,7 @@ class AppointmentController extends Controller
 
     /**
      * ✅ update supports doctor_id and uses whereTime collision check
+     * ✅ keeps doctor_name stable unless doctor_id changed or doctor_name explicitly emptied
      */
     public function update(Request $request, $id)
     {
@@ -217,17 +252,14 @@ class AppointmentController extends Controller
         $data = $v->validated();
 
         $newDoctorId = (int) ($data['doctor_id'] ?? $appointment->doctor_id);
-
         $newDate = Carbon::parse($data['appointment_date'] ?? $appointment->appointment_date)->toDateString();
 
-        // appointment_time in DB might be TIME (10:00:00), normalize to H:i
         $currentTime = $appointment->appointment_time
             ? Carbon::parse($appointment->appointment_time)->format('H:i')
             : null;
 
         $newTime = $data['appointment_time'] ?? $currentTime;
 
-        // if any key field missing (shouldn't), keep safe
         if (!$newTime) {
             return response()->json([
                 'msg' => 'Invalid appointment_time',
@@ -257,26 +289,23 @@ class AppointmentController extends Controller
             ], 422);
         }
 
-        // ✅ derive doctor_name only when needed (avoid unintended overrides)
         if (
             array_key_exists('doctor_id', $data) ||
             (array_key_exists('doctor_name', $data) && empty($data['doctor_name']))
         ) {
-            $doctor = Doctor::where('company_id', $companyId)
+            $doctor = Doctor::query()
+                ->where('company_id', $companyId)
                 ->where('is_active', true)
                 ->findOrFail($newDoctorId);
 
-            // if doctor_name was not provided, default to doctor's name
             $data['doctor_name'] = trim((string)($data['doctor_name'] ?? '')) ?: ($doctor->name ?? 'Doctor');
         }
 
-        // normalize date/time formats on update if provided
         if (isset($data['appointment_date'])) {
             $data['appointment_date'] = Carbon::parse($data['appointment_date'])->toDateString();
         }
         if (isset($data['appointment_time'])) {
-            // keep H:i
-            $data['appointment_time'] = $newTime;
+            $data['appointment_time'] = $newTime; // keep H:i
         }
 
         try {
@@ -324,7 +353,9 @@ class AppointmentController extends Controller
     /**
      * Public booking endpoint
      * ✅ doctor_id optional: if missing choose first active doctor in company
+     * ✅ validates within working hours + slot interval
      * ✅ collision check uses doctor_id + whereTime
+     * ✅ REBOOK cancelled slot by updating same record (solves unique index + avoids 500)
      */
     public function book(Request $request)
     {
@@ -380,77 +411,118 @@ class AppointmentController extends Controller
 
         if ($requested->lt($start) || $requested->gte($end)) {
             throw ValidationException::withMessages([
-                'appointment_time' => ['Time is outside working hours.']
+                'appointment_time' => ['Time is outside working hours.'],
             ]);
         }
 
         $diff = $start->diffInMinutes($requested);
         if ($slotMinutes <= 0 || ($diff % $slotMinutes !== 0)) {
             throw ValidationException::withMessages([
-                'appointment_time' => ['Time must match slot interval.']
+                'appointment_time' => ['Time must match slot interval.'],
             ]);
         }
 
-        $exists = Appointment::query()
-            ->where('company_id', $companyId)
-            ->where('doctor_id', $doctorId)
-            ->whereDate('appointment_date', $date)
-            ->whereTime('appointment_time', $time)
-            ->whereIn('status', ['scheduled', 'completed', 'no_show'])
-            ->exists();
-
-        if ($exists) {
-            return response()->json([
-                "msg" => "Time slot already booked",
-                "status" => 422,
-                "errors" => [
-                    "appointment_time" => [
-                        "This time slot is already booked for this doctor."
-                    ]
-                ]
-            ], 422);
-        }
-
         $doctorName = trim((string)($data['doctor_name'] ?? '')) ?: ($doctor->name ?? 'Doctor');
+        $blockedStatuses = ['scheduled', 'completed', 'no_show'];
 
-        $appointment = Appointment::create([
-            'company_id' => $companyId,
-            'patient_id' => $data['patient_id'],
-            'doctor_id'  => $doctorId,
-            'doctor_name' => $doctorName,
-            'appointment_date' => $date,
-            'appointment_time' => $time,
-            'status' => 'scheduled',
-            'notes' => $data['notes'] ?? null,
-            'created_by' => $request->user()->id,
-        ]);
+        return DB::transaction(function () use ($request, $companyId, $data, $date, $time, $doctorId, $doctorName, $blockedStatuses) {
 
-        return response()->json([
-            'msg' => 'Appointment booked',
-            'status' => 201,
-            'data' => $appointment->load([
-                'patient:id,name,email,company_id',
-                'doctor:id,name,company_id,work_start,work_end,slot_minutes',
-            ]),
-        ], 201);
+            // lock existing slot row (if any)
+            $existing = Appointment::query()
+                ->where('company_id', $companyId)
+                ->where('doctor_id', $doctorId)
+                ->whereDate('appointment_date', $date)
+                ->whereTime('appointment_time', $time)
+                ->lockForUpdate()
+                ->first();
+
+            if ($existing) {
+                if (in_array($existing->status, $blockedStatuses, true)) {
+                    return response()->json([
+                        'msg' => 'Time slot already booked',
+                        'status' => 422,
+                        'errors' => [
+                            'appointment_time' => ['This time slot is already booked for this doctor.'],
+                        ],
+                    ], 422);
+                }
+
+                // ✅ REBOOK cancelled slot by updating same row
+                if ($existing->status === 'cancelled') {
+                    $existing->update([
+                        'patient_id' => $data['patient_id'],
+                        'doctor_name' => $doctorName,
+                        'status' => 'scheduled',
+                        'notes' => $data['notes'] ?? null,
+                        'created_by' => $request->user()->id,
+                        'appointment_date' => $date,
+                        'appointment_time' => $time,
+                    ]);
+
+                    return response()->json([
+                        'msg' => 'Appointment rebooked',
+                        'status' => 200,
+                        'data' => $existing->fresh()->load([
+                            'patient:id,name,email,company_id',
+                            'doctor:id,name,company_id,work_start,work_end,slot_minutes',
+                        ]),
+                    ], 200);
+                }
+            }
+
+            // no existing row => create new
+            try {
+                $appointment = Appointment::create([
+                    'company_id' => $companyId,
+                    'patient_id' => $data['patient_id'],
+                    'doctor_id'  => $doctorId,
+                    'doctor_name' => $doctorName,
+                    'appointment_date' => $date,
+                    'appointment_time' => $time,
+                    'status' => 'scheduled',
+                    'notes' => $data['notes'] ?? null,
+                    'created_by' => $request->user()->id,
+                ]);
+            } catch (QueryException $e) {
+                // fallback for race condition duplicate
+                if ((string) $e->getCode() === '23000') {
+                    return response()->json([
+                        'msg' => 'Time slot already booked',
+                        'status' => 422,
+                        'errors' => [
+                            'appointment_time' => ['This time slot is already booked for this doctor.'],
+                        ],
+                    ], 422);
+                }
+                throw $e;
+            }
+
+            return response()->json([
+                'msg' => 'Appointment booked',
+                'status' => 201,
+                'data' => $appointment->load([
+                    'patient:id,name,email,company_id',
+                    'doctor:id,name,company_id,work_start,work_end,slot_minutes',
+                ]),
+            ], 201);
+        });
     }
 
     public function cancel(Request $request, $id)
     {
         $companyId = $request->user()->company_id;
 
-        $appointment = Appointment::where('company_id', $companyId)
+        $appointment = Appointment::query()
+            ->where('company_id', $companyId)
             ->findOrFail($id);
 
         if ($appointment->status === 'completed') {
             throw ValidationException::withMessages([
-                'status' => ['Completed appointments cannot be cancelled.']
+                'status' => ['Completed appointments cannot be cancelled.'],
             ]);
         }
 
-        $appointment->update([
-            'status' => 'cancelled'
-        ]);
+        $appointment->update(['status' => 'cancelled']);
 
         return response()->json([
             'msg' => 'Appointment cancelled',
@@ -471,8 +543,9 @@ class AppointmentController extends Controller
     {
         $companyId = $request->user()->company_id;
 
-        // fetch appointment first
-        $appointment = Appointment::where('company_id', $companyId)->findOrFail($id);
+        $appointment = Appointment::query()
+            ->where('company_id', $companyId)
+            ->findOrFail($id);
 
         $data = $request->validate([
             'total' => ['required', 'numeric', 'min:0.01'],
@@ -498,13 +571,13 @@ class AppointmentController extends Controller
 
         return DB::transaction(function () use ($request, $companyId, $data, $appointment, $serviceProduct) {
 
-            // lock appointment
-            $appointment = Appointment::where('company_id', $companyId)
+            $appointment = Appointment::query()
+                ->where('company_id', $companyId)
                 ->lockForUpdate()
                 ->findOrFail($appointment->id);
 
-            // prevent duplicate invoice inside tx
-            $existingInvoice = Invoice::where('company_id', $companyId)
+            $existingInvoice = Invoice::query()
+                ->where('company_id', $companyId)
                 ->where('appointment_id', $appointment->id)
                 ->lockForUpdate()
                 ->first();
@@ -526,11 +599,13 @@ class AppointmentController extends Controller
                 ], 409);
             }
 
-            // validate plan belongs to same customer
             $planId = $data['treatment_plan_id'] ?? null;
             if ($planId) {
-                $plan = TreatmentPlan::where('company_id', $companyId)->findOrFail($planId);
-                if ((int)$plan->customer_id !== (int)$appointment->patient_id) {
+                $plan = TreatmentPlan::query()
+                    ->where('company_id', $companyId)
+                    ->findOrFail($planId);
+
+                if ((int) $plan->customer_id !== (int) $appointment->patient_id) {
                     return response()->json([
                         'msg' => 'Treatment plan does not belong to this customer',
                         'status' => 422,
@@ -545,13 +620,11 @@ class AppointmentController extends Controller
                 }
             }
 
-            // update appointment before close
             $appointment->update([
                 'doctor_name' => $data['doctor_name'] ?? $appointment->doctor_name,
                 'notes'       => $data['notes'] ?? $appointment->notes,
             ]);
 
-            // 1) Order
             $order = \App\Models\Order::create([
                 'company_id'   => $companyId,
                 'customer_id'  => $appointment->patient_id,
@@ -560,7 +633,6 @@ class AppointmentController extends Controller
                 'created_by'   => $request->user()->id,
             ]);
 
-            // 2) OrderItem
             \App\Models\OrderItem::create([
                 'company_id'  => $companyId,
                 'order_id'    => $order->id,
@@ -570,10 +642,8 @@ class AppointmentController extends Controller
                 'total'       => $data['total'],
             ]);
 
-            // 3) invoice number
             $number = 'INV-' . now()->format('YmdHis') . '-' . $order->id;
 
-            // 4) Invoice
             $invoice = \App\Models\Invoice::create([
                 'company_id'        => $companyId,
                 'number'            => $number,
@@ -586,7 +656,6 @@ class AppointmentController extends Controller
                 'issued_at'         => now(),
             ]);
 
-            // 5) InvoiceItem
             \App\Models\InvoiceItem::create([
                 'company_id'  => $companyId,
                 'invoice_id'  => $invoice->id,
@@ -596,8 +665,8 @@ class AppointmentController extends Controller
                 'total'       => $data['total'],
             ]);
 
-            // 5.1) Ledger invoice issued
-            $exists = CustomerLedgerEntry::where('company_id', $companyId)
+            $exists = CustomerLedgerEntry::query()
+                ->where('company_id', $companyId)
                 ->where('invoice_id', $invoice->id)
                 ->where('type', 'invoice')
                 ->exists();
@@ -617,10 +686,7 @@ class AppointmentController extends Controller
                 ]);
             }
 
-            // 6) close appointment
-            $appointment->update([
-                'status' => 'completed',
-            ]);
+            $appointment->update(['status' => 'completed']);
 
             return response()->json([
                 'msg' => 'Appointment completed and invoice created',
@@ -637,18 +703,17 @@ class AppointmentController extends Controller
     {
         $companyId = $request->user()->company_id;
 
-        $appointment = Appointment::where('company_id', $companyId)
+        $appointment = Appointment::query()
+            ->where('company_id', $companyId)
             ->findOrFail($id);
 
         if ($appointment->status !== 'scheduled') {
             throw ValidationException::withMessages([
-                'status' => ['Only scheduled appointments can be marked as no-show.']
+                'status' => ['Only scheduled appointments can be marked as no-show.'],
             ]);
         }
 
-        $appointment->update([
-            'status' => 'no_show'
-        ]);
+        $appointment->update(['status' => 'no_show']);
 
         return response()->json([
             'msg' => 'Appointment marked as no-show',
