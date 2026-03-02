@@ -520,6 +520,7 @@ class AppointmentController extends Controller
                 'updated_at'   => now(),
             ]);
 
+            return response()->json(['hit' => 'ERP AppointmentController@book']);
 
             return response()->json([
                 'msg' => 'Appointment booked',
