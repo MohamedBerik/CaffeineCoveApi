@@ -15,6 +15,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
+use App\Services\ActivityLogger;
 
 class AppointmentController extends Controller
 {
@@ -180,7 +181,12 @@ class AppointmentController extends Controller
                 }
                 throw $e;
             }
-
+            ActivityLogger::log($request, 'appointment.booked', $appointment, [
+                'patient_id' => $appointment->patient_id,
+                'doctor_id'  => $appointment->doctor_id,
+                'date'       => (string) $appointment->appointment_date,
+                'time'       => (string) $appointment->appointment_time,
+            ]);
             return response()->json([
                 'msg' => 'Appointment created',
                 'status' => 201,
@@ -496,7 +502,12 @@ class AppointmentController extends Controller
                 }
                 throw $e;
             }
-
+            ActivityLogger::log($request, 'appointment.booked', $appointment, [
+                'patient_id' => $appointment->patient_id,
+                'doctor_id'  => $appointment->doctor_id,
+                'date'       => (string) $appointment->appointment_date,
+                'time'       => (string) $appointment->appointment_time,
+            ]);
             return response()->json([
                 'msg' => 'Appointment booked',
                 'status' => 201,
@@ -522,8 +533,14 @@ class AppointmentController extends Controller
             ]);
         }
 
+        $before = $appointment->only(['status', 'appointment_date', 'appointment_time', 'doctor_id']);
+
         $appointment->update(['status' => 'cancelled']);
 
+        ActivityLogger::log($request, 'appointment.cancelled', $appointment, [
+            'before' => $before,
+            'after'  => $appointment->only(['status']),
+        ]);
         return response()->json([
             'msg' => 'Appointment cancelled',
             'status' => 200,
@@ -655,7 +672,12 @@ class AppointmentController extends Controller
                 'status'            => 'unpaid',
                 'issued_at'         => now(),
             ]);
-
+            ActivityLogger::log($request, 'appointment.completed', $appointment, [
+                'invoice_id'        => $invoice->id,
+                'invoice_number'    => $invoice->number,
+                'treatment_plan_id' => $invoice->treatment_plan_id,
+                'total'             => (float) $invoice->total,
+            ]);
             \App\Models\InvoiceItem::create([
                 'company_id'  => $companyId,
                 'invoice_id'  => $invoice->id,
