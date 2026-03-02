@@ -181,12 +181,7 @@ class AppointmentController extends Controller
                 }
                 throw $e;
             }
-            ActivityLogger::log($request, 'appointment.booked', $appointment, [
-                'patient_id' => $appointment->patient_id,
-                'doctor_id'  => $appointment->doctor_id,
-                'date'       => (string) $appointment->appointment_date,
-                'time'       => (string) $appointment->appointment_time,
-            ]);
+
             return response()->json([
                 'msg' => 'Appointment created',
                 'status' => 201,
