@@ -509,18 +509,22 @@ class AppointmentController extends Controller
                 'time'       => (string) $appointment->appointment_time,
             ]);
 
+
             DB::table('activity_logs')->insert([
                 'company_id'   => $request->user()->company_id,
                 'user_id'      => $request->user()->id,
-                'action'       => 'TEST_LOG',
+                'action'       => 'appointment.booked',
                 'subject_type' => \App\Models\Appointment::class,
                 'subject_id'   => $appointment->id,
-                'properties'   => json_encode(['hello' => 'world']),
+                'properties'   => json_encode([
+                    'doctor_id' => $appointment->doctor_id,
+                    'date'      => (string) $appointment->appointment_date,
+                    'time'      => (string) $appointment->appointment_time,
+                ]),
                 'created_at'   => now(),
                 'updated_at'   => now(),
             ]);
 
-            return response()->json(['hit' => 'ERP AppointmentController@book']);
 
             return response()->json([
                 'msg' => 'Appointment booked',
