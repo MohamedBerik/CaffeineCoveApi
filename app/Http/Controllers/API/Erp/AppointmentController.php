@@ -356,10 +356,10 @@ class AppointmentController extends Controller
 
         $after = $appointment->fresh()->only($track);
 
-        $changed = [];
+        $changedFields = [];
         foreach ($track as $k) {
             if ((string)($before[$k] ?? '') !== (string)($after[$k] ?? '')) {
-                $changed[] = $k;
+                $changedFields[] = $k;
             }
         }
 
@@ -386,7 +386,7 @@ class AppointmentController extends Controller
             Appointment::class,
             $appointment->id,
             [
-                'changed_fields' => $changed,
+                'changed_fields' => $changedFields,
                 'doctor_id'      => $appointment->doctor_id,
                 'patient_id'     => $appointment->patient_id,
                 'date'           => Carbon::parse($appointment->appointment_date)->toDateString(),
