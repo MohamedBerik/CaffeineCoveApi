@@ -508,6 +508,19 @@ class AppointmentController extends Controller
                 'date'       => (string) $appointment->appointment_date,
                 'time'       => (string) $appointment->appointment_time,
             ]);
+
+            \DB::table('activity_logs')->insert([
+                'company_id'   => $request->user()->company_id,
+                'user_id'      => $request->user()->id,
+                'action'       => 'TEST_LOG',
+                'subject_type' => \App\Models\Appointment::class,
+                'subject_id'   => $appointment->id,
+                'properties'   => json_encode(['hello' => 'world']),
+                'created_at'   => now(),
+                'updated_at'   => now(),
+            ]);
+
+
             return response()->json([
                 'msg' => 'Appointment booked',
                 'status' => 201,
