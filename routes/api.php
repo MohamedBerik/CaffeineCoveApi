@@ -228,35 +228,54 @@ Route::prefix('erp')
         Route::middleware('permission:finance.view')
             ->get('/activity-logs', [ActivityLogController::class, 'index']);
 
-        Route::get('/appointments/available-slots', [AppointmentAvailabilityController::class, 'index']);
-        Route::post('/appointments/book', [AppointmentController::class, 'book']);
-        Route::put('/appointments/{id}', [AppointmentController::class, 'update']);
-        Route::post('/appointments/{id}/cancel', [AppointmentController::class, 'cancel']);
-        Route::post('/appointments/{id}/complete', [AppointmentController::class, 'complete']);
-        Route::post('/appointments/{id}/no-show', [AppointmentController::class, 'noShow']);
+        /*
+        |--------------------------------------------------------------------------
+        | Appointments
+        |--------------------------------------------------------------------------
+        */
+        Route::middleware('permission:appointments.view')
+            ->get('/appointments/available-slots', [AppointmentAvailabilityController::class, 'index']);
+        Route::middleware('permission:appointments.manage')
+            ->post('/appointments/book', [AppointmentController::class, 'book']);
+        Route::middleware('permission:appointments.manage')
+            ->put('/appointments/{id}', [AppointmentController::class, 'update']);
+        Route::middleware('permission:appointments.manage')
+            ->post('/appointments/{id}/cancel', [AppointmentController::class, 'cancel']);
+        Route::middleware('permission:appointments.complete')
+            ->post('/appointments/{id}/complete', [AppointmentController::class, 'complete']);
+        Route::middleware('permission:appointments.manage')
+            ->post('/appointments/{id}/no-show', [AppointmentController::class, 'noShow']);
+        Route::middleware('permission:appointments.manage')
+            ->post('/appointments/{id}/reschedule', [AppointmentController::class, 'reschedule']);
+        Route::middleware('permission:finance.view')
+            ->get('/appointments/{id}/activity', [AppointmentActivityController::class, 'index']);
+
         Route::get('/customers/{customerId}/credit-balance', [CustomerCreditController::class, 'show']);
 
+        /*
+        |--------------------------------------------------------------------------
+        | TreatmentPlan
+        |--------------------------------------------------------------------------
+        */
         Route::get('/treatment-plans', [TreatmentPlanController::class, 'index']);
         Route::post('/treatment-plans', [TreatmentPlanController::class, 'store']);
         Route::get('/treatment-plans/{id}', [TreatmentPlanController::class, 'show']);
         Route::put('/treatment-plans/{id}', [TreatmentPlanController::class, 'update']);
         Route::delete('/treatment-plans/{id}', [TreatmentPlanController::class, 'destroy']);
-
         Route::get('/treatment-plans/{id}/summary', [TreatmentPlanController::class, 'summary']);
         Route::get('/treatment-plans/{id}/cash-summary', [TreatmentPlanController::class, 'cashSummary']);
 
+        /*
+        |--------------------------------------------------------------------------
+        | Doctors
+        |--------------------------------------------------------------------------
+        */
         Route::get('/doctors', [DoctorController::class, 'index']);
         Route::post('/doctors', [DoctorController::class, 'store']);
         Route::get('/doctors/{id}', [DoctorController::class, 'show']);
         Route::put('/doctors/{id}', [DoctorController::class, 'update']);
         Route::delete('/doctors/{id}', [DoctorController::class, 'destroy']);
-
-        // Route::get('/doctors/{id}/availability', [DoctorController::class, 'availability']);
-
         Route::get('/doctors/{doctorId}/availability', [DoctorAvailabilityController::class, 'show']);
-
-        Route::middleware('permission:finance.view')
-            ->get('/appointments/{id}/activity', [AppointmentActivityController::class, 'index']);
     });
 
 Route::middleware('auth:sanctum')->prefix('saas')->group(function () {
