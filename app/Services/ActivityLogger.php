@@ -3,21 +3,25 @@
 namespace App\Services;
 
 use App\Models\ActivityLog;
-use Illuminate\Http\Request;
+use Illuminate\Contracts\Auth\Authenticatable;
 
 class ActivityLogger
 {
-    public static function log(Request $request, string $action, $subject, array $properties = []): void
-    {
-        $user = $request->user();
-
-        ActivityLog::create([
-            'company_id'   => $user?->company_id,
+    public static function log(
+        int $companyId,
+        ?Authenticatable $user,
+        string $action,
+        string $subjectType,
+        int $subjectId,
+        array $properties = []
+    ): ActivityLog {
+        return ActivityLog::create([
+            'company_id'   => $companyId,
             'user_id'      => $user?->id,
             'action'       => $action,
-            'subject_type' => get_class($subject),
-            'subject_id'   => $subject->id,
-            'properties'   => $properties,
+            'subject_type' => $subjectType,
+            'subject_id'   => $subjectId,
+            'properties'   => $properties, // ✅ array → JSON
         ]);
     }
 }

@@ -502,27 +502,32 @@ class AppointmentController extends Controller
                 }
                 throw $e;
             }
-            ActivityLogger::log($request, 'appointment.booked', $appointment, [
-                'patient_id' => $appointment->patient_id,
-                'doctor_id'  => $appointment->doctor_id,
-                'date'       => (string) $appointment->appointment_date,
-                'time'       => (string) $appointment->appointment_time,
-            ]);
+
+            ActivityLogger::log(
+                $companyId,
+                $request->user(),
+                'appointment.booked',
+                \App\Models\Appointment::class,
+                $appointment->id,
+                [
+                    'doctor_id' => $appointment->doctor_id,
+                    'date'      => (string) $appointment->appointment_date,
+                    'time'      => substr((string) $appointment->appointment_time, 0, 5),
+                ]
+            );
 
 
-            DB::table('activity_logs')->insert([
-                'company_id'   => $request->user()->company_id,
+            \App\Models\ActivityLog::create([
+                'company_id'   => $companyId,
                 'user_id'      => $request->user()->id,
                 'action'       => 'appointment.booked',
                 'subject_type' => \App\Models\Appointment::class,
                 'subject_id'   => $appointment->id,
-                'properties'   => json_encode([
+                'properties'   => [
                     'doctor_id' => $appointment->doctor_id,
                     'date'      => (string) $appointment->appointment_date,
-                    'time'      => (string) $appointment->appointment_time,
-                ]),
-                'created_at'   => now(),
-                'updated_at'   => now(),
+                    'time'      => substr((string)$appointment->appointment_time, 0, 5),
+                ],
             ]);
 
 
@@ -551,14 +556,25 @@ class AppointmentController extends Controller
             ]);
         }
 
-        $before = $appointment->only(['status', 'appointment_date', 'appointment_time', 'doctor_id']);
+        $oldStatus = $appointment->status;
 
         $appointment->update(['status' => 'cancelled']);
 
-        ActivityLogger::log($request, 'appointment.cancelled', $appointment, [
-            'before' => $before,
-            'after'  => $appointment->only(['status']),
-        ]);
+        ActivityLogger::log(
+            $companyId,
+            $request->user(),
+            'appointment.cancelled',
+            \App\Models\Appointment::class,
+            $appointment->id,
+            [
+                'old_status' => $oldStatus,
+                'new_status' => 'cancelled',
+                'doctor_id'  => $appointment->doctor_id,
+                'date'       => (string) $appointment->appointment_date,
+                'time'       => substr((string) $appointment->appointment_time, 0, 5),
+            ]
+        );
+
         return response()->json([
             'msg' => 'Appointment cancelled',
             'status' => 200,
@@ -690,12 +706,7 @@ class AppointmentController extends Controller
                 'status'            => 'unpaid',
                 'issued_at'         => now(),
             ]);
-            ActivityLogger::log($request, 'appointment.completed', $appointment, [
-                'invoice_id'        => $invoice->id,
-                'invoice_number'    => $invoice->number,
-                'treatment_plan_id' => $invoice->treatment_plan_id,
-                'total'             => (float) $invoice->total,
-            ]);
+
             \App\Models\InvoiceItem::create([
                 'company_id'  => $companyId,
                 'invoice_id'  => $invoice->id,
@@ -728,6 +739,20 @@ class AppointmentController extends Controller
 
             $appointment->update(['status' => 'completed']);
 
+            ActivityLogger::log(
+                $companyId,
+                $request->user(),
+                'appointment.completed',
+                \App\Models\Appointment::class,
+                $appointment->id,
+                [
+                    'invoice_id'        => $invoice->id,
+                    'invoice_number'    => $invoice->number,
+                    'treatment_plan_id' => $invoice->treatment_plan_id,
+                    'total'             => (float) $invoice->total,
+                ]
+            );
+
             return response()->json([
                 'msg' => 'Appointment completed and invoice created',
                 'status' => 200,
@@ -753,7 +778,24 @@ class AppointmentController extends Controller
             ]);
         }
 
+        $oldStatus = $appointment->status;
+
         $appointment->update(['status' => 'no_show']);
+
+        ActivityLogger::log(
+            $companyId,
+            $request->user(),
+            'appointment.no_show',
+            \App\Models\Appointment::class,
+            $appointment->id,
+            [
+                'old_status' => $oldStatus,
+                'new_status' => 'no_show',
+                'doctor_id'  => $appointment->doctor_id,
+                'date'       => (string) $appointment->appointment_date,
+                'time'       => substr((string) $appointment->appointment_time, 0, 5),
+            ]
+        );
 
         return response()->json([
             'msg' => 'Appointment marked as no-show',
