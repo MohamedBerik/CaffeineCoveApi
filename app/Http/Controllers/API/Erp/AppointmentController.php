@@ -149,7 +149,7 @@ class AppointmentController extends Controller
                         $existing->id,
                         [
                             'doctor_id' => $existing->doctor_id,
-                            'date'      => (string) $existing->appointment_date,
+                            'date' => Carbon::parse($appointment->appointment_date)->toDateString(), // "YYYY-MM-DD"
                             'time'      => substr((string) $existing->appointment_time, 0, 5),
                         ]
                     );
@@ -199,7 +199,7 @@ class AppointmentController extends Controller
                 $appointment->id,
                 [
                     'doctor_id' => $appointment->doctor_id,
-                    'date'      => (string) $appointment->appointment_date,
+                    'date' => Carbon::parse($appointment->appointment_date)->toDateString(), // "YYYY-MM-DD"
                     'time'      => substr((string) $appointment->appointment_time, 0, 5),
                 ]
             );
@@ -346,8 +346,19 @@ class AppointmentController extends Controller
             throw $e;
         }
 
-        // (اختياري) لو عايز log للتعديل:
-        // ActivityLogger::log($companyId, $request->user(), 'appointment.updated', Appointment::class, $appointment->id, ['fields' => array_keys($data)]);
+        ActivityLogger::log(
+            $companyId,
+            $request->user(),
+            'appointment.updated',
+            \App\Models\Appointment::class,
+            $appointment->id,
+            [
+                'changed_fields' => array_keys($data),
+                'doctor_id'      => $appointment->doctor_id,
+                'date'           => Carbon::parse($appointment->appointment_date)->toDateString(),
+                'time'           => substr((string) $appointment->appointment_time, 0, 5),
+            ]
+        );
 
         return response()->json([
             'msg' => 'Appointment updated',
@@ -490,7 +501,7 @@ class AppointmentController extends Controller
                         $existing->id,
                         [
                             'doctor_id' => $existing->doctor_id,
-                            'date'      => (string) $existing->appointment_date,
+                            'date' => Carbon::parse($appointment->appointment_date)->toDateString(), // "YYYY-MM-DD"
                             'time'      => substr((string) $existing->appointment_time, 0, 5),
                         ]
                     );
@@ -540,7 +551,7 @@ class AppointmentController extends Controller
                 $appointment->id,
                 [
                     'doctor_id' => $appointment->doctor_id,
-                    'date'      => (string) $appointment->appointment_date,
+                    'date' => Carbon::parse($appointment->appointment_date)->toDateString(), // "YYYY-MM-DD"
                     'time'      => substr((string) $appointment->appointment_time, 0, 5),
                 ]
             );
@@ -584,7 +595,7 @@ class AppointmentController extends Controller
                 'old_status' => $oldStatus,
                 'new_status' => 'cancelled',
                 'doctor_id'  => $appointment->doctor_id,
-                'date'       => (string) $appointment->appointment_date,
+                'date' => Carbon::parse($appointment->appointment_date)->toDateString(), // "YYYY-MM-DD"
                 'time'       => substr((string) $appointment->appointment_time, 0, 5),
             ]
         );
@@ -801,7 +812,7 @@ class AppointmentController extends Controller
                 'old_status' => $oldStatus,
                 'new_status' => 'no_show',
                 'doctor_id'  => $appointment->doctor_id,
-                'date'       => (string) $appointment->appointment_date,
+                'date' => Carbon::parse($appointment->appointment_date)->toDateString(), // "YYYY-MM-DD"
                 'time'       => substr((string) $appointment->appointment_time, 0, 5),
             ]
         );
