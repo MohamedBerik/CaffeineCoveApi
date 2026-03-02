@@ -509,7 +509,7 @@ class AppointmentController extends Controller
                 'time'       => (string) $appointment->appointment_time,
             ]);
 
-            \DB::table('activity_logs')->insert([
+            DB::table('activity_logs')->insert([
                 'company_id'   => $request->user()->company_id,
                 'user_id'      => $request->user()->id,
                 'action'       => 'TEST_LOG',
