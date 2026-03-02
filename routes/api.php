@@ -21,6 +21,7 @@ use App\Http\Controllers\API\Erp\InvoiceController;
 use App\Http\Controllers\API\Erp\PurchaseOrderController;
 use App\Http\Controllers\API\Erp\FinanceDashboardController;
 use App\Http\Controllers\API\Erp\ActivityLogController;
+use App\Http\Controllers\API\Erp\AppointmentActivityController;
 use App\Http\Controllers\API\Erp\CustomerStatementController;
 use App\Http\Controllers\API\Erp\PaymentRefundController;
 use App\Http\Controllers\API\Erp\SupplierStatementController;
@@ -253,6 +254,9 @@ Route::prefix('erp')
         // Route::get('/doctors/{id}/availability', [DoctorController::class, 'availability']);
 
         Route::get('/doctors/{doctorId}/availability', [DoctorAvailabilityController::class, 'show']);
+
+        Route::middleware('permission:finance.view')
+            ->get('/appointments/{id}/activity', [AppointmentActivityController::class, 'index']);
     });
 
 Route::middleware('auth:sanctum')->prefix('saas')->group(function () {
