@@ -32,6 +32,7 @@ class AppointmentController extends Controller
             ->orderByDesc('appointment_date')
             ->orderByDesc('appointment_time');
 
+        // ✅ safe scoped search (no leakage due to OR)
         if ($search = trim((string) $request->get('search', ''))) {
             $query->where(function ($q) use ($search) {
                 $q->where('doctor_name', 'like', "%{$search}%")
@@ -105,11 +106,21 @@ class AppointmentController extends Controller
             ->findOrFail((int) $data['doctor_id']);
 
         $doctorName = trim((string)($data['doctor_name'] ?? '')) ?: ($doctor->name ?? 'Doctor');
+
         $blockedStatuses = ['scheduled', 'completed', 'no_show'];
         $requestedStatus = $data['status'] ?? 'scheduled';
 
-        return DB::transaction(function () use ($request, $companyId, $data, $date, $time, $doctor, $doctorName, $blockedStatuses, $requestedStatus) {
-
+        return DB::transaction(function () use (
+            $request,
+            $companyId,
+            $data,
+            $date,
+            $time,
+            $doctor,
+            $doctorName,
+            $blockedStatuses,
+            $requestedStatus
+        ) {
             $existing = Appointment::query()
                 ->where('company_id', $companyId)
                 ->where('doctor_id', $doctor->id)
@@ -133,14 +144,14 @@ class AppointmentController extends Controller
                     $existing->update([
                         'patient_id' => $data['patient_id'],
                         'doctor_name' => $doctorName,
-                        'status' => $requestedStatus,
+                        'status' => $requestedStatus, // غالباً scheduled
                         'notes' => $data['notes'] ?? null,
                         'created_by' => $request->user()->id,
                         'appointment_date' => $date,
                         'appointment_time' => $time,
                     ]);
 
-                    // ✅ log rebook
+                    // ✅ log rebook (FIX: use $existing not $appointment)
                     ActivityLogger::log(
                         $companyId,
                         $request->user(),
@@ -148,9 +159,10 @@ class AppointmentController extends Controller
                         Appointment::class,
                         $existing->id,
                         [
-                            'doctor_id' => $existing->doctor_id,
-                            'date' => Carbon::parse($appointment->appointment_date)->toDateString(), // "YYYY-MM-DD"
-                            'time'      => substr((string) $existing->appointment_time, 0, 5),
+                            'doctor_id'  => $existing->doctor_id,
+                            'patient_id' => $existing->patient_id,
+                            'date'       => Carbon::parse($existing->appointment_date)->toDateString(),
+                            'time'       => substr((string) $existing->appointment_time, 0, 5),
                         ]
                     );
 
@@ -198,9 +210,11 @@ class AppointmentController extends Controller
                 Appointment::class,
                 $appointment->id,
                 [
-                    'doctor_id' => $appointment->doctor_id,
-                    'date' => Carbon::parse($appointment->appointment_date)->toDateString(), // "YYYY-MM-DD"
-                    'time'      => substr((string) $appointment->appointment_time, 0, 5),
+                    'doctor_id'  => $appointment->doctor_id,
+                    'patient_id' => $appointment->patient_id,
+                    'date'       => Carbon::parse($appointment->appointment_date)->toDateString(),
+                    'time'       => substr((string) $appointment->appointment_time, 0, 5),
+                    'status'     => $appointment->status,
                 ]
             );
 
@@ -237,6 +251,7 @@ class AppointmentController extends Controller
     /**
      * ✅ update supports doctor_id and uses whereTime collision check
      * ✅ keeps doctor_name stable unless doctor_id changed or doctor_name explicitly emptied
+     * ✅ logs appointment.updated
      */
     public function update(Request $request, $id)
     {
@@ -312,6 +327,7 @@ class AppointmentController extends Controller
             ], 422);
         }
 
+        // ✅ derive doctor_name only when needed (avoid unintended overrides)
         if (
             array_key_exists('doctor_id', $data) ||
             (array_key_exists('doctor_name', $data) && empty($data['doctor_name']))
@@ -324,12 +340,15 @@ class AppointmentController extends Controller
             $data['doctor_name'] = trim((string)($data['doctor_name'] ?? '')) ?: ($doctor->name ?? 'Doctor');
         }
 
+        // normalize date/time formats on update if provided
         if (isset($data['appointment_date'])) {
             $data['appointment_date'] = Carbon::parse($data['appointment_date'])->toDateString();
         }
         if (isset($data['appointment_time'])) {
-            $data['appointment_time'] = $newTime;
+            $data['appointment_time'] = $newTime; // keep H:i
         }
+
+        $changedFields = array_keys($data);
 
         try {
             $appointment->update($data);
@@ -346,17 +365,20 @@ class AppointmentController extends Controller
             throw $e;
         }
 
+        // ✅ log updated
         ActivityLogger::log(
             $companyId,
             $request->user(),
             'appointment.updated',
-            \App\Models\Appointment::class,
+            Appointment::class,
             $appointment->id,
             [
-                'changed_fields' => array_keys($data),
+                'changed_fields' => $changedFields,
                 'doctor_id'      => $appointment->doctor_id,
+                'patient_id'     => $appointment->patient_id,
                 'date'           => Carbon::parse($appointment->appointment_date)->toDateString(),
                 'time'           => substr((string) $appointment->appointment_time, 0, 5),
+                'status'         => $appointment->status,
             ]
         );
 
@@ -393,6 +415,7 @@ class AppointmentController extends Controller
      * ✅ validates within working hours + slot interval
      * ✅ collision check uses doctor_id + whereTime
      * ✅ REBOOK cancelled slot by updating same record
+     * ✅ logs appointment.booked OR appointment.rebooked (no duplicates)
      */
     public function book(Request $request)
     {
@@ -414,6 +437,7 @@ class AppointmentController extends Controller
         $date = Carbon::parse($data['appointment_date'])->toDateString();
         $time = $data['appointment_time'];
 
+        // resolve doctor
         if (!empty($data['doctor_id'])) {
             $doctor = Doctor::query()
                 ->where('company_id', $companyId)
@@ -436,6 +460,7 @@ class AppointmentController extends Controller
 
         $doctorId = (int) $doctor->id;
 
+        // working settings
         $startTime   = $doctor->work_start ?? '09:00';
         $endTime     = $doctor->work_end ?? '17:00';
         $slotMinutes = (int) ($doctor->slot_minutes ?? 30);
@@ -492,7 +517,7 @@ class AppointmentController extends Controller
                         'appointment_time' => $time,
                     ]);
 
-                    // ✅ log rebook
+                    // ✅ log rebook (FIX: use $existing not $appointment)
                     ActivityLogger::log(
                         $companyId,
                         $request->user(),
@@ -500,9 +525,10 @@ class AppointmentController extends Controller
                         Appointment::class,
                         $existing->id,
                         [
-                            'doctor_id' => $existing->doctor_id,
-                            'date' => Carbon::parse($appointment->appointment_date)->toDateString(), // "YYYY-MM-DD"
-                            'time'      => substr((string) $existing->appointment_time, 0, 5),
+                            'doctor_id'  => $existing->doctor_id,
+                            'patient_id' => $existing->patient_id,
+                            'date'       => Carbon::parse($existing->appointment_date)->toDateString(),
+                            'time'       => substr((string) $existing->appointment_time, 0, 5),
                         ]
                     );
 
@@ -542,7 +568,7 @@ class AppointmentController extends Controller
                 throw $e;
             }
 
-            // ✅ log booked (public booking)
+            // ✅ log booked (single source of truth)
             ActivityLogger::log(
                 $companyId,
                 $request->user(),
@@ -550,9 +576,10 @@ class AppointmentController extends Controller
                 Appointment::class,
                 $appointment->id,
                 [
-                    'doctor_id' => $appointment->doctor_id,
-                    'date' => Carbon::parse($appointment->appointment_date)->toDateString(), // "YYYY-MM-DD"
-                    'time'      => substr((string) $appointment->appointment_time, 0, 5),
+                    'doctor_id'  => $appointment->doctor_id,
+                    'patient_id' => $appointment->patient_id,
+                    'date'       => Carbon::parse($appointment->appointment_date)->toDateString(),
+                    'time'       => substr((string) $appointment->appointment_time, 0, 5),
                 ]
             );
 
@@ -595,7 +622,8 @@ class AppointmentController extends Controller
                 'old_status' => $oldStatus,
                 'new_status' => 'cancelled',
                 'doctor_id'  => $appointment->doctor_id,
-                'date' => Carbon::parse($appointment->appointment_date)->toDateString(), // "YYYY-MM-DD"
+                'patient_id' => $appointment->patient_id,
+                'date'       => Carbon::parse($appointment->appointment_date)->toDateString(),
                 'time'       => substr((string) $appointment->appointment_time, 0, 5),
             ]
         );
@@ -610,6 +638,12 @@ class AppointmentController extends Controller
         ]);
     }
 
+    /**
+     * COMPLETE APPOINTMENT + CREATE INVOICE (+ optional treatment_plan_id)
+     * ✅ locks appointment, prevents duplicate invoices
+     * ✅ validates treatment plan belongs to same customer
+     * ✅ logs appointment.completed
+     */
     public function complete(Request $request, $id)
     {
         $companyId = $request->user()->company_id;
@@ -812,7 +846,8 @@ class AppointmentController extends Controller
                 'old_status' => $oldStatus,
                 'new_status' => 'no_show',
                 'doctor_id'  => $appointment->doctor_id,
-                'date' => Carbon::parse($appointment->appointment_date)->toDateString(), // "YYYY-MM-DD"
+                'patient_id' => $appointment->patient_id,
+                'date'       => Carbon::parse($appointment->appointment_date)->toDateString(),
                 'time'       => substr((string) $appointment->appointment_time, 0, 5),
             ]
         );
