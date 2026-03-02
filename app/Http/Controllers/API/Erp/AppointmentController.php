@@ -348,13 +348,20 @@ class AppointmentController extends Controller
             $data['appointment_time'] = $newTime; // keep H:i
         }
 
-        $original = $appointment->getOriginal();
+        $track = ['patient_id', 'doctor_id', 'doctor_name', 'appointment_date', 'appointment_time', 'status', 'notes'];
+
+        $before = $appointment->only($track);
 
         $appointment->update($data);
 
-        $dirty = $appointment->getChanges(); // الحقول التي تغيرت فعلاً
+        $after = $appointment->fresh()->only($track);
 
-        $changedFields = array_keys($dirty);
+        $changed = [];
+        foreach ($track as $k) {
+            if ((string)($before[$k] ?? '') !== (string)($after[$k] ?? '')) {
+                $changed[] = $k;
+            }
+        }
 
         try {
             $appointment->update($data);
@@ -379,7 +386,7 @@ class AppointmentController extends Controller
             Appointment::class,
             $appointment->id,
             [
-                'changed_fields' => $changedFields,
+                'changed_fields' => $changed,
                 'doctor_id'      => $appointment->doctor_id,
                 'patient_id'     => $appointment->patient_id,
                 'date'           => Carbon::parse($appointment->appointment_date)->toDateString(),
