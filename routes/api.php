@@ -229,10 +229,10 @@ Route::prefix('erp')
 
         Route::get('/appointments/available-slots', [AppointmentAvailabilityController::class, 'index']);
         Route::post('/appointments/book', [AppointmentController::class, 'book']);
+        Route::put('/appointments/{id}', [AppointmentController::class, 'update']);
         Route::post('/appointments/{id}/cancel', [AppointmentController::class, 'cancel']);
         Route::post('/appointments/{id}/complete', [AppointmentController::class, 'complete']);
         Route::post('/appointments/{id}/no-show', [AppointmentController::class, 'noShow']);
-
         Route::get('/customers/{customerId}/credit-balance', [CustomerCreditController::class, 'show']);
 
         Route::get('/treatment-plans', [TreatmentPlanController::class, 'index']);
