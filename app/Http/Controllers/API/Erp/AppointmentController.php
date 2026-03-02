@@ -348,7 +348,13 @@ class AppointmentController extends Controller
             $data['appointment_time'] = $newTime; // keep H:i
         }
 
-        $changedFields = array_keys($data);
+        $original = $appointment->getOriginal();
+
+        $appointment->update($data);
+
+        $dirty = $appointment->getChanges(); // الحقول التي تغيرت فعلاً
+
+        $changedFields = array_keys($dirty);
 
         try {
             $appointment->update($data);
