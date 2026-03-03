@@ -4,78 +4,92 @@ namespace App\Http\Controllers\API\Erp;
 
 use App\Http\Controllers\Controller;
 use App\Models\Appointment;
+use App\Models\Doctor;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
-use Illuminate\Validation\Rule;
 
 class AppointmentAvailabilityController extends Controller
 {
+    /**
+     * GET /api/erp/appointments/available-slots?doctor_id=1&date=YYYY-MM-DD&include_booked=0|1
+     */
     public function index(Request $request)
     {
         $companyId = $request->user()->company_id;
 
         $data = $request->validate([
-            'doctor_name'       => ['required', 'string', 'max:190'],
-            'date'              => ['required', 'date'],                 // YYYY-MM-DD
-            'start_time'        => ['nullable', 'date_format:H:i'],      // default 09:00
-            'end_time'          => ['nullable', 'date_format:H:i'],      // default 17:00
-            'slot_minutes'      => ['nullable', 'integer', 'min:5', 'max:180'],
-            'include_booked'    => ['nullable', 'boolean'],
+            'doctor_id'       => ['required', 'integer'],
+            'date'            => ['required', 'date_format:Y-m-d'],
+            'include_booked'  => ['nullable', 'boolean'],
         ]);
 
-        $doctor = trim($data['doctor_name']);
+        $doctorId = (int) $data['doctor_id'];
         $date = Carbon::parse($data['date'])->toDateString();
+        $includeBooked = (bool) ($data['include_booked'] ?? false);
 
-        $startTime = $data['start_time'] ?? '09:00';
-        $endTime   = $data['end_time']   ?? '17:00';
+        // ✅ tenant scoped doctor
+        $doctor = Doctor::query()
+            ->where('company_id', $companyId)
+            ->where('is_active', true)
+            ->findOrFail($doctorId);
 
-        $slotMinutes = (int)($data['slot_minutes'] ?? 30);
-        $includeBooked = (bool)($data['include_booked'] ?? false);
+        // Working hours + slot minutes (fallback defaults)
+        $workStart   = $doctor->work_start ?: '09:00';
+        $workEnd     = $doctor->work_end ?: '17:00';
+        $slotMinutes = (int) ($doctor->slot_minutes ?: 30);
 
-        // ✅ get booked slots (ignore cancelled)
-        $bookedTimes = Appointment::where('company_id', $companyId)
-            ->where('doctor_name', $doctor)
+        if ($slotMinutes <= 0) {
+            return response()->json([
+                'msg' => 'Invalid doctor slot configuration',
+                'status' => 422,
+                'errors' => [
+                    'slot_minutes' => ['slot_minutes must be > 0'],
+                ],
+            ], 422);
+        }
+
+        $start = Carbon::parse("$date $workStart");
+        $end   = Carbon::parse("$date $workEnd");
+
+        if ($end->lte($start)) {
+            return response()->json([
+                'msg' => 'Invalid working hours',
+                'status' => 422,
+                'errors' => [
+                    'work_hours' => ['work_end must be after work_start'],
+                ],
+            ], 422);
+        }
+
+        // ✅ booked slots for that doctor/day (cancelled does NOT block)
+        $blockedStatuses = ['scheduled', 'completed', 'no_show'];
+
+        $bookedTimes = Appointment::query()
+            ->where('company_id', $companyId)
+            ->where('doctor_id', $doctorId)
             ->whereDate('appointment_date', $date)
-            ->whereIn('status', ['scheduled', 'completed', 'no_show'])
-            ->pluck('appointment_time')
-            ->map(fn($t) => Carbon::parse($t)->format('H:i'))
+            ->whereIn('status', $blockedStatuses)
+            ->selectRaw("TIME_FORMAT(appointment_time, '%H:%i') as t")
+            ->pluck('t')
+            ->filter()
             ->unique()
             ->values()
             ->all();
 
         $bookedSet = array_flip($bookedTimes);
 
-        // ✅ build all possible slots
-        $start = Carbon::parse("$date $startTime");
-        $end   = Carbon::parse("$date $endTime");
-
-        if ($end->lessThanOrEqualTo($start)) {
-            return response()->json([
-                'msg' => 'Invalid working hours',
-                'status' => 422,
-                'errors' => [
-                    'end_time' => ['end_time must be after start_time.']
-                ],
-            ], 422);
-        }
-
+        // ✅ Generate slots: [start, end) stepping slotMinutes
         $slots = [];
         $cursor = $start->copy();
 
-        while ($cursor->copy()->addMinutes($slotMinutes)->lessThanOrEqualTo($end)) {
+        while ($cursor->lt($end)) {
             $time = $cursor->format('H:i');
             $isBooked = isset($bookedSet[$time]);
 
             if (!$isBooked) {
-                $slots[] = [
-                    'time' => $time,
-                    'status' => 'available',
-                ];
+                $slots[] = ['time' => $time, 'available' => true];
             } elseif ($includeBooked) {
-                $slots[] = [
-                    'time' => $time,
-                    'status' => 'booked',
-                ];
+                $slots[] = ['time' => $time, 'available' => false];
             }
 
             $cursor->addMinutes($slotMinutes);
@@ -85,12 +99,15 @@ class AppointmentAvailabilityController extends Controller
             'msg' => 'Available slots',
             'status' => 200,
             'data' => [
-                'company_id' => $companyId,
-                'doctor_name' => $doctor,
+                'doctor' => [
+                    'id' => $doctor->id,
+                    'name' => $doctor->name,
+                    'work_start' => $workStart,
+                    'work_end' => $workEnd,
+                    'slot_minutes' => $slotMinutes,
+                ],
                 'date' => $date,
-                'start_time' => $startTime,
-                'end_time' => $endTime,
-                'slot_minutes' => $slotMinutes,
+                'blocked_statuses' => $blockedStatuses,
                 'booked_times' => $bookedTimes,
                 'slots' => $slots,
             ],
