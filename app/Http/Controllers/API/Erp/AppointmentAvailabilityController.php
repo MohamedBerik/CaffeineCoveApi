@@ -5,6 +5,7 @@ namespace App\Http\Controllers\API\Erp;
 use App\Http\Controllers\Controller;
 use App\Services\DoctorAvailabilityService;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 
 class AppointmentAvailabilityController extends Controller
 {
@@ -17,7 +18,11 @@ class AppointmentAvailabilityController extends Controller
         $companyId = (int) $request->user()->company_id;
 
         $data = $request->validate([
-            'doctor_id' => ['required', 'integer'],
+            'doctor_id' => [
+                'required',
+                'integer',
+                Rule::exists('doctors', 'id')->where(fn($q) => $q->where('company_id', $companyId)->where('is_active', true)),
+            ],
             'date' => ['required', 'date_format:Y-m-d'],
             'include_booked' => ['nullable', 'boolean'],
         ]);
