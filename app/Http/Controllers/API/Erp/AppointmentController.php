@@ -818,9 +818,6 @@ class AppointmentController extends Controller
             return response()->json([
                 'msg' => 'Completed appointments cannot be rescheduled.',
                 'status' => 422,
-                'errors' => [
-                    'status' => ['Completed appointments cannot be rescheduled.'],
-                ],
             ], 422);
         }
 
@@ -831,7 +828,8 @@ class AppointmentController extends Controller
                 'required',
                 'integer',
                 Rule::exists('doctors', 'id')->where(
-                    fn($q) => $q->where('company_id', $companyId)->where('is_active', true)
+                    fn($q) =>
+                    $q->where('company_id', $companyId)->where('is_active', true)
                 ),
             ],
         ]);
@@ -840,69 +838,40 @@ class AppointmentController extends Controller
         $newTime = $data['appointment_time'];
         $newDoctorId = (int) $data['doctor_id'];
 
-        // Load doctor to validate working hours + slot interval + derive doctor_name if needed
-        $doctor = Doctor::query()
-            ->where('company_id', $companyId)
-            ->where('is_active', true)
-            ->findOrFail($newDoctorId);
-
-        $startTime   = $doctor->work_start ?? '09:00';
-        $endTime     = $doctor->work_end ?? '17:00';
-        $slotMinutes = (int) ($doctor->slot_minutes ?? 30);
-
-        $start = Carbon::parse("$newDate $startTime");
-        $end   = Carbon::parse("$newDate $endTime");
-        $requested = Carbon::parse("$newDate $newTime");
-
-        if ($requested->lt($start) || $requested->gte($end)) {
-            return response()->json([
-                'msg' => 'Validation required',
-                'status' => 422,
-                'errors' => [
-                    'appointment_time' => ['Time is outside working hours.'],
-                ],
-            ], 422);
-        }
-
-        $diff = $start->diffInMinutes($requested);
-        if ($slotMinutes <= 0 || ($diff % $slotMinutes !== 0)) {
-            return response()->json([
-                'msg' => 'Validation required',
-                'status' => 422,
-                'errors' => [
-                    'appointment_time' => ['Time must match slot interval.'],
-                ],
-            ], 422);
-        }
-
         $blockedStatuses = ['scheduled', 'completed', 'no_show'];
 
-        $old = [
-            'doctor_id' => (int) $appointment->doctor_id,
-            'date'      => Carbon::parse($appointment->appointment_date)->toDateString(),
-            'time'      => substr((string) $appointment->appointment_time, 0, 5),
-            'status'    => (string) $appointment->status,
-        ];
+        return DB::transaction(function () use ($request, $companyId, $appointment, $newDoctorId, $newDate, $newTime, $blockedStatuses) {
 
-        return DB::transaction(function () use (
-            $request,
-            $companyId,
-            $appointment,
-            $doctor,
-            $newDoctorId,
-            $newDate,
-            $newTime,
-            $blockedStatuses,
-            $old
-        ) {
-            // Lock current appointment row
-            $appointment = Appointment::query()
+            // 1) Lock current appointment row
+            $from = Appointment::query()
                 ->where('company_id', $companyId)
                 ->lockForUpdate()
                 ->findOrFail($appointment->id);
 
-            // Lock any existing row that already occupies the target slot (same unique key)
-            $target = Appointment::query()
+            if ($from->status === 'completed') {
+                return response()->json([
+                    'msg' => 'Completed appointments cannot be rescheduled.',
+                    'status' => 422,
+                ], 422);
+            }
+
+            // No-op: same slot
+            $fromDate = Carbon::parse($from->appointment_date)->toDateString();
+            $fromTime = $from->appointment_time ? substr((string)$from->appointment_time, 0, 5) : null;
+
+            if ((int)$from->doctor_id === (int)$newDoctorId && $fromDate === $newDate && $fromTime === $newTime) {
+                return response()->json([
+                    'msg' => 'Appointment already in the requested slot',
+                    'status' => 200,
+                    'data' => $from->fresh()->load([
+                        'patient:id,name,email,company_id',
+                        'doctor:id,name,company_id,work_start,work_end,slot_minutes',
+                    ]),
+                ], 200);
+            }
+
+            // 2) Lock target slot row (if any)
+            $to = Appointment::query()
                 ->where('company_id', $companyId)
                 ->where('doctor_id', $newDoctorId)
                 ->whereDate('appointment_date', $newDate)
@@ -910,76 +879,79 @@ class AppointmentController extends Controller
                 ->lockForUpdate()
                 ->first();
 
-            // If the target slot is occupied by another appointment
-            if ($target && (int) $target->id !== (int) $appointment->id) {
-                if (in_array($target->status, $blockedStatuses, true)) {
-                    return response()->json([
-                        'msg' => 'Time slot already booked',
-                        'status' => 422,
-                        'errors' => [
-                            'appointment_time' => ['This time slot is already booked for this doctor.'],
-                        ],
-                    ], 422);
-                }
-
-                // If target is cancelled => REUSE that row (rebook), then cancel old appointment
-                if ($target->status === 'cancelled') {
-                    $target->update([
-                        'patient_id'        => $appointment->patient_id,
-                        'doctor_id'         => $newDoctorId,
-                        'doctor_name'       => $doctor->name ?? $appointment->doctor_name,
-                        'appointment_date'  => $newDate,
-                        'appointment_time'  => $newTime,
-                        'status'            => 'scheduled',
-                        'notes'             => $appointment->notes,
-                        'created_by'        => $request->user()->id,
-                    ]);
-
-                    // Cancel old appointment to keep history (and free nothing because unique slot is different now)
-                    $appointment->update([
-                        'status' => 'cancelled',
-                    ]);
-
-                    ActivityLogger::log(
-                        $companyId,
-                        $request->user(),
-                        'appointment.rescheduled',
-                        Appointment::class,
-                        $target->id,
-                        [
-                            'from_appointment_id' => $appointment->id,
-                            'to_appointment_id'   => $target->id,
-                            'old_doctor_id' => $old['doctor_id'],
-                            'old_date'      => $old['date'],
-                            'old_time'      => $old['time'],
-                            'new_doctor_id' => $newDoctorId,
-                            'new_date'      => $newDate,
-                            'new_time'      => $newTime,
-                            'patient_id'    => $target->patient_id,
-                        ]
-                    );
-
-                    return response()->json([
-                        'msg' => 'Appointment rescheduled',
-                        'status' => 200,
-                        'data' => $target->fresh()->load([
-                            'patient:id,name,email,company_id',
-                            'doctor:id,name,company_id,work_start,work_end,slot_minutes',
-                        ]),
-                    ], 200);
-                }
+            // 3) If target exists and is blocking => reject
+            if ($to && in_array($to->status, $blockedStatuses, true)) {
+                return response()->json([
+                    'msg' => 'Time slot already booked',
+                    'status' => 422,
+                    'errors' => [
+                        'appointment_time' => ['This time slot is already booked for this doctor.'],
+                    ],
+                ], 422);
             }
 
-            // If no target row exists OR target is the same appointment => safe to update current row
-            try {
-                $appointment->update([
+            // Save "old" details for log
+            $old = [
+                'old_doctor_id' => (int) $from->doctor_id,
+                'old_date'      => Carbon::parse($from->appointment_date)->toDateString(),
+                'old_time'      => substr((string)$from->appointment_time, 0, 5),
+            ];
+
+            // 4) CASE A: target exists and is cancelled => reuse target row (update it) + cancel old row
+            if ($to && $to->status === 'cancelled') {
+
+                // Update target row to become the new scheduled appointment
+                $to->update([
+                    'patient_id'        => $from->patient_id,
                     'doctor_id'         => $newDoctorId,
-                    'doctor_name'       => $doctor->name ?? $appointment->doctor_name,
+                    'doctor_name'       => $from->doctor_name,
                     'appointment_date'  => $newDate,
                     'appointment_time'  => $newTime,
+                    'status'            => 'scheduled',
+                    'notes'             => $from->notes,
+                    'created_by'        => $request->user()->id, // أو خليه $from->created_by حسب قرارك
+                ]);
+
+                // Cancel old row (keep it to preserve history + avoid unique issues)
+                $from->update([
+                    'status' => 'cancelled',
+                ]);
+
+                ActivityLogger::log(
+                    $companyId,
+                    $request->user(),
+                    'appointment.rescheduled',
+                    Appointment::class,
+                    $to->id, // subject_id = new active appointment
+                    array_merge($old, [
+                        'new_doctor_id'       => $newDoctorId,
+                        'new_date'            => $newDate,
+                        'new_time'            => $newTime,
+                        'patient_id'          => $to->patient_id,
+                        'from_appointment_id' => $from->id,
+                        'to_appointment_id'   => $to->id,
+                    ])
+                );
+
+                return response()->json([
+                    'msg' => 'Appointment rescheduled',
+                    'status' => 200,
+                    'data' => $to->fresh()->load([
+                        'patient:id,name,email,company_id',
+                        'doctor:id,name,company_id,work_start,work_end,slot_minutes',
+                    ]),
+                ], 200);
+            }
+
+            // 5) CASE B: target does not exist => update current row in place
+            try {
+                $from->update([
+                    'doctor_id'        => $newDoctorId,
+                    'appointment_date' => $newDate,
+                    'appointment_time' => $newTime,
                 ]);
             } catch (QueryException $e) {
-                if ((string) $e->getCode() === '23000') {
+                if ((string)$e->getCode() === '23000') {
                     return response()->json([
                         'msg' => 'Time slot already booked',
                         'status' => 422,
@@ -996,22 +968,21 @@ class AppointmentController extends Controller
                 $request->user(),
                 'appointment.rescheduled',
                 Appointment::class,
-                $appointment->id,
-                [
-                    'old_doctor_id' => $old['doctor_id'],
-                    'old_date'      => $old['date'],
-                    'old_time'      => $old['time'],
-                    'new_doctor_id' => $newDoctorId,
-                    'new_date'      => $newDate,
-                    'new_time'      => $newTime,
-                    'patient_id'    => $appointment->patient_id,
-                ]
+                $from->id,
+                array_merge($old, [
+                    'new_doctor_id'       => $newDoctorId,
+                    'new_date'            => $newDate,
+                    'new_time'            => $newTime,
+                    'patient_id'          => $from->patient_id,
+                    'from_appointment_id' => $from->id,
+                    'to_appointment_id'   => $from->id,
+                ])
             );
 
             return response()->json([
                 'msg' => 'Appointment rescheduled',
                 'status' => 200,
-                'data' => $appointment->fresh()->load([
+                'data' => $from->fresh()->load([
                     'patient:id,name,email,company_id',
                     'doctor:id,name,company_id,work_start,work_end,slot_minutes',
                 ]),
