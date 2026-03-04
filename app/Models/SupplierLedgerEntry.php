@@ -8,6 +8,7 @@ use App\Models\Concerns\BelongsToCompanyTrait;
 
 class SupplierLedgerEntry extends Model
 {
+    use HasFactory;
     use BelongsToCompanyTrait;
 
     protected $fillable = [

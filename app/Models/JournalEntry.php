@@ -4,9 +4,11 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use App\Models\Concerns\BelongsToCompanyTrait;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 
 class JournalEntry extends Model
 {
+    use HasFactory;
     use BelongsToCompanyTrait;
 
     protected $fillable = [

@@ -9,6 +9,7 @@ use App\Models\Concerns\BelongsToCompanyTrait;
 
 class InvoiceItem extends Model
 {
+    use HasFactory;
     use BelongsToCompanyTrait;
 
     protected $fillable = [

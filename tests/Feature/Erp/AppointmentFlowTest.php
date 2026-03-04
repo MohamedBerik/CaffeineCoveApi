@@ -5,6 +5,8 @@ namespace Tests\Feature\Erp;
 use Tests\TestCase;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
+
+use App\Http\Middleware\CheckPermission;
 use App\Models\User;
 use App\Models\Company;
 use App\Models\Doctor;
@@ -21,6 +23,9 @@ class AppointmentFlowTest extends TestCase
 
     public function test_can_book_appointment()
     {
+        // ✅ We are testing booking flow, not permissions here
+        $this->withoutMiddleware(CheckPermission::class);
+
         $user = $this->actingAsUserWithCompany();
         $companyId = $user->company_id;
 
@@ -49,9 +54,13 @@ class AppointmentFlowTest extends TestCase
         $this->assertDatabaseHas('appointments', [
             'company_id' => $companyId,
             'doctor_id' => $doctor->id,
+            'patient_id' => $patient->id,
+            'appointment_date' => '2026-03-05',
+            'appointment_time' => '10:00:00', // MySQL may store time with seconds
             'status' => 'scheduled',
         ]);
     }
+
     private function actingAsUserWithCompany(): User
     {
         $company = Company::factory()->create();

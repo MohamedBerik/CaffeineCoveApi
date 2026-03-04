@@ -8,6 +8,7 @@ use App\Models\Concerns\BelongsToCompanyTrait;
 
 class Supplier extends Model
 {
+    use HasFactory;
     use BelongsToCompanyTrait;
 
     protected $fillable = ['company_id', 'name', 'email', 'phone'];
