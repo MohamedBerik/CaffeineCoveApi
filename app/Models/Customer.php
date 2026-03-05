@@ -15,8 +15,15 @@ class Customer extends Model
         'company_id',
         "name",
         "email",
-        // "password",
+        "phone",
         "status",
+        // patient fields
+        'patient_code',
+        'phone',
+        'date_of_birth',
+        'gender',
+        'address',
+        'notes',
     ];
 
     protected $hidden = [

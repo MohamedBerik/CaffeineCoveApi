@@ -5,7 +5,6 @@ use Illuminate\Support\Facades\Route;
 
 use App\Http\Controllers\API\AuthController;
 use App\Http\Controllers\API\CategoryController;
-use App\Http\Controllers\API\CustomerController;
 use App\Http\Controllers\API\SupplierController;
 use App\Http\Controllers\API\EmployeeController;
 use App\Http\Controllers\API\UserController;
@@ -31,6 +30,7 @@ use App\Http\Controllers\API\Erp\CustomerCreditController;
 use App\Http\Controllers\API\Erp\DoctorController;
 use App\Http\Controllers\API\Erp\DoctorAvailabilityController;
 use App\Http\Controllers\API\Erp\TreatmentPlanController;
+use App\Http\Controllers\API\Erp\CustomerController;
 use App\Http\Controllers\API\Erp\AppointmentController;
 use App\Http\Controllers\API\SaaS\ClinicOnboardingController;
 use App\Http\Controllers\API\SaaS\TenantController;
@@ -92,7 +92,7 @@ Route::middleware([
     ->group(function () {
 
         Route::get('/dashboard', [AdminDashboardController::class, 'index']);
-        Route::apiResource('customers',   CustomerController::class);
+        // Route::apiResource('customers',   CustomerController::class);
         Route::apiResource('categories',  CategoryController::class);
         Route::apiResource('suppliers',   SupplierController::class);
         Route::apiResource('employees',   EmployeeController::class);
@@ -276,6 +276,26 @@ Route::prefix('erp')
         Route::put('/doctors/{id}', [DoctorController::class, 'update']);
         Route::delete('/doctors/{id}', [DoctorController::class, 'destroy']);
         Route::get('/doctors/{doctorId}/availability', [DoctorAvailabilityController::class, 'show']);
+
+        /*
+        |--------------------------------------------------------------------------
+        | Customers(Patients)
+        |--------------------------------------------------------------------------
+        */
+        Route::middleware('permission:patients.view')
+            ->get('/customers', [CustomerController::class, 'index']);
+
+        Route::middleware('permission:patients.view')
+            ->get('/customers/{id}', [CustomerController::class, 'show']);
+
+        Route::middleware('permission:patients.manage')
+            ->post('/customers', [CustomerController::class, 'store']);
+
+        Route::middleware('permission:patients.manage')
+            ->put('/customers/{id}', [CustomerController::class, 'update']);
+
+        Route::middleware('permission:patients.manage')
+            ->delete('/customers/{id}', [CustomerController::class, 'destroy']);
     });
 
 Route::middleware('auth:sanctum')->prefix('saas')->group(function () {
