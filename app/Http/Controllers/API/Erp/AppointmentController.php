@@ -597,9 +597,12 @@ class AppointmentController extends Controller
             ->findOrFail($id);
 
         $data = $request->validate([
-            'total' => ['required', 'numeric', 'min:0.01'],
+            // ✅ total optional لأننا ممكن نحسبه من الخطة
+            'total' => ['nullable', 'numeric', 'min:0.01'],
+
             'doctor_name' => ['nullable', 'string', 'max:190'],
             'notes' => ['nullable', 'string'],
+
             'treatment_plan_id' => [
                 'nullable',
                 'integer',
@@ -607,6 +610,7 @@ class AppointmentController extends Controller
             ],
         ]);
 
+        // ✅ fallback product (must exist) لضمان product_id
         $serviceProduct = \App\Models\Product::where('company_id', $companyId)
             ->where('title_en', 'Consultation')
             ->first();
@@ -648,7 +652,10 @@ class AppointmentController extends Controller
                 ], 409);
             }
 
+            // ✅ Validate plan ownership if provided
             $planId = $data['treatment_plan_id'] ?? null;
+            $plan = null;
+
             if ($planId) {
                 $plan = TreatmentPlan::query()
                     ->where('company_id', $companyId)
@@ -661,35 +668,96 @@ class AppointmentController extends Controller
                         'errors' => [
                             'treatment_plan_id' => ['Treatment plan customer_id mismatch.'],
                         ],
-                        'debug' => [
-                            'appointment_patient_id' => $appointment->patient_id,
-                            'plan_customer_id' => $plan->customer_id,
-                        ],
                     ], 422);
                 }
             }
 
+            // ✅ Update appointment meta
             $appointment->update([
                 'doctor_name' => $data['doctor_name'] ?? $appointment->doctor_name,
                 'notes'       => $data['notes'] ?? $appointment->notes,
             ]);
 
+            // ✅ Build invoice/order lines
+            $lines = [];
+
+            if ($plan) {
+                // IMPORTANT: استخدم جدول items الحقيقي بتاعك
+                $items = \App\Models\TreatmentPlanItem::query()
+                    ->where('company_id', $companyId)
+                    ->where('treatment_plan_id', $plan->id)
+                    ->orderBy('id', 'asc')
+                    ->get();
+
+                if ($items->isEmpty()) {
+                    return response()->json([
+                        'msg' => 'Treatment plan has no items',
+                        'status' => 422,
+                        'errors' => [
+                            'treatment_plan_id' => ['Treatment plan must have at least 1 item to complete appointment.'],
+                        ],
+                    ], 422);
+                }
+
+                foreach ($items as $it) {
+                    $price = (float) $it->price;
+
+                    // ✅ MVP fallback: always use service product to avoid null product_id
+                    // لاحقًا: اربط كل procedure بمنتج مخصوص من catalog
+                    $lines[] = [
+                        'product_id' => $serviceProduct->id,
+                        'quantity'   => 1,
+                        'unit_price' => $price,
+                        'total'      => $price,
+                        'desc'       => $it->procedure ?? 'Treatment Item',
+                    ];
+                }
+            } else {
+                // no plan: use provided total as 1 line service
+                $total = (float) ($data['total'] ?? 0);
+
+                if ($total <= 0) {
+                    return response()->json([
+                        'msg' => 'total is required when no treatment_plan_id is provided',
+                        'status' => 422,
+                        'errors' => [
+                            'total' => ['total is required when no treatment_plan_id is provided'],
+                        ],
+                    ], 422);
+                }
+
+                $lines[] = [
+                    'product_id' => $serviceProduct->id,
+                    'quantity'   => 1,
+                    'unit_price' => $total,
+                    'total'      => $total,
+                    'desc'       => 'Consultation',
+                ];
+            }
+
+            $grandTotal = array_sum(array_map(fn($l) => (float) $l['total'], $lines));
+
+            // ✅ Create order (orders has title_en/title_ar columns عندك)
             $order = \App\Models\Order::create([
                 'company_id'   => $companyId,
                 'customer_id'  => $appointment->patient_id,
+                'title_en'     => 'Appointment Services',
+                'title_ar'     => 'خدمات الموعد',
                 'status'       => 'confirmed',
-                'total'        => $data['total'],
+                'total'        => $grandTotal,
                 'created_by'   => $request->user()->id,
             ]);
 
-            \App\Models\OrderItem::create([
-                'company_id'  => $companyId,
-                'order_id'    => $order->id,
-                'product_id'  => $serviceProduct->id,
-                'quantity'    => 1,
-                'unit_price'  => $data['total'],
-                'total'       => $data['total'],
-            ]);
+            foreach ($lines as $l) {
+                \App\Models\OrderItem::create([
+                    'company_id' => $companyId,
+                    'order_id'   => $order->id,
+                    'product_id' => $l['product_id'],
+                    'quantity'   => $l['quantity'],
+                    'unit_price' => $l['unit_price'],
+                    'total'      => $l['total'],
+                ]);
+            }
 
             $number = 'INV-' . now()->format('YmdHis') . '-' . $order->id;
 
@@ -698,22 +766,25 @@ class AppointmentController extends Controller
                 'number'            => $number,
                 'order_id'          => $order->id,
                 'appointment_id'    => $appointment->id,
-                'treatment_plan_id' => $data['treatment_plan_id'] ?? null,
+                'treatment_plan_id' => $plan ? $plan->id : null,
                 'customer_id'       => $appointment->patient_id,
-                'total'             => $data['total'],
+                'total'             => $grandTotal,
                 'status'            => 'unpaid',
                 'issued_at'         => now(),
             ]);
 
-            \App\Models\InvoiceItem::create([
-                'company_id'  => $companyId,
-                'invoice_id'  => $invoice->id,
-                'product_id'  => $serviceProduct->id,
-                'quantity'    => 1,
-                'unit_price'  => $data['total'],
-                'total'       => $data['total'],
-            ]);
+            foreach ($lines as $l) {
+                \App\Models\InvoiceItem::create([
+                    'company_id' => $companyId,
+                    'invoice_id' => $invoice->id,
+                    'product_id' => $l['product_id'],
+                    'quantity'   => $l['quantity'],
+                    'unit_price' => $l['unit_price'],
+                    'total'      => $l['total'],
+                ]);
+            }
 
+            // ledger entry
             $exists = CustomerLedgerEntry::query()
                 ->where('company_id', $companyId)
                 ->where('invoice_id', $invoice->id)
@@ -758,6 +829,7 @@ class AppointmentController extends Controller
                 'order_id' => $order->id,
                 'invoice_number' => $invoice->number,
                 'treatment_plan_id' => $invoice->treatment_plan_id,
+                'total' => (float) $invoice->total,
             ]);
         });
     }
