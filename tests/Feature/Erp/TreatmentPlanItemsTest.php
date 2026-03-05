@@ -34,14 +34,20 @@ class TreatmentPlanItemsTest extends TestCase
             'status' => 'active',
         ]);
 
+        // Create procedure (catalog)
+        $procedure = \App\Models\Procedure::create([
+            'company_id' => $companyId,
+            'name' => 'Filling',
+            'price' => 250,
+        ]);
+
         // Add item
         $res = $this->postJson("/api/erp/treatment-plans/{$plan->id}/items", [
-            'procedure' => 'Filling',
+            'procedure_id' => $procedure->id,
             'tooth_number' => '16',
             'surface' => 'occlusal',
             'price' => 250,
         ]);
-
         $res->assertStatus(201);
         $itemId = $res->json('data.id');
 
