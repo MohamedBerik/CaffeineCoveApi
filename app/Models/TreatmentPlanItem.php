@@ -25,4 +25,8 @@ class TreatmentPlanItem extends Model
     {
         return $this->belongsTo(TreatmentPlan::class, 'treatment_plan_id');
     }
+    public function procedureRef()
+    {
+        return $this->belongsTo(Procedure::class, 'procedure_id');
+    }
 }

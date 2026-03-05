@@ -32,6 +32,7 @@ use App\Http\Controllers\API\Erp\DoctorAvailabilityController;
 use App\Http\Controllers\API\Erp\TreatmentPlanController;
 use App\Http\Controllers\API\Erp\CustomerController;
 use App\Http\Controllers\API\Erp\AppointmentController;
+use App\Http\Controllers\API\Erp\ProcedureController;
 use App\Http\Controllers\API\SaaS\ClinicOnboardingController;
 use App\Http\Controllers\API\SaaS\TenantController;
 
@@ -282,6 +283,23 @@ Route::prefix('erp')
         Route::post('/treatment-plans/{id}/items', [TreatmentPlanController::class, 'addItem']);
         Route::put('/treatment-plan-items/{itemId}', [TreatmentPlanController::class, 'updateItem']);
         Route::delete('/treatment-plan-items/{itemId}', [TreatmentPlanController::class, 'deleteItem']);
+
+        /*
+        |--------------------------------------------------------------------------
+        | Procedure
+        |--------------------------------------------------------------------------
+        */
+        Route::middleware('permission:procedures.view')
+            ->get('/procedures', [ProcedureController::class, 'index']);
+
+        Route::middleware('permission:procedures.manage')
+            ->post('/procedures', [ProcedureController::class, 'store']);
+
+        Route::middleware('permission:procedures.manage')
+            ->put('/procedures/{id}', [ProcedureController::class, 'update']);
+
+        Route::middleware('permission:procedures.manage')
+            ->delete('/procedures/{id}', [ProcedureController::class, 'destroy']);
         /*
         |--------------------------------------------------------------------------
         | Doctors

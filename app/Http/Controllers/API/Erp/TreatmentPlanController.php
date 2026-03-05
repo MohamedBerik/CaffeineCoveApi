@@ -5,6 +5,7 @@ namespace App\Http\Controllers\API\Erp;
 use App\Http\Controllers\Controller;
 use App\Models\TreatmentPlan;
 use App\Models\Invoice;
+use App\Models\Procedure;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
@@ -435,6 +436,7 @@ class TreatmentPlanController extends Controller
         $items = TreatmentPlanItem::query()
             ->where('company_id', $companyId)
             ->where('treatment_plan_id', $plan->id)
+            ->with('procedureRef:id,name,default_price')
             ->orderBy('id', 'asc')
             ->get();
 
@@ -452,27 +454,33 @@ class TreatmentPlanController extends Controller
         $plan = TreatmentPlan::where('company_id', $companyId)->findOrFail($id);
 
         $data = $request->validate([
-            'procedure' => ['required', 'string', 'max:190'],
+            'procedure_id' => ['required', 'integer'],
             'tooth_number' => ['nullable', 'string', 'max:10'],
             'surface' => ['nullable', 'string', 'max:50'],
             'notes' => ['nullable', 'string'],
-            'price' => ['required', 'numeric', 'min:0'],
+            'price' => ['nullable', 'numeric', 'min:0'],
         ]);
+
+        $procedure = Procedure::where('company_id', $companyId)
+            ->findOrFail($data['procedure_id']);
+
+        $price = $data['price'] ?? $procedure->default_price;
 
         $item = TreatmentPlanItem::create([
             'company_id' => $companyId,
             'treatment_plan_id' => $plan->id,
-            'procedure' => $data['procedure'],
+            'procedure_id' => $procedure->id,
+            'procedure' => $procedure->name,
             'tooth_number' => $data['tooth_number'] ?? null,
             'surface' => $data['surface'] ?? null,
             'notes' => $data['notes'] ?? null,
-            'price' => $data['price'],
+            'price' => $price,
         ]);
 
         return response()->json([
             'msg' => 'Item added',
             'status' => 201,
-            'data' => $item,
+            'data' => $item->load('procedureRef'),
         ], 201);
     }
 
@@ -483,19 +491,37 @@ class TreatmentPlanController extends Controller
         $item = TreatmentPlanItem::where('company_id', $companyId)->findOrFail($itemId);
 
         $data = $request->validate([
-            'procedure' => ['sometimes', 'required', 'string', 'max:190'],
+            'procedure_id' => ['sometimes', 'required', 'integer'],
             'tooth_number' => ['sometimes', 'nullable', 'string', 'max:10'],
             'surface' => ['sometimes', 'nullable', 'string', 'max:50'],
             'notes' => ['sometimes', 'nullable', 'string'],
-            'price' => ['sometimes', 'required', 'numeric', 'min:0'],
+            'price' => ['sometimes', 'nullable', 'numeric', 'min:0'],
         ]);
 
-        $item->update($data);
+        if (isset($data['procedure_id'])) {
+
+            $procedure = Procedure::where('company_id', $companyId)
+                ->findOrFail($data['procedure_id']);
+
+            $item->procedure_id = $procedure->id;
+            $item->procedure = $procedure->name;
+
+            if (!isset($data['price'])) {
+                $item->price = $procedure->default_price;
+            }
+        }
+
+        $item->update([
+            'tooth_number' => $data['tooth_number'] ?? $item->tooth_number,
+            'surface' => $data['surface'] ?? $item->surface,
+            'notes' => $data['notes'] ?? $item->notes,
+            'price' => $data['price'] ?? $item->price,
+        ]);
 
         return response()->json([
             'msg' => 'Item updated',
             'status' => 200,
-            'data' => $item->fresh(),
+            'data' => $item->fresh()->load('procedureRef'),
         ]);
     }
 
