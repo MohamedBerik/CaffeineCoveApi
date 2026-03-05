@@ -256,15 +256,32 @@ Route::prefix('erp')
         |--------------------------------------------------------------------------
         | TreatmentPlan
         |--------------------------------------------------------------------------
-        */
-        Route::get('/treatment-plans', [TreatmentPlanController::class, 'index']);
-        Route::post('/treatment-plans', [TreatmentPlanController::class, 'store']);
-        Route::get('/treatment-plans/{id}', [TreatmentPlanController::class, 'show']);
-        Route::put('/treatment-plans/{id}', [TreatmentPlanController::class, 'update']);
-        Route::delete('/treatment-plans/{id}', [TreatmentPlanController::class, 'destroy']);
-        Route::get('/treatment-plans/{id}/summary', [TreatmentPlanController::class, 'summary']);
-        Route::get('/treatment-plans/{id}/cash-summary', [TreatmentPlanController::class, 'cashSummary']);
+       */
+        Route::middleware('permission:treatment_plans.view')
+            ->get('/treatment-plans', [TreatmentPlanController::class, 'index']);
 
+        Route::middleware('permission:treatment_plans.manage')
+            ->post('/treatment-plans', [TreatmentPlanController::class, 'store']);
+
+        Route::middleware('permission:treatment_plans.view')
+            ->get('/treatment-plans/{id}', [TreatmentPlanController::class, 'show']);
+
+        Route::middleware('permission:treatment_plans.manage')
+            ->put('/treatment-plans/{id}', [TreatmentPlanController::class, 'update']);
+
+        Route::middleware('permission:treatment_plans.manage')
+            ->delete('/treatment-plans/{id}', [TreatmentPlanController::class, 'destroy']);
+
+        Route::middleware('permission:treatment_plans.view')
+            ->get('/treatment-plans/{id}/summary', [TreatmentPlanController::class, 'summary']);
+
+        Route::middleware('permission:treatment_plans.view')
+            ->get('/treatment-plans/{id}/cash-summary', [TreatmentPlanController::class, 'cashSummary']);
+
+        Route::get('/treatment-plans/{id}/items', [TreatmentPlanController::class, 'items']);
+        Route::post('/treatment-plans/{id}/items', [TreatmentPlanController::class, 'addItem']);
+        Route::put('/treatment-plan-items/{itemId}', [TreatmentPlanController::class, 'updateItem']);
+        Route::delete('/treatment-plan-items/{itemId}', [TreatmentPlanController::class, 'deleteItem']);
         /*
         |--------------------------------------------------------------------------
         | Doctors
