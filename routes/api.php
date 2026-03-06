@@ -352,6 +352,9 @@ Route::prefix('erp')
 
         Route::middleware('permission:patients.manage')
             ->delete('/dental-records/{id}', [DentalRecordController::class, 'destroy']);
+
+        Route::middleware('permission:treatment_plans.manage')
+            ->post('/dental-records/{id}/to-treatment-plan-item', [DentalRecordController::class, 'toTreatmentPlanItem']);
     });
 
 Route::middleware('auth:sanctum')->prefix('saas')->group(function () {

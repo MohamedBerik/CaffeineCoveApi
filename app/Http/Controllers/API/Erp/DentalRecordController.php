@@ -6,6 +6,8 @@ use App\Http\Controllers\Controller;
 use App\Models\DentalRecord;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
+use App\Models\TreatmentPlan;
+use App\Models\TreatmentPlanItem;
 
 class DentalRecordController extends Controller
 {
@@ -167,5 +169,91 @@ class DentalRecordController extends Controller
             'msg' => 'Dental record deleted',
             'status' => 200,
         ]);
+    }
+
+    public function toTreatmentPlanItem(Request $request, $id)
+    {
+        $companyId = $request->user()->company_id;
+
+        $record = DentalRecord::query()
+            ->where('company_id', $companyId)
+            ->with('procedure')
+            ->findOrFail($id);
+
+        $data = $request->validate([
+            'treatment_plan_id' => [
+                'required',
+                'integer',
+                Rule::exists('treatment_plans', 'id')->where(fn($q) => $q->where('company_id', $companyId)),
+            ],
+            'price' => ['nullable', 'numeric', 'min:0'],
+        ]);
+
+        $plan = \App\Models\TreatmentPlan::query()
+            ->where('company_id', $companyId)
+            ->findOrFail($data['treatment_plan_id']);
+
+        if ((int) $plan->customer_id !== (int) $record->customer_id) {
+            return response()->json([
+                'msg' => 'Treatment plan does not belong to this customer',
+                'status' => 422,
+                'errors' => [
+                    'treatment_plan_id' => ['Treatment plan customer_id mismatch.'],
+                ],
+            ], 422);
+        }
+
+        if (!$record->procedure_id || !$record->procedure) {
+            return response()->json([
+                'msg' => 'Dental record must have a procedure before conversion',
+                'status' => 422,
+                'errors' => [
+                    'procedure_id' => ['Dental record procedure_id is required.'],
+                ],
+            ], 422);
+        }
+
+        $duplicate = \App\Models\TreatmentPlanItem::query()
+            ->where('company_id', $companyId)
+            ->where('treatment_plan_id', $plan->id)
+            ->where('procedure_id', $record->procedure_id)
+            ->where('tooth_number', $record->tooth_number)
+            ->where(function ($q) use ($record) {
+                if (is_null($record->surface)) {
+                    $q->whereNull('surface');
+                } else {
+                    $q->where('surface', $record->surface);
+                }
+            })
+            ->first();
+
+        if ($duplicate) {
+            return response()->json([
+                'msg' => 'Dental record already converted to treatment plan item',
+                'status' => 409,
+                'data' => [
+                    'treatment_plan_item_id' => $duplicate->id,
+                ],
+            ], 409);
+        }
+
+        $price = $data['price'] ?? (float) ($record->procedure->default_price ?? 0);
+
+        $item = \App\Models\TreatmentPlanItem::create([
+            'company_id'        => $companyId,
+            'treatment_plan_id' => $plan->id,
+            'procedure_id'      => $record->procedure_id,
+            'procedure'         => $record->procedure->name,
+            'tooth_number'      => $record->tooth_number,
+            'surface'           => $record->surface,
+            'notes'             => $record->notes,
+            'price'             => $price,
+        ]);
+
+        return response()->json([
+            'msg' => 'Dental record converted to treatment plan item',
+            'status' => 201,
+            'data' => $item->fresh()->load('procedureRef'),
+        ], 201);
     }
 }
