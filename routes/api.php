@@ -32,6 +32,7 @@ use App\Http\Controllers\API\Erp\DoctorAvailabilityController;
 use App\Http\Controllers\API\Erp\TreatmentPlanController;
 use App\Http\Controllers\API\Erp\CustomerController;
 use App\Http\Controllers\API\Erp\AppointmentController;
+use App\Http\Controllers\API\Erp\DentalRecordController;
 use App\Http\Controllers\API\Erp\ProcedureController;
 use App\Http\Controllers\API\SaaS\ClinicOnboardingController;
 use App\Http\Controllers\API\SaaS\TenantController;
@@ -331,6 +332,26 @@ Route::prefix('erp')
 
         Route::middleware('permission:patients.manage')
             ->delete('/customers/{id}', [CustomerController::class, 'destroy']);
+
+        /*
+        |--------------------------------------------------------------------------
+        | DentalRecord
+        |--------------------------------------------------------------------------
+        */
+        Route::middleware('permission:patients.view')
+            ->get('/dental-records', [DentalRecordController::class, 'index']);
+
+        Route::middleware('permission:patients.manage')
+            ->post('/dental-records', [DentalRecordController::class, 'store']);
+
+        Route::middleware('permission:patients.view')
+            ->get('/dental-records/{id}', [DentalRecordController::class, 'show']);
+
+        Route::middleware('permission:patients.manage')
+            ->put('/dental-records/{id}', [DentalRecordController::class, 'update']);
+
+        Route::middleware('permission:patients.manage')
+            ->delete('/dental-records/{id}', [DentalRecordController::class, 'destroy']);
     });
 
 Route::middleware('auth:sanctum')->prefix('saas')->group(function () {
