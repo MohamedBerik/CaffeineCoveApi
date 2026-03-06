@@ -98,19 +98,22 @@ class ErpDashboardTest extends TestCase
             'issued_at' => now(),
         ]);
 
-        $payment = Payment::create([
-            'company_id' => $companyId,
-            'invoice_id' => $invoicePartial->id,
-            'amount' => 200,
-            'method' => 'cash',
-            'paid_at' => now(),
-            'received_by' => $user->id,
+        $paidAt = Carbon::today()->setTime(12, 0, 0);
+
+        $paymentId = DB::table('payments')->insertGetId([
+            'company_id'     => $companyId,
+            'invoice_id'     => $invoicePartial->id,
+            'amount'         => 200,
+            'applied_amount' => 200,
+            'credit_amount'  => 0,
+            'method'         => 'cash',
+            'paid_at'        => $paidAt,
+            'received_by'    => $user->id,
+            'created_at'     => now(),
+            'updated_at'     => now(),
         ]);
 
-        $payment->forceFill([
-            'applied_amount' => 200,
-            'credit_amount' => 0,
-        ])->save();
+        $payment = Payment::findOrFail($paymentId);
 
         // customer credit wallet
         DB::table('customer_credits')->insert([

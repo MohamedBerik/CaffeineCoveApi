@@ -28,7 +28,7 @@ class ClinicSettingController extends Controller
         return response()->json([
             'msg' => 'Clinic settings',
             'status' => 200,
-            'data' => $settings
+            'data' => $settings,
         ]);
     }
 
@@ -38,7 +38,15 @@ class ClinicSettingController extends Controller
 
         $settings = ClinicSetting::firstOrCreate(
             ['company_id' => $companyId],
-            ['clinic_name' => 'My Clinic']
+            [
+                'clinic_name' => 'My Clinic',
+                'currency' => 'USD',
+                'timezone' => 'UTC',
+                'invoice_prefix' => 'INV',
+                'invoice_start_number' => 1,
+                'next_invoice_number' => 1,
+                'language' => 'en',
+            ]
         );
 
         $data = $request->validate([
@@ -48,7 +56,7 @@ class ClinicSettingController extends Controller
             'currency' => ['sometimes', 'string', 'max:10'],
             'timezone' => ['sometimes', 'string'],
             'invoice_prefix' => ['sometimes', 'string', 'max:10'],
-            'invoice_start_number' => ['sometimes', 'integer'],
+            'invoice_start_number' => ['sometimes', 'integer', 'min:1'],
             'language' => ['sometimes', 'string', 'max:10'],
         ]);
 

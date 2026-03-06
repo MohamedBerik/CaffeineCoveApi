@@ -25,14 +25,13 @@ class InvoiceNumberService
                     ]
                 );
 
-            // أول مرة فقط: نضمن أن next يبدأ من invoice_start_number
             if ((int) $settings->next_invoice_number < (int) $settings->invoice_start_number) {
                 $settings->next_invoice_number = (int) $settings->invoice_start_number;
                 $settings->save();
             }
 
             $currentNumber = (int) $settings->next_invoice_number;
-            $prefix = trim((string) $settings->invoice_prefix ?: 'INV');
+            $prefix = trim((string) ($settings->invoice_prefix ?: 'INV'));
 
             $invoiceNumber = sprintf('%s-%04d', $prefix, $currentNumber);
 

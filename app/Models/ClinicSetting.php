@@ -15,6 +15,7 @@ class ClinicSetting extends Model
         'timezone',
         'invoice_prefix',
         'invoice_start_number',
+        'next_invoice_number',
         'language',
     ];
 
