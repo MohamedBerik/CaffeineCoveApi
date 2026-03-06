@@ -759,7 +759,7 @@ class AppointmentController extends Controller
                 ]);
             }
 
-            $number = 'INV-' . now()->format('YmdHis') . '-' . $order->id;
+            $number = \App\Services\InvoiceNumberService::generate($companyId);
 
             $invoice = \App\Models\Invoice::create([
                 'company_id'        => $companyId,

@@ -32,7 +32,9 @@ use App\Http\Controllers\API\Erp\DoctorAvailabilityController;
 use App\Http\Controllers\API\Erp\TreatmentPlanController;
 use App\Http\Controllers\API\Erp\CustomerController;
 use App\Http\Controllers\API\Erp\AppointmentController;
+use App\Http\Controllers\API\Erp\ClinicSettingController;
 use App\Http\Controllers\API\Erp\DentalRecordController;
+use App\Http\Controllers\API\Erp\ErpDashboardController;
 use App\Http\Controllers\API\Erp\PatientProfileController;
 use App\Http\Controllers\API\Erp\PatientTimelineController;
 use App\Http\Controllers\API\Erp\ProcedureController;
@@ -363,6 +365,12 @@ Route::prefix('erp')
 
         Route::middleware('permission:patients.view')
             ->get('/customers/{customerId}/timeline', [PatientTimelineController::class, 'index']);
+
+        Route::middleware('permission:finance.view')
+            ->get('/dashboard', [ErpDashboardController::class, 'index']);
+
+        Route::get('/clinic-settings', [ClinicSettingController::class, 'show']);
+        Route::put('/clinic-settings', [ClinicSettingController::class, 'update']);
     });
 
 Route::middleware('auth:sanctum')->prefix('saas')->group(function () {
