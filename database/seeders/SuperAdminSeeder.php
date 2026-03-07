@@ -18,7 +18,7 @@ class SuperAdminSeeder extends Seeder
                 'is_super_admin' => true,
                 'company_id' => null,
                 'role' => 'super_admin',
-                'status' => 'active'
+                'status' => 1,
             ]
         );
     }
