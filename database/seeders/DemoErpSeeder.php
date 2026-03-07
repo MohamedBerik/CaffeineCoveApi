@@ -63,7 +63,7 @@ class DemoErpSeeder extends Seeder
                     'password' => Hash::make('12345678'),
                     'company_id' => $company->id,
                     'role' => 'admin',
-                    'status' => 'active',
+                    'status' => '1',
                     'is_super_admin' => 0,
                 ]
             );
