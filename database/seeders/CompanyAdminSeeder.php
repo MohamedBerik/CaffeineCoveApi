@@ -31,7 +31,7 @@ class CompanyAdminSeeder extends Seeder
                 'password' => Hash::make('123456'),
                 'company_id' => 2,
                 'role' => 'admin',
-                'status' => 'active',
+                'status' => 1,
                 'is_super_admin' => false
             ]
         );
