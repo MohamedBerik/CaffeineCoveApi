@@ -59,7 +59,21 @@ Route::post('/login',    [AuthController::class, 'login']);
 Route::middleware('auth:sanctum')->group(function () {
 
     Route::get('/me', function (Request $request) {
-        return response()->json($request->user());
+
+        $user = $request->user();
+
+        return response()->json([
+            'id' => $user->id,
+            'name' => $user->name,
+            'email' => $user->email,
+            'role' => $user->role,
+            'company_id' => $user->company_id,
+            'is_super_admin' => $user->is_super_admin,
+
+            'permissions' => method_exists($user, 'getAllPermissions')
+                ? $user->getAllPermissions()->pluck('name')->values()
+                : [],
+        ]);
     });
 
     Route::post('/logout', function (Request $request) {
