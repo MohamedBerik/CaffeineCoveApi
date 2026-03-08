@@ -59,8 +59,33 @@ Route::post('/login',    [AuthController::class, 'login']);
 Route::middleware('auth:sanctum')->group(function () {
 
     Route::get('/me', function (Request $request) {
-
         $user = $request->user();
+
+        $permissions = [];
+
+        if ($user->is_super_admin || $user->role === 'admin') {
+            $permissions = [
+                'finance.view',
+                'finance.create',
+                'orders.view',
+                'orders.manage',
+                'orders.confirm',
+                'orders.cancel',
+                'payments.refund',
+                'purchases.manage',
+                'purchases.receive',
+                'purchases.return',
+                'appointments.view',
+                'appointments.manage',
+                'appointments.complete',
+                'treatment_plans.view',
+                'treatment_plans.manage',
+                'procedures.view',
+                'procedures.manage',
+                'patients.view',
+                'patients.manage',
+            ];
+        }
 
         return response()->json([
             'id' => $user->id,
@@ -68,11 +93,8 @@ Route::middleware('auth:sanctum')->group(function () {
             'email' => $user->email,
             'role' => $user->role,
             'company_id' => $user->company_id,
-            'is_super_admin' => $user->is_super_admin,
-
-            'permissions' => method_exists($user, 'getAllPermissions')
-                ? $user->getAllPermissions()->pluck('name')->values()
-                : [],
+            'is_super_admin' => (bool) $user->is_super_admin,
+            'permissions' => $permissions,
         ]);
     });
 
