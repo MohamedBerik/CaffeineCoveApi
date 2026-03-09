@@ -597,12 +597,9 @@ class AppointmentController extends Controller
             ->findOrFail($id);
 
         $data = $request->validate([
-            // ✅ total optional لأننا ممكن نحسبه من الخطة
             'total' => ['nullable', 'numeric', 'min:0.01'],
-
             'doctor_name' => ['nullable', 'string', 'max:190'],
             'notes' => ['nullable', 'string'],
-
             'treatment_plan_id' => [
                 'nullable',
                 'integer',
@@ -610,7 +607,6 @@ class AppointmentController extends Controller
             ],
         ]);
 
-        // ✅ fallback product (must exist) لضمان product_id
         $serviceProduct = \App\Models\Product::where('company_id', $companyId)
             ->where('title_en', 'Consultation')
             ->first();
@@ -623,7 +619,6 @@ class AppointmentController extends Controller
         }
 
         return DB::transaction(function () use ($request, $companyId, $data, $appointment, $serviceProduct) {
-
             $appointment = Appointment::query()
                 ->where('company_id', $companyId)
                 ->lockForUpdate()
@@ -652,7 +647,17 @@ class AppointmentController extends Controller
                 ], 409);
             }
 
-            // ✅ Validate plan ownership if provided
+            // ✅ مهم: لا نسمح بإكمال إلا المواعيد scheduled فقط
+            if (!in_array($appointment->status, ['scheduled'], true)) {
+                return response()->json([
+                    'msg' => 'Only scheduled appointments can be completed',
+                    'status' => 422,
+                    'errors' => [
+                        'status' => ['Cancelled or no-show appointments cannot be completed directly.'],
+                    ],
+                ], 422);
+            }
+
             $planId = $data['treatment_plan_id'] ?? null;
             $plan = null;
 
@@ -672,17 +677,14 @@ class AppointmentController extends Controller
                 }
             }
 
-            // ✅ Update appointment meta
             $appointment->update([
                 'doctor_name' => $data['doctor_name'] ?? $appointment->doctor_name,
-                'notes'       => $data['notes'] ?? $appointment->notes,
+                'notes' => $data['notes'] ?? $appointment->notes,
             ]);
 
-            // ✅ Build invoice/order lines
             $lines = [];
 
             if ($plan) {
-                // IMPORTANT: استخدم جدول items الحقيقي بتاعك
                 $items = \App\Models\TreatmentPlanItem::query()
                     ->where('company_id', $companyId)
                     ->where('treatment_plan_id', $plan->id)
@@ -702,18 +704,15 @@ class AppointmentController extends Controller
                 foreach ($items as $it) {
                     $price = (float) $it->price;
 
-                    // ✅ MVP fallback: always use service product to avoid null product_id
-                    // لاحقًا: اربط كل procedure بمنتج مخصوص من catalog
                     $lines[] = [
                         'product_id' => $serviceProduct->id,
-                        'quantity'   => 1,
+                        'quantity' => 1,
                         'unit_price' => $price,
-                        'total'      => $price,
-                        'desc'       => $it->procedure ?? 'Treatment Item',
+                        'total' => $price,
+                        'desc' => $it->procedure ?? 'Treatment Item',
                     ];
                 }
             } else {
-                // no plan: use provided total as 1 line service
                 $total = (float) ($data['total'] ?? 0);
 
                 if ($total <= 0) {
@@ -728,49 +727,48 @@ class AppointmentController extends Controller
 
                 $lines[] = [
                     'product_id' => $serviceProduct->id,
-                    'quantity'   => 1,
+                    'quantity' => 1,
                     'unit_price' => $total,
-                    'total'      => $total,
-                    'desc'       => 'Consultation',
+                    'total' => $total,
+                    'desc' => 'Consultation',
                 ];
             }
 
             $grandTotal = array_sum(array_map(fn($l) => (float) $l['total'], $lines));
 
-            // ✅ Create order (orders has title_en/title_ar columns عندك)
             $order = \App\Models\Order::create([
-                'company_id'   => $companyId,
-                'customer_id'  => $appointment->patient_id,
-                'title_en'     => 'Appointment Services',
-                'title_ar'     => 'خدمات الموعد',
-                'status'       => 'confirmed',
-                'total'        => $grandTotal,
-                'created_by'   => $request->user()->id,
+                'company_id' => $companyId,
+                'customer_id' => $appointment->patient_id,
+                'title_en' => 'Appointment Services',
+                'title_ar' => 'خدمات الموعد',
+                'status' => 'confirmed',
+                'total' => $grandTotal,
+                'created_by' => $request->user()->id,
             ]);
 
             foreach ($lines as $l) {
                 \App\Models\OrderItem::create([
                     'company_id' => $companyId,
-                    'order_id'   => $order->id,
+                    'order_id' => $order->id,
                     'product_id' => $l['product_id'],
-                    'quantity'   => $l['quantity'],
+                    'quantity' => $l['quantity'],
                     'unit_price' => $l['unit_price'],
-                    'total'      => $l['total'],
+                    'total' => $l['total'],
                 ]);
             }
 
             $number = \App\Services\InvoiceNumberService::generate($companyId);
 
             $invoice = \App\Models\Invoice::create([
-                'company_id'        => $companyId,
-                'number'            => $number,
-                'order_id'          => $order->id,
-                'appointment_id'    => $appointment->id,
+                'company_id' => $companyId,
+                'number' => $number,
+                'order_id' => $order->id,
+                'appointment_id' => $appointment->id,
                 'treatment_plan_id' => $plan ? $plan->id : null,
-                'customer_id'       => $appointment->patient_id,
-                'total'             => $grandTotal,
-                'status'            => 'unpaid',
-                'issued_at'         => now(),
+                'customer_id' => $appointment->patient_id,
+                'total' => $grandTotal,
+                'status' => 'unpaid',
+                'issued_at' => now(),
             ]);
 
             foreach ($lines as $l) {
@@ -778,13 +776,12 @@ class AppointmentController extends Controller
                     'company_id' => $companyId,
                     'invoice_id' => $invoice->id,
                     'product_id' => $l['product_id'],
-                    'quantity'   => $l['quantity'],
+                    'quantity' => $l['quantity'],
                     'unit_price' => $l['unit_price'],
-                    'total'      => $l['total'],
+                    'total' => $l['total'],
                 ]);
             }
 
-            // ledger entry
             $exists = CustomerLedgerEntry::query()
                 ->where('company_id', $companyId)
                 ->where('invoice_id', $invoice->id)
@@ -793,16 +790,16 @@ class AppointmentController extends Controller
 
             if (!$exists) {
                 CustomerLedgerEntry::create([
-                    'company_id'   => $companyId,
-                    'customer_id'  => $invoice->customer_id,
-                    'invoice_id'   => $invoice->id,
-                    'payment_id'   => null,
-                    'refund_id'    => null,
-                    'type'         => 'invoice',
-                    'debit'        => $invoice->total,
-                    'credit'       => 0,
-                    'entry_date'   => $invoice->issued_at ?? now(),
-                    'description'  => 'Invoice issued #' . $invoice->number,
+                    'company_id' => $companyId,
+                    'customer_id' => $invoice->customer_id,
+                    'invoice_id' => $invoice->id,
+                    'payment_id' => null,
+                    'refund_id' => null,
+                    'type' => 'invoice',
+                    'debit' => $invoice->total,
+                    'credit' => 0,
+                    'entry_date' => $invoice->issued_at ?? now(),
+                    'description' => 'Invoice issued #' . $invoice->number,
                 ]);
             }
 
@@ -815,10 +812,10 @@ class AppointmentController extends Controller
                 Appointment::class,
                 $appointment->id,
                 [
-                    'invoice_id'        => $invoice->id,
-                    'invoice_number'    => $invoice->number,
+                    'invoice_id' => $invoice->id,
+                    'invoice_number' => $invoice->number,
                     'treatment_plan_id' => $invoice->treatment_plan_id,
-                    'total'             => (float) $invoice->total,
+                    'total' => (float) $invoice->total,
                 ]
             );
 
