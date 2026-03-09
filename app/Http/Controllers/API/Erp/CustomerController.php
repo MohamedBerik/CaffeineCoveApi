@@ -7,6 +7,7 @@ use App\Http\Resources\CustomerResource;
 use App\Models\Customer;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
+use Illuminate\Support\Facades\DB;
 
 class CustomerController extends Controller
 {
@@ -70,37 +71,37 @@ class CustomerController extends Controller
         $companyId = $request->user()->company_id;
 
         $data = $request->validate([
-            'name'  => ['required', 'string', 'min:3', 'max:255'],
+            'name' => ['required', 'string', 'min:3', 'max:255'],
             'email' => [
                 'nullable',
                 'email',
                 'max:255',
                 Rule::unique('customers', 'email')->where(fn($q) => $q->where('company_id', $companyId)),
             ],
-
-            'patient_code'  => ['nullable', 'string', 'max:50'],
-            'phone'         => ['nullable', 'string', 'max:50'],
+            'phone' => ['nullable', 'string', 'max:50'],
             'date_of_birth' => ['nullable', 'date'],
-            'gender'        => ['nullable', Rule::in(['male', 'female'])],
-            'address'       => ['nullable', 'string', 'max:255'],
-            'notes'         => ['nullable', 'string'],
-
-            // جدولك enum "0/1"
+            'gender' => ['nullable', Rule::in(['male', 'female'])],
+            'address' => ['nullable', 'string', 'max:255'],
+            'notes' => ['nullable', 'string'],
             'status' => ['nullable', Rule::in(['0', '1'])],
         ]);
 
-        $customer = Customer::create([
-            'company_id'    => $companyId,
-            'name'          => $data['name'],
-            'email'         => $data['email'] ?? null,
-            'patient_code'  => $data['patient_code'] ?? null,
-            'phone'         => $data['phone'] ?? null,
-            'date_of_birth' => $data['date_of_birth'] ?? null,
-            'gender'        => $data['gender'] ?? null,
-            'address'       => $data['address'] ?? null,
-            'notes'         => $data['notes'] ?? null,
-            'status'        => $data['status'] ?? '1',
-        ]);
+        $customer = DB::transaction(function () use ($companyId, $data) {
+            $patientCode = $this->generateNextPatientCode($companyId);
+
+            return Customer::create([
+                'company_id' => $companyId,
+                'name' => $data['name'],
+                'email' => $data['email'] ?? null,
+                'patient_code' => $patientCode,
+                'phone' => $data['phone'] ?? null,
+                'date_of_birth' => $data['date_of_birth'] ?? null,
+                'gender' => $data['gender'] ?? null,
+                'address' => $data['address'] ?? null,
+                'notes' => $data['notes'] ?? null,
+                'status' => $data['status'] ?? '1',
+            ]);
+        });
 
         return response()->json([
             'msg' => 'Created successfully',
@@ -126,7 +127,7 @@ class CustomerController extends Controller
         }
 
         $data = $request->validate([
-            'name'  => ['sometimes', 'required', 'string', 'min:3', 'max:255'],
+            'name' => ['sometimes', 'required', 'string', 'min:3', 'max:255'],
             'email' => [
                 'sometimes',
                 'nullable',
@@ -136,18 +137,26 @@ class CustomerController extends Controller
                     ->where(fn($q) => $q->where('company_id', $companyId))
                     ->ignore($customer->id),
             ],
-
-            'patient_code'  => ['sometimes', 'nullable', 'string', 'max:50'],
-            'phone'         => ['sometimes', 'nullable', 'string', 'max:50'],
+            'phone' => ['sometimes', 'nullable', 'string', 'max:50'],
             'date_of_birth' => ['sometimes', 'nullable', 'date'],
-            'gender'        => ['sometimes', 'nullable', Rule::in(['male', 'female'])],
-            'address'       => ['sometimes', 'nullable', 'string', 'max:255'],
-            'notes'         => ['sometimes', 'nullable', 'string'],
-
+            'gender' => ['sometimes', 'nullable', Rule::in(['male', 'female'])],
+            'address' => ['sometimes', 'nullable', 'string', 'max:255'],
+            'notes' => ['sometimes', 'nullable', 'string'],
             'status' => ['sometimes', 'nullable', Rule::in(['0', '1'])],
         ]);
 
-        foreach (['name', 'email', 'patient_code', 'phone', 'date_of_birth', 'gender', 'address', 'notes', 'status'] as $field) {
+        foreach (
+            [
+                'name',
+                'email',
+                'phone',
+                'date_of_birth',
+                'gender',
+                'address',
+                'notes',
+                'status'
+            ] as $field
+        ) {
             if (array_key_exists($field, $data)) {
                 $customer->{$field} = $data[$field];
             }
@@ -185,5 +194,23 @@ class CustomerController extends Controller
             'status' => 200,
             'data' => null
         ]);
+    }
+
+    private function generateNextPatientCode(int $companyId): string
+    {
+        $lastCustomer = Customer::query()
+            ->where('company_id', $companyId)
+            ->whereNotNull('patient_code')
+            ->orderByDesc('id')
+            ->lockForUpdate()
+            ->first();
+
+        $nextNumber = 1;
+
+        if ($lastCustomer && preg_match('/(\d+)$/', (string) $lastCustomer->patient_code, $matches)) {
+            $nextNumber = ((int) $matches[1]) + 1;
+        }
+
+        return 'PT-' . str_pad((string) $nextNumber, 5, '0', STR_PAD_LEFT);
     }
 }
