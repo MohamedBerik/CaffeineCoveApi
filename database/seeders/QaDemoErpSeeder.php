@@ -306,8 +306,8 @@ class QaDemoErpSeeder extends Seeder
                 'doctor_name' => $doctor2->name,
                 'appointment_date' => $tomorrow->toDateString(),
                 'appointment_time' => '14:00',
-                'status' => 'in_progress',
-                'notes' => 'QA in-progress appointment',
+                'status' => 'scheduled',
+                'notes' => 'QA scheduled appointment',
                 'created_by' => $adminId,
             ]);
 
