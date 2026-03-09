@@ -555,6 +555,22 @@ class QaDemoErpSeeder extends Seeder
                 'created_at' => now(),
                 'updated_at' => now(),
             ]);
+            DB::table('clinic_settings')->updateOrInsert(
+                ['company_id' => $companyId],
+                [
+                    'clinic_name' => 'QA Clinic',
+                    'phone' => '01000000000',
+                    'email' => 'qa@clinic.test',
+                    'currency' => 'USD',
+                    'timezone' => 'UTC',
+                    'invoice_prefix' => 'INV-QA',
+                    'invoice_start_number' => 1001,
+                    'next_invoice_number' => 1004,
+                    'language' => 'en',
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]
+            );
         });
     }
 }

@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\ClinicSetting;
+use App\Models\Invoice;
 use Illuminate\Support\Facades\DB;
 
 class InvoiceNumberService
@@ -10,7 +11,8 @@ class InvoiceNumberService
     public static function generate(int $companyId): string
     {
         return DB::transaction(function () use ($companyId) {
-            $settings = ClinicSetting::where('company_id', $companyId)
+            $settings = ClinicSetting::query()
+                ->where('company_id', $companyId)
                 ->lockForUpdate()
                 ->firstOrCreate(
                     ['company_id' => $companyId],
@@ -25,17 +27,28 @@ class InvoiceNumberService
                     ]
                 );
 
-            if ((int) $settings->next_invoice_number < (int) $settings->invoice_start_number) {
-                $settings->next_invoice_number = (int) $settings->invoice_start_number;
-                $settings->save();
+            $prefix = trim((string) ($settings->invoice_prefix ?: 'INV'));
+            $startNumber = max(1, (int) ($settings->invoice_start_number ?: 1));
+            $nextNumber = max($startNumber, (int) ($settings->next_invoice_number ?: $startNumber));
+
+            // ✅ safeguard: sync with latest existing invoice number for same company/prefix
+            $lastInvoice = Invoice::query()
+                ->where('company_id', $companyId)
+                ->where('number', 'like', $prefix . '-%')
+                ->orderByDesc('id')
+                ->lockForUpdate()
+                ->first();
+
+            if ($lastInvoice && preg_match('/^' . preg_quote($prefix, '/') . '-(\d+)$/', (string) $lastInvoice->number, $matches)) {
+                $lastUsedNumber = (int) $matches[1];
+                if ($nextNumber <= $lastUsedNumber) {
+                    $nextNumber = $lastUsedNumber + 1;
+                }
             }
 
-            $currentNumber = (int) $settings->next_invoice_number;
-            $prefix = trim((string) ($settings->invoice_prefix ?: 'INV'));
+            $invoiceNumber = sprintf('%s-%04d', $prefix, $nextNumber);
 
-            $invoiceNumber = sprintf('%s-%04d', $prefix, $currentNumber);
-
-            $settings->next_invoice_number = $currentNumber + 1;
+            $settings->next_invoice_number = $nextNumber + 1;
             $settings->save();
 
             return $invoiceNumber;
