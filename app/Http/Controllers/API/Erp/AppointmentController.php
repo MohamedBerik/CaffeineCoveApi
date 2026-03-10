@@ -583,7 +583,7 @@ class AppointmentController extends Controller
     }
 
     /**
-     * COMPLETE APPOINTMENT + CREATE INVOICE (+ optional treatment_plan_id)
+     * COMPLETE APPOINTMENT + CREATE INVOICE + (optional treatment_plan_id)
      * ✅ locks appointment, prevents duplicate invoices
      * ✅ validates treatment plan belongs to same customer
      * ✅ logs appointment.completed
