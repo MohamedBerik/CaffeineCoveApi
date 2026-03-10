@@ -546,9 +546,16 @@ class AppointmentController extends Controller
             ->where('company_id', $companyId)
             ->findOrFail($id);
 
-        if ($appointment->status === 'completed') {
+        if ($appointment->status === 'cancelled') {
+            return response()->json([
+                'msg' => 'Appointment already cancelled',
+                'status' => 409,
+            ], 409);
+        }
+
+        if ($appointment->status !== 'scheduled') {
             throw ValidationException::withMessages([
-                'status' => ['Completed appointments cannot be cancelled.'],
+                'status' => ['Only scheduled appointments can be cancelled.'],
             ]);
         }
 
@@ -839,6 +846,13 @@ class AppointmentController extends Controller
             ->where('company_id', $companyId)
             ->findOrFail($id);
 
+        if ($appointment->status === 'no_show') {
+            return response()->json([
+                'msg' => 'Appointment already marked as no-show',
+                'status' => 409,
+            ], 409);
+        }
+
         if ($appointment->status !== 'scheduled') {
             throw ValidationException::withMessages([
                 'status' => ['Only scheduled appointments can be marked as no-show.'],
@@ -903,10 +917,9 @@ class AppointmentController extends Controller
         ]);
 
         $newDate     = Carbon::parse($data['appointment_date'])->toDateString();
-        $newTime     = $data['appointment_time']; // H:i
+        $newTime     = $data['appointment_time'];
         $newDoctorId = (int) $data['doctor_id'];
 
-        // ✅ Validate against target doctor's working hours + slot interval
         $doctor = Doctor::query()
             ->where('company_id', $companyId)
             ->where('is_active', true)
@@ -973,7 +986,6 @@ class AppointmentController extends Controller
             $blockedStatuses,
             $doctor
         ) {
-            // 1) Lock current appointment row
             $from = Appointment::query()
                 ->where('company_id', $companyId)
                 ->lockForUpdate()
@@ -986,11 +998,16 @@ class AppointmentController extends Controller
                 ], 422);
             }
 
-            // No-op: same slot
             $fromDate = Carbon::parse($from->appointment_date)->toDateString();
-            $fromTime = $from->appointment_time ? substr((string) $from->appointment_time, 0, 5) : null;
+            $fromTime = $from->appointment_time
+                ? substr((string) $from->appointment_time, 0, 5)
+                : null;
 
-            if ((int) $from->doctor_id === (int) $newDoctorId && $fromDate === $newDate && $fromTime === $newTime) {
+            if (
+                (int) $from->doctor_id === (int) $newDoctorId &&
+                $fromDate === $newDate &&
+                $fromTime === $newTime
+            ) {
                 return response()->json([
                     'msg' => 'Appointment already in the requested slot',
                     'status' => 200,
@@ -1001,7 +1018,6 @@ class AppointmentController extends Controller
                 ], 200);
             }
 
-            // 2) Lock target slot row (if any)
             $to = Appointment::query()
                 ->where('company_id', $companyId)
                 ->where('doctor_id', $newDoctorId)
@@ -1010,7 +1026,6 @@ class AppointmentController extends Controller
                 ->lockForUpdate()
                 ->first();
 
-            // 3) If target exists and is blocking => reject
             if ($to && in_array($to->status, $blockedStatuses, true)) {
                 return response()->json([
                     'msg' => 'Time slot already booked',
@@ -1021,21 +1036,19 @@ class AppointmentController extends Controller
                 ], 422);
             }
 
-            // Save "old" details for log
             $old = [
+                'old_status'    => $from->status,
                 'old_doctor_id' => (int) $from->doctor_id,
                 'old_date'      => Carbon::parse($from->appointment_date)->toDateString(),
                 'old_time'      => substr((string) $from->appointment_time, 0, 5),
             ];
 
-            // If doctor changes, derive doctor_name from new doctor (avoid stale name)
-            $newDoctorName = ($from->doctor_id == $newDoctorId)
+            $newDoctorName = ((int) $from->doctor_id === (int) $newDoctorId)
                 ? $from->doctor_name
                 : ($doctor->name ?? 'Doctor');
 
-            // 4) CASE A: target exists and is cancelled => reuse target row + cancel old row
+            // CASE A: target slot موجود لكنه cancelled → نعيد استخدامه
             if ($to && $to->status === 'cancelled') {
-
                 $to->update([
                     'patient_id'       => $from->patient_id,
                     'doctor_id'        => $newDoctorId,
@@ -1058,6 +1071,7 @@ class AppointmentController extends Controller
                     Appointment::class,
                     $to->id,
                     array_merge($old, [
+                        'new_status'          => 'scheduled',
                         'new_doctor_id'       => $newDoctorId,
                         'new_date'            => $newDate,
                         'new_time'            => $newTime,
@@ -1077,13 +1091,14 @@ class AppointmentController extends Controller
                 ], 200);
             }
 
-            // 5) CASE B: target does not exist => update current row in place
+            // CASE B: target slot غير موجود → نعدل نفس الصف
             try {
                 $from->update([
                     'doctor_id'        => $newDoctorId,
                     'doctor_name'      => $newDoctorName,
                     'appointment_date' => $newDate,
                     'appointment_time' => $newTime,
+                    'status'           => 'scheduled',
                 ]);
             } catch (QueryException $e) {
                 if ((string) $e->getCode() === '23000') {
@@ -1105,6 +1120,7 @@ class AppointmentController extends Controller
                 Appointment::class,
                 $from->id,
                 array_merge($old, [
+                    'new_status'          => 'scheduled',
                     'new_doctor_id'       => $newDoctorId,
                     'new_date'            => $newDate,
                     'new_time'            => $newTime,
