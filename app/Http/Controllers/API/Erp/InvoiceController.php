@@ -146,20 +146,18 @@ class InvoiceController extends Controller
         $totalCashReceived = $payments->sum(fn($p) => (float) $p->amount);
 
         return [
-            'invoice' => [
-                'id' => $invoice->id,
-                'number' => $invoice->number,
-                'issued_at' => $invoice->issued_at,
-                'total' => $invoice->total,
-                'status' => $invoice->status,
-                'appointment_id' => $invoice->appointment_id,
-                'order_id'       => $invoice->order_id,
-                'customer' => $invoice->customer,
-                'items' => $invoice->items ?? [],
+            'id' => $invoice->id,
+            'number' => $invoice->number,
+            'issued_at' => $invoice->issued_at,
+            'total' => $invoice->total,
+            'status' => $invoice->status,
+            'appointment_id' => $invoice->appointment_id,
+            'order_id' => $invoice->order_id,
+            'customer' => $invoice->customer,
+            'customer_id' => $invoice->customer_id,
 
-                // في full endpoint هتكون loaded، في show العادي ممكن تكون [] وده طبيعي
-                'journal_entries' => $invoice->journalEntries ?? [],
-            ],
+            'items' => $invoice->items ?? [],
+            'journal_entries' => $invoice->journalEntries ?? [],
 
             // ✅ invoice computed (صح)
             'total_paid' => (float) $totalApplied,              // paid toward invoice ONLY
