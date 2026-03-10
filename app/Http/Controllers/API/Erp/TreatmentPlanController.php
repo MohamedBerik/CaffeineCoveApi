@@ -23,7 +23,6 @@ class TreatmentPlanController extends Controller
             ->orderByDesc('id')
             ->paginate(20);
 
-        // enrich with computed totals (paid/refunded/net/remaining) from invoices
         $plans->getCollection()->transform(function ($plan) use ($companyId) {
             return $this->planResponse($plan, $companyId);
         });
@@ -59,18 +58,17 @@ class TreatmentPlanController extends Controller
                 'integer',
                 Rule::exists('customers', 'id')->where(fn($q) => $q->where('company_id', $companyId)),
             ],
-            'title'       => ['required', 'string', 'max:190'],
-            'notes'       => ['nullable', 'string'],
-            'total_cost'  => ['required', 'numeric', 'min:0'],
+            'title' => ['required', 'string', 'max:190'],
+            'notes' => ['nullable', 'string'],
         ]);
 
         $plan = TreatmentPlan::create([
-            'company_id'  => $companyId,
+            'company_id' => $companyId,
             'customer_id' => $data['customer_id'],
-            'title'       => $data['title'],
-            'notes'       => $data['notes'] ?? null,
-            'total_cost'  => $data['total_cost'],
-            'status'      => 'active',
+            'title' => $data['title'],
+            'notes' => $data['notes'] ?? null,
+            'total_cost' => 0,
+            'status' => 'active',
         ]);
 
         return response()->json([
@@ -86,13 +84,16 @@ class TreatmentPlanController extends Controller
         $plan = TreatmentPlan::where('company_id', $companyId)->findOrFail($id);
 
         $data = $request->validate([
-            'title'      => ['nullable', 'string', 'max:190'],
-            'notes'      => ['nullable', 'string'],
-            'total_cost' => ['nullable', 'numeric', 'min:0'],
-            'status'     => ['nullable', 'in:active,completed,cancelled'],
+            'title' => ['nullable', 'string', 'max:190'],
+            'notes' => ['nullable', 'string'],
+            'status' => ['nullable', 'in:active,completed,cancelled'],
         ]);
 
-        $plan->update($data);
+        $plan->update([
+            'title' => $data['title'] ?? $plan->title,
+            'notes' => $data['notes'] ?? $plan->notes,
+            'status' => $data['status'] ?? $plan->status,
+        ]);
 
         return response()->json([
             'msg' => 'Treatment plan updated',
@@ -106,7 +107,6 @@ class TreatmentPlanController extends Controller
 
         $plan = TreatmentPlan::where('company_id', $companyId)->findOrFail($id);
 
-        // safety: prevent delete if linked invoices exist
         $hasInvoices = Invoice::where('company_id', $companyId)
             ->where('treatment_plan_id', $plan->id)
             ->exists();
@@ -122,11 +122,6 @@ class TreatmentPlanController extends Controller
         return response()->json(['msg' => 'Treatment plan deleted']);
     }
 
-    /**
-     * ✅ Invoice-based: totals for plan based on invoices payments (applied_amount)
-     * ✅ refunds counted ONLY when applies_to=invoice
-     * ❌ refunds applies_to=credit NOT included here
-     */
     private function planResponse(TreatmentPlan $plan, int $companyId, bool $withInvoices = false): array
     {
         $invoiceIds = $withInvoices && $plan->relationLoaded('invoices')
@@ -158,22 +153,21 @@ class TreatmentPlanController extends Controller
         $remaining = max(0, (float) $plan->total_cost - $netPaid);
 
         $resp = [
-            'id'         => $plan->id,
+            'id' => $plan->id,
             'customer_id' => $plan->customer_id,
-            'title'      => $plan->title,
-            'notes'      => $plan->notes,
+            'title' => $plan->title,
+            'notes' => $plan->notes,
             'total_cost' => (float) $plan->total_cost,
-            'status'     => $plan->status,
+            'status' => $plan->status,
             'created_at' => $plan->created_at,
             'updated_at' => $plan->updated_at,
 
-            'customer'   => $plan->relationLoaded('customer') ? $plan->customer : null,
+            'customer' => $plan->relationLoaded('customer') ? $plan->customer : null,
 
-            // computed (invoice-based)
-            'total_paid'     => (float) $totalApplied,
+            'total_paid' => (float) $totalApplied,
             'total_refunded' => (float) $totalRefundedInvoice,
-            'net_paid'       => (float) $netPaid,
-            'remaining'      => (float) $remaining,
+            'net_paid' => (float) $netPaid,
+            'remaining' => (float) $remaining,
         ];
 
         if ($withInvoices) {
@@ -183,11 +177,6 @@ class TreatmentPlanController extends Controller
         return $resp;
     }
 
-    /**
-     * ✅ Plan Summary (Invoice-based)
-     * - paid = payments.applied_amount
-     * - refunded = refunds where applies_to=invoice
-     */
     public function summary(Request $request, $id)
     {
         $companyId = $request->user()->company_id;
@@ -259,8 +248,8 @@ class TreatmentPlanController extends Controller
 
         $invoiceRows = $invoices->map(function ($inv) use ($paidByInvoice, $refundedByInvoice) {
             $paid = (float) ($paidByInvoice[$inv->id] ?? 0);
-            $ref  = (float) ($refundedByInvoice[$inv->id] ?? 0);
-            $net  = $paid - $ref;
+            $ref = (float) ($refundedByInvoice[$inv->id] ?? 0);
+            $net = $paid - $ref;
 
             return [
                 'id' => $inv->id,
@@ -278,9 +267,9 @@ class TreatmentPlanController extends Controller
         });
 
         $totalInvoiced = (float) $invoices->sum(fn($i) => (float) $i->total);
-        $totalPaid     = (float) $invoiceRows->sum('total_paid');
+        $totalPaid = (float) $invoiceRows->sum('total_paid');
         $totalRefunded = (float) $invoiceRows->sum('total_refunded');
-        $netPaid       = $totalPaid - $totalRefunded;
+        $netPaid = $totalPaid - $totalRefunded;
         $remainingOnPlan = max(0, (float) $plan->total_cost - $netPaid);
 
         return response()->json([
@@ -309,19 +298,6 @@ class TreatmentPlanController extends Controller
         ]);
     }
 
-    /**
-     * ✅ NEW: Cash summary for a treatment plan (cash-in / cash-out)
-     *
-     * - cash_in: SUM(payments.amount) for payments on invoices of this plan
-     * - cash_out_invoice_refunds: refunds applies_to=invoice for those payments
-     * - cash_out_credit_refunds: refunds applies_to=credit for those payments
-     * - net_cash = cash_in - (cash_out_invoice_refunds + cash_out_credit_refunds)
-     *
-     * Plus customer wallet balance from customer_credits:
-     * - credit_issued (type=credit)
-     * - credit_used   (type=debit)
-     * - net_credit
-     */
     public function cashSummary(Request $request, $id)
     {
         $companyId = $request->user()->company_id;
@@ -332,7 +308,6 @@ class TreatmentPlanController extends Controller
             ->where('treatment_plan_id', $plan->id)
             ->pluck('id');
 
-        // No invoices => still return wallet
         if ($invoiceIds->isEmpty()) {
             $creditIssued = (float) DB::table('customer_credits')
                 ->where('company_id', $companyId)
@@ -367,13 +342,11 @@ class TreatmentPlanController extends Controller
             ]);
         }
 
-        // cash in = total received money on payments for those invoices
         $cashIn = (float) DB::table('payments')
             ->where('company_id', $companyId)
             ->whereIn('invoice_id', $invoiceIds)
             ->sum('amount');
 
-        // cash out invoice refunds
         $cashOutInvoiceRefunds = (float) DB::table('payment_refunds')
             ->join('payments', 'payments.id', '=', 'payment_refunds.payment_id')
             ->where('payments.company_id', $companyId)
@@ -382,7 +355,6 @@ class TreatmentPlanController extends Controller
             ->where('payment_refunds.applies_to', 'invoice')
             ->sum('payment_refunds.amount');
 
-        // cash out credit refunds (THIS is what we separate)
         $cashOutCreditRefunds = (float) DB::table('payment_refunds')
             ->join('payments', 'payments.id', '=', 'payment_refunds.payment_id')
             ->where('payments.company_id', $companyId)
@@ -393,7 +365,6 @@ class TreatmentPlanController extends Controller
 
         $netCash = $cashIn - ($cashOutInvoiceRefunds + $cashOutCreditRefunds);
 
-        // wallet
         $creditIssued = (float) DB::table('customer_credits')
             ->where('company_id', $companyId)
             ->where('customer_id', $plan->customer_id)
@@ -477,6 +448,8 @@ class TreatmentPlanController extends Controller
             'price' => $price,
         ]);
 
+        $this->recalculatePlanTotal($companyId, $plan->id);
+
         return response()->json([
             'msg' => 'Item added',
             'status' => 201,
@@ -499,7 +472,6 @@ class TreatmentPlanController extends Controller
         ]);
 
         if (isset($data['procedure_id'])) {
-
             $procedure = Procedure::where('company_id', $companyId)
                 ->findOrFail($data['procedure_id']);
 
@@ -518,6 +490,8 @@ class TreatmentPlanController extends Controller
             'price' => $data['price'] ?? $item->price,
         ]);
 
+        $this->recalculatePlanTotal($companyId, $item->treatment_plan_id);
+
         return response()->json([
             'msg' => 'Item updated',
             'status' => 200,
@@ -530,11 +504,31 @@ class TreatmentPlanController extends Controller
         $companyId = $request->user()->company_id;
 
         $item = TreatmentPlanItem::where('company_id', $companyId)->findOrFail($itemId);
+        $planId = $item->treatment_plan_id;
+
         $item->delete();
+
+        $this->recalculatePlanTotal($companyId, $planId);
 
         return response()->json([
             'msg' => 'Item deleted',
             'status' => 200,
         ]);
+    }
+
+    private function recalculatePlanTotal(int $companyId, int $planId): void
+    {
+        $sum = (float) TreatmentPlanItem::query()
+            ->where('company_id', $companyId)
+            ->where('treatment_plan_id', $planId)
+            ->sum('price');
+
+        TreatmentPlan::query()
+            ->where('company_id', $companyId)
+            ->where('id', $planId)
+            ->update([
+                'total_cost' => $sum,
+                'updated_at' => now(),
+            ]);
     }
 }
