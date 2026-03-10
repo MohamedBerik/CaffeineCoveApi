@@ -134,9 +134,20 @@ class InvoicePaymentController extends Controller
             }
 
             // Accounts
-            $cashAccount   = Account::where('company_id', $companyId)->where('code', '1000')->firstOrFail();
-            $arAccount     = Account::where('company_id', $companyId)->where('code', '1100')->firstOrFail();
-            $creditAccount = Account::where('company_id', $companyId)->where('code', '2100')->firstOrFail();
+            $cashAccount = Account::where('company_id', $companyId)->where('code', '1000')->first();
+            $arAccount = Account::where('company_id', $companyId)->where('code', '1100')->first();
+            $creditAccount = Account::where('company_id', $companyId)->where('code', '2100')->first();
+
+            if (!$cashAccount || !$arAccount || !$creditAccount) {
+                return response()->json([
+                    'msg' => 'Required accounting accounts are missing for this company.',
+                    'missing_accounts' => [
+                        'cash_1000' => !$cashAccount,
+                        'ar_1100' => !$arAccount,
+                        'customer_credit_2100' => !$creditAccount,
+                    ],
+                ], 422);
+            }
 
             // Accounting entry:
             // Dr Cash = full amount
