@@ -1467,11 +1467,14 @@ class AppointmentController extends Controller
             'treatment_plan_id' => [
                 'nullable',
                 'integer',
-                Rule::exists('treatment_plans', 'id')->where(fn($q) => $q->where('company_id', $companyId)),
+                Rule::exists('treatment_plans', 'id')->where(
+                    fn($q) => $q->where('company_id', $companyId)
+                ),
             ],
         ]);
 
-        $serviceProduct = \App\Models\Product::where('company_id', $companyId)
+        $serviceProduct = \App\Models\Product::query()
+            ->where('company_id', $companyId)
             ->where('title_en', 'Consultation')
             ->first();
 
@@ -1505,9 +1508,17 @@ class AppointmentController extends Controller
                 ], 422);
             }
 
+            // ✅ لو الموعد ناتج من Start Procedure
+            $linkedPlanItem = \App\Models\TreatmentPlanItem::query()
+                ->where('company_id', $companyId)
+                ->where('appointment_id', $appointment->id)
+                ->lockForUpdate()
+                ->first();
+
             $planId = $data['treatment_plan_id'] ?? null;
             $plan = null;
 
+            // 1) لو اليوزر أرسل treatment_plan_id يدويًا
             if ($planId) {
                 $plan = TreatmentPlan::query()
                     ->where('company_id', $companyId)
@@ -1524,6 +1535,23 @@ class AppointmentController extends Controller
                 }
             }
 
+            // 2) ✅ Auto-detect الخطة من الـ linked item
+            if (!$plan && $linkedPlanItem && $linkedPlanItem->treatment_plan_id) {
+                $plan = TreatmentPlan::query()
+                    ->where('company_id', $companyId)
+                    ->find($linkedPlanItem->treatment_plan_id);
+
+                if ($plan && (int) $plan->customer_id !== (int) $appointment->patient_id) {
+                    return response()->json([
+                        'msg' => 'Linked treatment plan does not belong to this customer',
+                        'status' => 422,
+                        'errors' => [
+                            'treatment_plan_id' => ['Linked treatment plan customer_id mismatch.'],
+                        ],
+                    ], 422);
+                }
+            }
+
             $appointment->update([
                 'doctor_name' => $data['doctor_name'] ?? $appointment->doctor_name,
                 'notes' => $data['notes'] ?? $appointment->notes,
@@ -1531,18 +1559,21 @@ class AppointmentController extends Controller
 
             $total = (float) ($data['total'] ?? 0);
 
-            // ✅ consultation only: no treatment invoice
+            // ✅ consultation only مسموح فقط لو الموعد ليس treatment appointment
             if (!$plan && $total <= 0) {
-                $appointment->update(['status' => 'completed']);
+                if ($linkedPlanItem) {
+                    return response()->json([
+                        'msg' => 'This treatment appointment requires billing before completion',
+                        'status' => 422,
+                        'errors' => [
+                            'treatment_plan_id' => [
+                                'Provide total or link a valid treatment plan before completing this started procedure appointment.',
+                            ],
+                        ],
+                    ], 422);
+                }
 
-                // ✅ لو الموعد مرتبط بـ treatment_plan_item نعلّمه completed
-                \App\Models\TreatmentPlanItem::query()
-                    ->where('company_id', $companyId)
-                    ->where('appointment_id', $appointment->id)
-                    ->update([
-                        'status' => 'completed',
-                        'completed_at' => now(),
-                    ]);
+                $appointment->update(['status' => 'completed']);
 
                 ActivityLogger::log(
                     $companyId,
@@ -1570,8 +1601,7 @@ class AppointmentController extends Controller
                 ]);
             }
 
-            // ✅ لا نمنع بسبب consultation invoice
-            // ✅ نمنع فقط treatment/services invoice سابق لنفس الموعد
+            // ✅ امنع فقط تكرار فاتورة treatment/service لنفس الموعد
             $existingTreatmentInvoice = Invoice::query()
                 ->where('company_id', $companyId)
                 ->where('appointment_id', $appointment->id)
@@ -1594,32 +1624,49 @@ class AppointmentController extends Controller
             $lines = [];
 
             if ($plan) {
-                $items = \App\Models\TreatmentPlanItem::query()
-                    ->where('company_id', $companyId)
-                    ->where('treatment_plan_id', $plan->id)
-                    ->orderBy('id', 'asc')
-                    ->get();
-
-                if ($items->isEmpty()) {
-                    return response()->json([
-                        'msg' => 'Treatment plan has no items',
-                        'status' => 422,
-                        'errors' => [
-                            'treatment_plan_id' => ['Treatment plan must have at least 1 item to complete appointment.'],
-                        ],
-                    ], 422);
-                }
-
-                foreach ($items as $it) {
-                    $price = (float) $it->price;
+                // ✅ لو الموعد ناتج من Start Procedure ومعاه item مربوط
+                // الأفضل نفوتر الـ item نفسه فقط
+                if ($linkedPlanItem) {
+                    $price = (float) $linkedPlanItem->price;
 
                     $lines[] = [
                         'product_id' => $serviceProduct->id,
                         'quantity' => 1,
                         'unit_price' => $price,
                         'total' => $price,
-                        'desc' => $it->procedure ?? 'Treatment Item',
+                        'desc' => $linkedPlanItem->procedure ?? 'Treatment Item',
                     ];
+                } else {
+                    // ✅ سلوك قديم: plan كامل
+                    $items = \App\Models\TreatmentPlanItem::query()
+                        ->where('company_id', $companyId)
+                        ->where('treatment_plan_id', $plan->id)
+                        ->orderBy('id', 'asc')
+                        ->get();
+
+                    if ($items->isEmpty()) {
+                        return response()->json([
+                            'msg' => 'Treatment plan has no items',
+                            'status' => 422,
+                            'errors' => [
+                                'treatment_plan_id' => [
+                                    'Treatment plan must have at least 1 item to complete appointment.',
+                                ],
+                            ],
+                        ], 422);
+                    }
+
+                    foreach ($items as $it) {
+                        $price = (float) $it->price;
+
+                        $lines[] = [
+                            'product_id' => $serviceProduct->id,
+                            'quantity' => 1,
+                            'unit_price' => $price,
+                            'total' => $price,
+                            'desc' => $it->procedure ?? 'Treatment Item',
+                        ];
+                    }
                 }
             } else {
                 if ($total <= 0) {
@@ -1712,14 +1759,13 @@ class AppointmentController extends Controller
 
             $appointment->update(['status' => 'completed']);
 
-            // ✅ لو الموعد ده ناتج من Start Procedure، نكمل الـ item
-            \App\Models\TreatmentPlanItem::query()
-                ->where('company_id', $companyId)
-                ->where('appointment_id', $appointment->id)
-                ->update([
+            // ✅ أكمل الـ item المرتبط بهذا الموعد
+            if ($linkedPlanItem) {
+                $linkedPlanItem->update([
                     'status' => 'completed',
                     'completed_at' => now(),
                 ]);
+            }
 
             ActivityLogger::log(
                 $companyId,
@@ -1732,6 +1778,7 @@ class AppointmentController extends Controller
                     'invoice_number' => $invoice->number,
                     'treatment_plan_id' => $invoice->treatment_plan_id,
                     'total' => (float) $invoice->total,
+                    'treatment_plan_item_id' => $linkedPlanItem?->id,
                 ]
             );
 
@@ -1742,6 +1789,7 @@ class AppointmentController extends Controller
                 'order_id' => $order->id,
                 'invoice_number' => $invoice->number,
                 'treatment_plan_id' => $invoice->treatment_plan_id,
+                'treatment_plan_item_id' => $linkedPlanItem?->id,
                 'total' => (float) $invoice->total,
             ]);
         });
