@@ -55,17 +55,30 @@ class DentalRecordController extends Controller
             'customer_id' => [
                 'required',
                 'integer',
-                Rule::exists('customers', 'id')->where(fn($q) => $q->where('company_id', $companyId)),
+                Rule::exists('customers', 'id')->where(
+                    fn($q) => $q->where('company_id', $companyId)
+                ),
             ],
             'appointment_id' => [
                 'nullable',
                 'integer',
-                Rule::exists('appointments', 'id')->where(fn($q) => $q->where('company_id', $companyId)),
+                Rule::exists('appointments', 'id')->where(
+                    fn($q) => $q->where('company_id', $companyId)
+                ),
+            ],
+            'doctor_id' => [
+                'nullable',
+                'integer',
+                Rule::exists('doctors', 'id')->where(
+                    fn($q) => $q->where('company_id', $companyId)->where('is_active', true)
+                ),
             ],
             'procedure_id' => [
                 'nullable',
                 'integer',
-                Rule::exists('procedures', 'id')->where(fn($q) => $q->where('company_id', $companyId)),
+                Rule::exists('procedures', 'id')->where(
+                    fn($q) => $q->where('company_id', $companyId)
+                ),
             ],
             'tooth_number' => ['required', 'string', 'max:10'],
             'surface' => ['nullable', 'string', 'max:50'],
@@ -77,6 +90,7 @@ class DentalRecordController extends Controller
             'company_id' => $companyId,
             'customer_id' => $data['customer_id'],
             'appointment_id' => $data['appointment_id'] ?? null,
+            'doctor_id' => $data['doctor_id'] ?? null,
             'procedure_id' => $data['procedure_id'] ?? null,
             'tooth_number' => $data['tooth_number'],
             'surface' => $data['surface'] ?? null,
@@ -90,6 +104,7 @@ class DentalRecordController extends Controller
             'data' => $record->load([
                 'customer:id,name,email,company_id',
                 'appointment:id,company_id,appointment_date,appointment_time,status',
+                'doctor:id,name,company_id',
                 'procedure:id,company_id,name,default_price',
             ]),
         ], 201);

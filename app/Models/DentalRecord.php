@@ -15,6 +15,7 @@ class DentalRecord extends Model
         'company_id',
         'customer_id',
         'appointment_id',
+        'doctor_id',
         'procedure_id',
         'tooth_number',
         'surface',
@@ -35,5 +36,10 @@ class DentalRecord extends Model
     public function procedure()
     {
         return $this->belongsTo(Procedure::class);
+    }
+
+    public function doctor()
+    {
+        return $this->belongsTo(Doctor::class);
     }
 }
