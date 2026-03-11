@@ -10,6 +10,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use App\Models\TreatmentPlanItem;
+use App\Services\ActivityLogger;
 
 class TreatmentPlanController extends Controller
 {
