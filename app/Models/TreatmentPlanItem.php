@@ -20,7 +20,21 @@ class TreatmentPlanItem extends Model
         'surface',
         'notes',
         'price',
+        'status',
+        'appointment_id',
+        'started_at',
+        'completed_at',
     ];
+
+    protected $casts = [
+        'started_at' => 'datetime',
+        'completed_at' => 'datetime',
+    ];
+
+    public function appointment()
+    {
+        return $this->belongsTo(\App\Models\Appointment::class);
+    }
 
     public function plan()
     {

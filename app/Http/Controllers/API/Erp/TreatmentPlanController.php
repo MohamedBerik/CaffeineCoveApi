@@ -531,4 +531,160 @@ class TreatmentPlanController extends Controller
                 'updated_at' => now(),
             ]);
     }
+
+    public function startItem(Request $request, $itemId)
+    {
+        $companyId = $request->user()->company_id;
+
+        $data = $request->validate([
+            'doctor_id' => ['nullable', 'integer'],
+            'appointment_date' => ['required', 'date'],
+            'appointment_time' => ['required', 'date_format:H:i'],
+            'notes' => ['nullable', 'string'],
+        ]);
+
+        return DB::transaction(function () use ($request, $companyId, $itemId, $data) {
+            $item = TreatmentPlanItem::query()
+                ->where('company_id', $companyId)
+                ->lockForUpdate()
+                ->findOrFail($itemId);
+
+            if ($item->status === 'completed') {
+                return response()->json([
+                    'msg' => 'This procedure is already completed',
+                    'status' => 409,
+                ], 409);
+            }
+
+            if ($item->status === 'in_progress' && $item->appointment_id) {
+                return response()->json([
+                    'msg' => 'This procedure is already in progress',
+                    'status' => 409,
+                    'appointment_id' => $item->appointment_id,
+                ], 409);
+            }
+
+            $plan = TreatmentPlan::query()
+                ->where('company_id', $companyId)
+                ->findOrFail($item->treatment_plan_id);
+
+            if (!empty($data['doctor_id'])) {
+                $doctor = \App\Models\Doctor::query()
+                    ->where('company_id', $companyId)
+                    ->where('is_active', true)
+                    ->findOrFail((int) $data['doctor_id']);
+            } else {
+                $doctor = \App\Models\Doctor::query()
+                    ->where('company_id', $companyId)
+                    ->where('is_active', true)
+                    ->orderBy('id', 'asc')
+                    ->first();
+
+                if (!$doctor) {
+                    return response()->json([
+                        'msg' => 'No active doctor found. Create a doctor first.',
+                        'status' => 422,
+                    ], 422);
+                }
+            }
+
+            $date = \Carbon\Carbon::parse($data['appointment_date'])->toDateString();
+            $time = $data['appointment_time'];
+
+            $startTime = $doctor->work_start ?? '09:00';
+            $endTime = $doctor->work_end ?? '17:00';
+            $slotMinutes = (int) ($doctor->slot_minutes ?? 30);
+
+            $start = \Carbon\Carbon::parse("$date $startTime");
+            $end = \Carbon\Carbon::parse("$date $endTime");
+            $requested = \Carbon\Carbon::parse("$date $time");
+
+            if ($requested->lt($start) || $requested->gte($end)) {
+                return response()->json([
+                    'msg' => 'Time is outside working hours.',
+                    'status' => 422,
+                    'errors' => [
+                        'appointment_time' => ['Time is outside working hours.'],
+                    ],
+                ], 422);
+            }
+
+            $diff = $start->diffInMinutes($requested);
+            if ($slotMinutes <= 0 || ($diff % $slotMinutes !== 0)) {
+                return response()->json([
+                    'msg' => 'Time must match slot interval.',
+                    'status' => 422,
+                    'errors' => [
+                        'appointment_time' => ['Time must match slot interval.'],
+                    ],
+                ], 422);
+            }
+
+            $existing = \App\Models\Appointment::query()
+                ->where('company_id', $companyId)
+                ->where('doctor_id', $doctor->id)
+                ->whereDate('appointment_date', $date)
+                ->whereTime('appointment_time', $time)
+                ->lockForUpdate()
+                ->first();
+
+            if ($existing && in_array($existing->status, ['scheduled', 'completed', 'no_show'], true)) {
+                return response()->json([
+                    'msg' => 'Time slot already booked',
+                    'status' => 422,
+                    'errors' => [
+                        'appointment_time' => ['This time slot is already booked for this doctor.'],
+                    ],
+                ], 422);
+            }
+
+            $appointment = \App\Models\Appointment::create([
+                'company_id' => $companyId,
+                'patient_id' => $plan->customer_id,
+                'doctor_id' => $doctor->id,
+                'doctor_name' => $doctor->name ?? 'Doctor',
+                'appointment_date' => $date,
+                'appointment_time' => $time,
+                'status' => 'scheduled',
+                'notes' => $data['notes'] ?? $item->notes,
+                'created_by' => $request->user()->id,
+            ]);
+
+            $item->update([
+                'status' => 'in_progress',
+                'appointment_id' => $appointment->id,
+                'started_at' => now(),
+            ]);
+
+            ActivityLogger::log(
+                $companyId,
+                $request->user(),
+                'treatment_plan_item.started',
+                TreatmentPlanItem::class,
+                $item->id,
+                [
+                    'treatment_plan_id' => $item->treatment_plan_id,
+                    'appointment_id' => $appointment->id,
+                    'patient_id' => $plan->customer_id,
+                    'doctor_id' => $doctor->id,
+                    'procedure_id' => $item->procedure_id,
+                    'procedure' => $item->procedure,
+                    'date' => $date,
+                    'time' => $time,
+                ]
+            );
+
+            return response()->json([
+                'msg' => 'Procedure started successfully',
+                'status' => 201,
+                'data' => [
+                    'item' => $item->fresh(),
+                    'appointment' => $appointment->load([
+                        'patient:id,name,email,company_id',
+                        'doctor:id,name,company_id,work_start,work_end,slot_minutes',
+                    ]),
+                ],
+            ], 201);
+        });
+    }
 }
