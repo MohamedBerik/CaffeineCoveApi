@@ -60,12 +60,6 @@ class AppointmentController extends Controller
         ]);
     }
 
-    /**
-     * ERP-style create (admin/internal)
-     * ✅ required doctor_id + tenant scoped patient/doctor
-     * ✅ collision check by doctor_id + whereTime
-     * ✅ REBOOK if existing slot is cancelled (update same row)
-     */
     public function store(Request $request)
     {
         $companyId = $request->user()->company_id;
@@ -248,11 +242,6 @@ class AppointmentController extends Controller
         ]);
     }
 
-    /**
-     * ✅ update supports doctor_id and uses whereTime collision check
-     * ✅ keeps doctor_name stable unless doctor_id changed or doctor_name explicitly emptied
-     * ✅ logs appointment.updated
-     */
     public function update(Request $request, $id)
     {
         $companyId = $request->user()->company_id;
@@ -353,190 +342,182 @@ class AppointmentController extends Controller
         ]);
     }
 
-    /**
-     * Public booking endpoint
-     * ✅ doctor_id optional
-     * ✅ validates within working hours + slot interval
-     * ✅ collision check uses doctor_id + whereTime
-     * ✅ REBOOK cancelled slot by updating same record
-     * ✅ logs appointment.booked OR appointment.rebooked (no duplicates)
-     */
-    public function book(Request $request)
-    {
-        $companyId = $request->user()->company_id;
+    // public function book(Request $request)
+    // {
+    //     $companyId = $request->user()->company_id;
 
-        $data = $request->validate([
-            'patient_id' => [
-                'required',
-                'integer',
-                Rule::exists('customers', 'id')->where(fn($q) => $q->where('company_id', $companyId)),
-            ],
-            'doctor_id' => ['nullable', 'integer'],
-            'doctor_name' => ['nullable', 'string', 'max:190'],
-            'appointment_date' => ['required', 'date'],
-            'appointment_time' => ['required', 'date_format:H:i'],
-            'notes' => ['nullable', 'string'],
-        ]);
+    //     $data = $request->validate([
+    //         'patient_id' => [
+    //             'required',
+    //             'integer',
+    //             Rule::exists('customers', 'id')->where(fn($q) => $q->where('company_id', $companyId)),
+    //         ],
+    //         'doctor_id' => ['nullable', 'integer'],
+    //         'doctor_name' => ['nullable', 'string', 'max:190'],
+    //         'appointment_date' => ['required', 'date'],
+    //         'appointment_time' => ['required', 'date_format:H:i'],
+    //         'notes' => ['nullable', 'string'],
+    //     ]);
 
-        $date = Carbon::parse($data['appointment_date'])->toDateString();
-        $time = $data['appointment_time'];
+    //     $date = Carbon::parse($data['appointment_date'])->toDateString();
+    //     $time = $data['appointment_time'];
 
-        // resolve doctor
-        if (!empty($data['doctor_id'])) {
-            $doctor = Doctor::query()
-                ->where('company_id', $companyId)
-                ->where('is_active', true)
-                ->findOrFail((int)$data['doctor_id']);
-        } else {
-            $doctor = Doctor::query()
-                ->where('company_id', $companyId)
-                ->where('is_active', true)
-                ->orderBy('id', 'asc')
-                ->first();
+    //     // resolve doctor
+    //     if (!empty($data['doctor_id'])) {
+    //         $doctor = Doctor::query()
+    //             ->where('company_id', $companyId)
+    //             ->where('is_active', true)
+    //             ->findOrFail((int)$data['doctor_id']);
+    //     } else {
+    //         $doctor = Doctor::query()
+    //             ->where('company_id', $companyId)
+    //             ->where('is_active', true)
+    //             ->orderBy('id', 'asc')
+    //             ->first();
 
-            if (!$doctor) {
-                return response()->json([
-                    'msg' => 'No active doctor found. Create a doctor first.',
-                    'status' => 422,
-                ], 422);
-            }
-        }
+    //         if (!$doctor) {
+    //             return response()->json([
+    //                 'msg' => 'No active doctor found. Create a doctor first.',
+    //                 'status' => 422,
+    //             ], 422);
+    //         }
+    //     }
 
-        $doctorId = (int) $doctor->id;
+    //     $doctorId = (int) $doctor->id;
 
-        // working settings
-        $startTime   = $doctor->work_start ?? '09:00';
-        $endTime     = $doctor->work_end ?? '17:00';
-        $slotMinutes = (int) ($doctor->slot_minutes ?? 30);
+    //     // working settings
+    //     $startTime   = $doctor->work_start ?? '09:00';
+    //     $endTime     = $doctor->work_end ?? '17:00';
+    //     $slotMinutes = (int) ($doctor->slot_minutes ?? 30);
 
-        $start = Carbon::parse("$date $startTime");
-        $end   = Carbon::parse("$date $endTime");
-        $requested = Carbon::parse("$date $time");
+    //     $start = Carbon::parse("$date $startTime");
+    //     $end   = Carbon::parse("$date $endTime");
+    //     $requested = Carbon::parse("$date $time");
 
-        if ($requested->lt($start) || $requested->gte($end)) {
-            throw ValidationException::withMessages([
-                'appointment_time' => ['Time is outside working hours.'],
-            ]);
-        }
+    //     if ($requested->lt($start) || $requested->gte($end)) {
+    //         throw ValidationException::withMessages([
+    //             'appointment_time' => ['Time is outside working hours.'],
+    //         ]);
+    //     }
 
-        $diff = $start->diffInMinutes($requested);
-        if ($slotMinutes <= 0 || ($diff % $slotMinutes !== 0)) {
-            throw ValidationException::withMessages([
-                'appointment_time' => ['Time must match slot interval.'],
-            ]);
-        }
+    //     $diff = $start->diffInMinutes($requested);
+    //     if ($slotMinutes <= 0 || ($diff % $slotMinutes !== 0)) {
+    //         throw ValidationException::withMessages([
+    //             'appointment_time' => ['Time must match slot interval.'],
+    //         ]);
+    //     }
 
-        $doctorName = trim((string)($data['doctor_name'] ?? '')) ?: ($doctor->name ?? 'Doctor');
-        $blockedStatuses = ['scheduled', 'completed', 'no_show'];
+    //     $doctorName = trim((string)($data['doctor_name'] ?? '')) ?: ($doctor->name ?? 'Doctor');
+    //     $blockedStatuses = ['scheduled', 'completed', 'no_show'];
 
-        return DB::transaction(function () use ($request, $companyId, $data, $date, $time, $doctorId, $doctorName, $blockedStatuses) {
+    //     return DB::transaction(function () use ($request, $companyId, $data, $date, $time, $doctorId, $doctorName, $blockedStatuses) {
 
-            $existing = Appointment::query()
-                ->where('company_id', $companyId)
-                ->where('doctor_id', $doctorId)
-                ->whereDate('appointment_date', $date)
-                ->whereTime('appointment_time', $time)
-                ->lockForUpdate()
-                ->first();
+    //         $existing = Appointment::query()
+    //             ->where('company_id', $companyId)
+    //             ->where('doctor_id', $doctorId)
+    //             ->whereDate('appointment_date', $date)
+    //             ->whereTime('appointment_time', $time)
+    //             ->lockForUpdate()
+    //             ->first();
 
-            if ($existing) {
-                if (in_array($existing->status, $blockedStatuses, true)) {
-                    return response()->json([
-                        'msg' => 'Time slot already booked',
-                        'status' => 422,
-                        'errors' => [
-                            'appointment_time' => ['This time slot is already booked for this doctor.'],
-                        ],
-                    ], 422);
-                }
+    //         if ($existing) {
+    //             if (in_array($existing->status, $blockedStatuses, true)) {
+    //                 return response()->json([
+    //                     'msg' => 'Time slot already booked',
+    //                     'status' => 422,
+    //                     'errors' => [
+    //                         'appointment_time' => ['This time slot is already booked for this doctor.'],
+    //                     ],
+    //                 ], 422);
+    //             }
 
-                if ($existing->status === 'cancelled') {
-                    $existing->update([
-                        'patient_id' => $data['patient_id'],
-                        'doctor_name' => $doctorName,
-                        'status' => 'scheduled',
-                        'notes' => $data['notes'] ?? null,
-                        'created_by' => $request->user()->id,
-                        'appointment_date' => $date,
-                        'appointment_time' => $time,
-                    ]);
+    //             if ($existing->status === 'cancelled') {
+    //                 $existing->update([
+    //                     'patient_id' => $data['patient_id'],
+    //                     'doctor_name' => $doctorName,
+    //                     'status' => 'scheduled',
+    //                     'notes' => $data['notes'] ?? null,
+    //                     'created_by' => $request->user()->id,
+    //                     'appointment_date' => $date,
+    //                     'appointment_time' => $time,
+    //                 ]);
 
-                    // ✅ log rebook (FIX: use $existing not $appointment)
-                    ActivityLogger::log(
-                        $companyId,
-                        $request->user(),
-                        'appointment.rebooked',
-                        Appointment::class,
-                        $existing->id,
-                        [
-                            'doctor_id'  => $existing->doctor_id,
-                            'patient_id' => $existing->patient_id,
-                            'date'       => Carbon::parse($existing->appointment_date)->toDateString(),
-                            'time'       => substr((string) $existing->appointment_time, 0, 5),
-                        ]
-                    );
+    //                 // ✅ log rebook (FIX: use $existing not $appointment)
+    //                 ActivityLogger::log(
+    //                     $companyId,
+    //                     $request->user(),
+    //                     'appointment.rebooked',
+    //                     Appointment::class,
+    //                     $existing->id,
+    //                     [
+    //                         'doctor_id'  => $existing->doctor_id,
+    //                         'patient_id' => $existing->patient_id,
+    //                         'date'       => Carbon::parse($existing->appointment_date)->toDateString(),
+    //                         'time'       => substr((string) $existing->appointment_time, 0, 5),
+    //                     ]
+    //                 );
 
-                    return response()->json([
-                        'msg' => 'Appointment rebooked',
-                        'status' => 200,
-                        'data' => $existing->fresh()->load([
-                            'patient:id,name,email,company_id',
-                            'doctor:id,name,company_id,work_start,work_end,slot_minutes',
-                        ]),
-                    ], 200);
-                }
-            }
+    //                 return response()->json([
+    //                     'msg' => 'Appointment rebooked',
+    //                     'status' => 200,
+    //                     'data' => $existing->fresh()->load([
+    //                         'patient:id,name,email,company_id',
+    //                         'doctor:id,name,company_id,work_start,work_end,slot_minutes',
+    //                     ]),
+    //                 ], 200);
+    //             }
+    //         }
 
-            try {
-                $appointment = Appointment::create([
-                    'company_id' => $companyId,
-                    'patient_id' => $data['patient_id'],
-                    'doctor_id'  => $doctorId,
-                    'doctor_name' => $doctorName,
-                    'appointment_date' => $date,
-                    'appointment_time' => $time,
-                    'status' => 'scheduled',
-                    'notes' => $data['notes'] ?? null,
-                    'created_by' => $request->user()->id,
-                ]);
-            } catch (QueryException $e) {
-                if ((string) $e->getCode() === '23000') {
-                    return response()->json([
-                        'msg' => 'Time slot already booked',
-                        'status' => 422,
-                        'errors' => [
-                            'appointment_time' => ['This time slot is already booked for this doctor.'],
-                        ],
-                    ], 422);
-                }
-                throw $e;
-            }
+    //         try {
+    //             $appointment = Appointment::create([
+    //                 'company_id' => $companyId,
+    //                 'patient_id' => $data['patient_id'],
+    //                 'doctor_id'  => $doctorId,
+    //                 'doctor_name' => $doctorName,
+    //                 'appointment_date' => $date,
+    //                 'appointment_time' => $time,
+    //                 'status' => 'scheduled',
+    //                 'notes' => $data['notes'] ?? null,
+    //                 'created_by' => $request->user()->id,
+    //             ]);
+    //         } catch (QueryException $e) {
+    //             if ((string) $e->getCode() === '23000') {
+    //                 return response()->json([
+    //                     'msg' => 'Time slot already booked',
+    //                     'status' => 422,
+    //                     'errors' => [
+    //                         'appointment_time' => ['This time slot is already booked for this doctor.'],
+    //                     ],
+    //                 ], 422);
+    //             }
+    //             throw $e;
+    //         }
 
-            // ✅ log booked (single source of truth)
-            ActivityLogger::log(
-                $companyId,
-                $request->user(),
-                'appointment.booked',
-                Appointment::class,
-                $appointment->id,
-                [
-                    'doctor_id'  => $appointment->doctor_id,
-                    'patient_id' => $appointment->patient_id,
-                    'date'       => Carbon::parse($appointment->appointment_date)->toDateString(),
-                    'time'       => substr((string) $appointment->appointment_time, 0, 5),
-                ]
-            );
+    //         // ✅ log booked (single source of truth)
+    //         ActivityLogger::log(
+    //             $companyId,
+    //             $request->user(),
+    //             'appointment.booked',
+    //             Appointment::class,
+    //             $appointment->id,
+    //             [
+    //                 'doctor_id'  => $appointment->doctor_id,
+    //                 'patient_id' => $appointment->patient_id,
+    //                 'date'       => Carbon::parse($appointment->appointment_date)->toDateString(),
+    //                 'time'       => substr((string) $appointment->appointment_time, 0, 5),
+    //             ]
+    //         );
 
-            return response()->json([
-                'msg' => 'Appointment booked',
-                'status' => 201,
-                'data' => $appointment->load([
-                    'patient:id,name,email,company_id',
-                    'doctor:id,name,company_id,work_start,work_end,slot_minutes',
-                ]),
-            ], 201);
-        });
-    }
+    //         return response()->json([
+    //             'msg' => 'Appointment booked',
+    //             'status' => 201,
+    //             'data' => $appointment->load([
+    //                 'patient:id,name,email,company_id',
+    //                 'doctor:id,name,company_id,work_start,work_end,slot_minutes',
+    //             ]),
+    //         ], 201);
+    //     });
+    // }
 
     public function cancel(Request $request, $id)
     {
@@ -589,254 +570,248 @@ class AppointmentController extends Controller
         ]);
     }
 
-    /**
-     * COMPLETE APPOINTMENT + CREATE INVOICE + (optional treatment_plan_id)
-     * ✅ locks appointment, prevents duplicate invoices
-     * ✅ validates treatment plan belongs to same customer
-     * ✅ logs appointment.completed
-     */
-    public function complete(Request $request, $id)
-    {
-        $companyId = $request->user()->company_id;
+    // public function complete(Request $request, $id)
+    // {
+    //     $companyId = $request->user()->company_id;
 
-        $appointment = Appointment::query()
-            ->where('company_id', $companyId)
-            ->findOrFail($id);
+    //     $appointment = Appointment::query()
+    //         ->where('company_id', $companyId)
+    //         ->findOrFail($id);
 
-        $data = $request->validate([
-            'total' => ['nullable', 'numeric', 'min:0.01'],
-            'doctor_name' => ['nullable', 'string', 'max:190'],
-            'notes' => ['nullable', 'string'],
-            'treatment_plan_id' => [
-                'nullable',
-                'integer',
-                Rule::exists('treatment_plans', 'id')->where(fn($q) => $q->where('company_id', $companyId)),
-            ],
-        ]);
+    //     $data = $request->validate([
+    //         'total' => ['nullable', 'numeric', 'min:0.01'],
+    //         'doctor_name' => ['nullable', 'string', 'max:190'],
+    //         'notes' => ['nullable', 'string'],
+    //         'treatment_plan_id' => [
+    //             'nullable',
+    //             'integer',
+    //             Rule::exists('treatment_plans', 'id')->where(fn($q) => $q->where('company_id', $companyId)),
+    //         ],
+    //     ]);
 
-        $serviceProduct = \App\Models\Product::where('company_id', $companyId)
-            ->where('title_en', 'Consultation')
-            ->first();
+    //     $serviceProduct = \App\Models\Product::where('company_id', $companyId)
+    //         ->where('title_en', 'Consultation')
+    //         ->first();
 
-        if (!$serviceProduct) {
-            return response()->json([
-                'msg' => 'Missing service product (Consultation). Create it first.',
-                'status' => 422,
-            ], 422);
-        }
+    //     if (!$serviceProduct) {
+    //         return response()->json([
+    //             'msg' => 'Missing service product (Consultation). Create it first.',
+    //             'status' => 422,
+    //         ], 422);
+    //     }
 
-        return DB::transaction(function () use ($request, $companyId, $data, $appointment, $serviceProduct) {
-            $appointment = Appointment::query()
-                ->where('company_id', $companyId)
-                ->lockForUpdate()
-                ->findOrFail($appointment->id);
+    //     return DB::transaction(function () use ($request, $companyId, $data, $appointment, $serviceProduct) {
+    //         $appointment = Appointment::query()
+    //             ->where('company_id', $companyId)
+    //             ->lockForUpdate()
+    //             ->findOrFail($appointment->id);
 
-            $existingInvoice = Invoice::query()
-                ->where('company_id', $companyId)
-                ->where('appointment_id', $appointment->id)
-                ->lockForUpdate()
-                ->first();
+    //         $existingInvoice = Invoice::query()
+    //             ->where('company_id', $companyId)
+    //             ->where('appointment_id', $appointment->id)
+    //             ->lockForUpdate()
+    //             ->first();
 
-            if ($existingInvoice) {
-                return response()->json([
-                    'msg' => 'Invoice already exists for this appointment',
-                    'status' => 409,
-                    'invoice_id' => $existingInvoice->id,
-                    'invoice_number' => $existingInvoice->number,
-                    'treatment_plan_id' => $existingInvoice->treatment_plan_id,
-                ], 409);
-            }
+    //         if ($existingInvoice) {
+    //             return response()->json([
+    //                 'msg' => 'Invoice already exists for this appointment',
+    //                 'status' => 409,
+    //                 'invoice_id' => $existingInvoice->id,
+    //                 'invoice_number' => $existingInvoice->number,
+    //                 'treatment_plan_id' => $existingInvoice->treatment_plan_id,
+    //             ], 409);
+    //         }
 
-            if ($appointment->status === 'completed') {
-                return response()->json([
-                    'msg' => 'Appointment already completed',
-                    'status' => 409,
-                ], 409);
-            }
+    //         if ($appointment->status === 'completed') {
+    //             return response()->json([
+    //                 'msg' => 'Appointment already completed',
+    //                 'status' => 409,
+    //             ], 409);
+    //         }
 
-            // ✅ مهم: لا نسمح بإكمال إلا المواعيد scheduled فقط
-            if (!in_array($appointment->status, ['scheduled'], true)) {
-                return response()->json([
-                    'msg' => 'Only scheduled appointments can be completed',
-                    'status' => 422,
-                    'errors' => [
-                        'status' => ['Cancelled or no-show appointments cannot be completed directly.'],
-                    ],
-                ], 422);
-            }
+    //         // ✅ مهم: لا نسمح بإكمال إلا المواعيد scheduled فقط
+    //         if (!in_array($appointment->status, ['scheduled'], true)) {
+    //             return response()->json([
+    //                 'msg' => 'Only scheduled appointments can be completed',
+    //                 'status' => 422,
+    //                 'errors' => [
+    //                     'status' => ['Cancelled or no-show appointments cannot be completed directly.'],
+    //                 ],
+    //             ], 422);
+    //         }
 
-            $planId = $data['treatment_plan_id'] ?? null;
-            $plan = null;
+    //         $planId = $data['treatment_plan_id'] ?? null;
+    //         $plan = null;
 
-            if ($planId) {
-                $plan = TreatmentPlan::query()
-                    ->where('company_id', $companyId)
-                    ->findOrFail($planId);
+    //         if ($planId) {
+    //             $plan = TreatmentPlan::query()
+    //                 ->where('company_id', $companyId)
+    //                 ->findOrFail($planId);
 
-                if ((int) $plan->customer_id !== (int) $appointment->patient_id) {
-                    return response()->json([
-                        'msg' => 'Treatment plan does not belong to this customer',
-                        'status' => 422,
-                        'errors' => [
-                            'treatment_plan_id' => ['Treatment plan customer_id mismatch.'],
-                        ],
-                    ], 422);
-                }
-            }
+    //             if ((int) $plan->customer_id !== (int) $appointment->patient_id) {
+    //                 return response()->json([
+    //                     'msg' => 'Treatment plan does not belong to this customer',
+    //                     'status' => 422,
+    //                     'errors' => [
+    //                         'treatment_plan_id' => ['Treatment plan customer_id mismatch.'],
+    //                     ],
+    //                 ], 422);
+    //             }
+    //         }
 
-            $appointment->update([
-                'doctor_name' => $data['doctor_name'] ?? $appointment->doctor_name,
-                'notes' => $data['notes'] ?? $appointment->notes,
-            ]);
+    //         $appointment->update([
+    //             'doctor_name' => $data['doctor_name'] ?? $appointment->doctor_name,
+    //             'notes' => $data['notes'] ?? $appointment->notes,
+    //         ]);
 
-            $lines = [];
+    //         $lines = [];
 
-            if ($plan) {
-                $items = \App\Models\TreatmentPlanItem::query()
-                    ->where('company_id', $companyId)
-                    ->where('treatment_plan_id', $plan->id)
-                    ->orderBy('id', 'asc')
-                    ->get();
+    //         if ($plan) {
+    //             $items = \App\Models\TreatmentPlanItem::query()
+    //                 ->where('company_id', $companyId)
+    //                 ->where('treatment_plan_id', $plan->id)
+    //                 ->orderBy('id', 'asc')
+    //                 ->get();
 
-                if ($items->isEmpty()) {
-                    return response()->json([
-                        'msg' => 'Treatment plan has no items',
-                        'status' => 422,
-                        'errors' => [
-                            'treatment_plan_id' => ['Treatment plan must have at least 1 item to complete appointment.'],
-                        ],
-                    ], 422);
-                }
+    //             if ($items->isEmpty()) {
+    //                 return response()->json([
+    //                     'msg' => 'Treatment plan has no items',
+    //                     'status' => 422,
+    //                     'errors' => [
+    //                         'treatment_plan_id' => ['Treatment plan must have at least 1 item to complete appointment.'],
+    //                     ],
+    //                 ], 422);
+    //             }
 
-                foreach ($items as $it) {
-                    $price = (float) $it->price;
+    //             foreach ($items as $it) {
+    //                 $price = (float) $it->price;
 
-                    $lines[] = [
-                        'product_id' => $serviceProduct->id,
-                        'quantity' => 1,
-                        'unit_price' => $price,
-                        'total' => $price,
-                        'desc' => $it->procedure ?? 'Treatment Item',
-                    ];
-                }
-            } else {
-                $total = (float) ($data['total'] ?? 0);
+    //                 $lines[] = [
+    //                     'product_id' => $serviceProduct->id,
+    //                     'quantity' => 1,
+    //                     'unit_price' => $price,
+    //                     'total' => $price,
+    //                     'desc' => $it->procedure ?? 'Treatment Item',
+    //                 ];
+    //             }
+    //         } else {
+    //             $total = (float) ($data['total'] ?? 0);
 
-                if ($total <= 0) {
-                    return response()->json([
-                        'msg' => 'total is required when no treatment_plan_id is provided',
-                        'status' => 422,
-                        'errors' => [
-                            'total' => ['total is required when no treatment_plan_id is provided'],
-                        ],
-                    ], 422);
-                }
+    //             if ($total <= 0) {
+    //                 return response()->json([
+    //                     'msg' => 'total is required when no treatment_plan_id is provided',
+    //                     'status' => 422,
+    //                     'errors' => [
+    //                         'total' => ['total is required when no treatment_plan_id is provided'],
+    //                     ],
+    //                 ], 422);
+    //             }
 
-                $lines[] = [
-                    'product_id' => $serviceProduct->id,
-                    'quantity' => 1,
-                    'unit_price' => $total,
-                    'total' => $total,
-                    'desc' => 'Consultation',
-                ];
-            }
+    //             $lines[] = [
+    //                 'product_id' => $serviceProduct->id,
+    //                 'quantity' => 1,
+    //                 'unit_price' => $total,
+    //                 'total' => $total,
+    //                 'desc' => 'Consultation',
+    //             ];
+    //         }
 
-            $grandTotal = array_sum(array_map(fn($l) => (float) $l['total'], $lines));
+    //         $grandTotal = array_sum(array_map(fn($l) => (float) $l['total'], $lines));
 
-            $order = \App\Models\Order::create([
-                'company_id' => $companyId,
-                'customer_id' => $appointment->patient_id,
-                'title_en' => 'Appointment Services',
-                'title_ar' => 'خدمات الموعد',
-                'status' => 'confirmed',
-                'total' => $grandTotal,
-                'created_by' => $request->user()->id,
-            ]);
+    //         $order = \App\Models\Order::create([
+    //             'company_id' => $companyId,
+    //             'customer_id' => $appointment->patient_id,
+    //             'title_en' => 'Appointment Services',
+    //             'title_ar' => 'خدمات الموعد',
+    //             'status' => 'confirmed',
+    //             'total' => $grandTotal,
+    //             'created_by' => $request->user()->id,
+    //         ]);
 
-            foreach ($lines as $l) {
-                \App\Models\OrderItem::create([
-                    'company_id' => $companyId,
-                    'order_id' => $order->id,
-                    'product_id' => $l['product_id'],
-                    'quantity' => $l['quantity'],
-                    'unit_price' => $l['unit_price'],
-                    'total' => $l['total'],
-                ]);
-            }
+    //         foreach ($lines as $l) {
+    //             \App\Models\OrderItem::create([
+    //                 'company_id' => $companyId,
+    //                 'order_id' => $order->id,
+    //                 'product_id' => $l['product_id'],
+    //                 'quantity' => $l['quantity'],
+    //                 'unit_price' => $l['unit_price'],
+    //                 'total' => $l['total'],
+    //             ]);
+    //         }
 
-            $number = \App\Services\InvoiceNumberService::generate($companyId);
+    //         $number = \App\Services\InvoiceNumberService::generate($companyId);
 
-            $invoice = \App\Models\Invoice::create([
-                'company_id' => $companyId,
-                'number' => $number,
-                'order_id' => $order->id,
-                'appointment_id' => $appointment->id,
-                'treatment_plan_id' => $plan ? $plan->id : null,
-                'customer_id' => $appointment->patient_id,
-                'total' => $grandTotal,
-                'status' => 'unpaid',
-                'issued_at' => now(),
-            ]);
+    //         $invoice = \App\Models\Invoice::create([
+    //             'company_id' => $companyId,
+    //             'number' => $number,
+    //             'order_id' => $order->id,
+    //             'appointment_id' => $appointment->id,
+    //             'treatment_plan_id' => $plan ? $plan->id : null,
+    //             'customer_id' => $appointment->patient_id,
+    //             'total' => $grandTotal,
+    //             'status' => 'unpaid',
+    //             'issued_at' => now(),
+    //         ]);
 
-            foreach ($lines as $l) {
-                \App\Models\InvoiceItem::create([
-                    'company_id' => $companyId,
-                    'invoice_id' => $invoice->id,
-                    'product_id' => $l['product_id'],
-                    'quantity' => $l['quantity'],
-                    'unit_price' => $l['unit_price'],
-                    'total' => $l['total'],
-                ]);
-            }
+    //         foreach ($lines as $l) {
+    //             \App\Models\InvoiceItem::create([
+    //                 'company_id' => $companyId,
+    //                 'invoice_id' => $invoice->id,
+    //                 'product_id' => $l['product_id'],
+    //                 'quantity' => $l['quantity'],
+    //                 'unit_price' => $l['unit_price'],
+    //                 'total' => $l['total'],
+    //             ]);
+    //         }
 
-            $exists = CustomerLedgerEntry::query()
-                ->where('company_id', $companyId)
-                ->where('invoice_id', $invoice->id)
-                ->where('type', 'invoice')
-                ->exists();
+    //         $exists = CustomerLedgerEntry::query()
+    //             ->where('company_id', $companyId)
+    //             ->where('invoice_id', $invoice->id)
+    //             ->where('type', 'invoice')
+    //             ->exists();
 
-            if (!$exists) {
-                CustomerLedgerEntry::create([
-                    'company_id' => $companyId,
-                    'customer_id' => $invoice->customer_id,
-                    'invoice_id' => $invoice->id,
-                    'payment_id' => null,
-                    'refund_id' => null,
-                    'type' => 'invoice',
-                    'debit' => $invoice->total,
-                    'credit' => 0,
-                    'entry_date' => $invoice->issued_at ?? now(),
-                    'description' => 'Invoice issued #' . $invoice->number,
-                ]);
-            }
+    //         if (!$exists) {
+    //             CustomerLedgerEntry::create([
+    //                 'company_id' => $companyId,
+    //                 'customer_id' => $invoice->customer_id,
+    //                 'invoice_id' => $invoice->id,
+    //                 'payment_id' => null,
+    //                 'refund_id' => null,
+    //                 'type' => 'invoice',
+    //                 'debit' => $invoice->total,
+    //                 'credit' => 0,
+    //                 'entry_date' => $invoice->issued_at ?? now(),
+    //                 'description' => 'Invoice issued #' . $invoice->number,
+    //             ]);
+    //         }
 
-            $appointment->update(['status' => 'completed']);
+    //         $appointment->update(['status' => 'completed']);
 
-            ActivityLogger::log(
-                $companyId,
-                $request->user(),
-                'appointment.completed',
-                Appointment::class,
-                $appointment->id,
-                [
-                    'invoice_id' => $invoice->id,
-                    'invoice_number' => $invoice->number,
-                    'treatment_plan_id' => $invoice->treatment_plan_id,
-                    'total' => (float) $invoice->total,
-                ]
-            );
+    //         ActivityLogger::log(
+    //             $companyId,
+    //             $request->user(),
+    //             'appointment.completed',
+    //             Appointment::class,
+    //             $appointment->id,
+    //             [
+    //                 'invoice_id' => $invoice->id,
+    //                 'invoice_number' => $invoice->number,
+    //                 'treatment_plan_id' => $invoice->treatment_plan_id,
+    //                 'total' => (float) $invoice->total,
+    //             ]
+    //         );
 
-            return response()->json([
-                'msg' => 'Appointment completed and invoice created',
-                'status' => 200,
-                'invoice_id' => $invoice->id,
-                'order_id' => $order->id,
-                'invoice_number' => $invoice->number,
-                'treatment_plan_id' => $invoice->treatment_plan_id,
-                'total' => (float) $invoice->total,
-            ]);
-        });
-    }
+    //         return response()->json([
+    //             'msg' => 'Appointment completed and invoice created',
+    //             'status' => 200,
+    //             'invoice_id' => $invoice->id,
+    //             'order_id' => $order->id,
+    //             'invoice_number' => $invoice->number,
+    //             'treatment_plan_id' => $invoice->treatment_plan_id,
+    //             'total' => (float) $invoice->total,
+    //         ]);
+    //     });
+    // }
 
     public function noShow(Request $request, $id)
     {
@@ -1138,6 +1113,619 @@ class AppointmentController extends Controller
                     'doctor:id,name,company_id,work_start,work_end,slot_minutes',
                 ]),
             ], 200);
+        });
+    }
+    ////////////////////////////////////////////////////////////////////////////////////
+    //book method for dental clinic only with consultaion fee
+    public function book(Request $request)
+    {
+        $companyId = $request->user()->company_id;
+
+        $data = $request->validate([
+            'patient_id' => [
+                'required',
+                'integer',
+                Rule::exists('customers', 'id')->where(fn($q) => $q->where('company_id', $companyId)),
+            ],
+            'doctor_id' => ['nullable', 'integer'],
+            'doctor_name' => ['nullable', 'string', 'max:190'],
+            'appointment_date' => ['required', 'date'],
+            'appointment_time' => ['required', 'date_format:H:i'],
+            'notes' => ['nullable', 'string'],
+        ]);
+
+        $date = Carbon::parse($data['appointment_date'])->toDateString();
+        $time = $data['appointment_time'];
+
+        // resolve doctor
+        if (!empty($data['doctor_id'])) {
+            $doctor = Doctor::query()
+                ->where('company_id', $companyId)
+                ->where('is_active', true)
+                ->findOrFail((int) $data['doctor_id']);
+        } else {
+            $doctor = Doctor::query()
+                ->where('company_id', $companyId)
+                ->where('is_active', true)
+                ->orderBy('id', 'asc')
+                ->first();
+
+            if (!$doctor) {
+                return response()->json([
+                    'msg' => 'No active doctor found. Create a doctor first.',
+                    'status' => 422,
+                ], 422);
+            }
+        }
+
+        $doctorId = (int) $doctor->id;
+
+        // working settings
+        $startTime = $doctor->work_start ?? '09:00';
+        $endTime = $doctor->work_end ?? '17:00';
+        $slotMinutes = (int) ($doctor->slot_minutes ?? 30);
+
+        $start = Carbon::parse("$date $startTime");
+        $end = Carbon::parse("$date $endTime");
+        $requested = Carbon::parse("$date $time");
+
+        if ($requested->lt($start) || $requested->gte($end)) {
+            throw ValidationException::withMessages([
+                'appointment_time' => ['Time is outside working hours.'],
+            ]);
+        }
+
+        $diff = $start->diffInMinutes($requested);
+
+        if ($slotMinutes <= 0 || ($diff % $slotMinutes !== 0)) {
+            throw ValidationException::withMessages([
+                'appointment_time' => ['Time must match slot interval.'],
+            ]);
+        }
+
+        $doctorName = trim((string) ($data['doctor_name'] ?? '')) ?: ($doctor->name ?? 'Doctor');
+
+        $blockedStatuses = ['scheduled', 'completed', 'no_show'];
+
+        return DB::transaction(function () use (
+            $request,
+            $companyId,
+            $data,
+            $date,
+            $time,
+            $doctorId,
+            $doctorName,
+            $blockedStatuses
+        ) {
+            $existing = Appointment::query()
+                ->where('company_id', $companyId)
+                ->where('doctor_id', $doctorId)
+                ->whereDate('appointment_date', $date)
+                ->whereTime('appointment_time', $time)
+                ->lockForUpdate()
+                ->first();
+
+            if ($existing) {
+                if (in_array($existing->status, $blockedStatuses, true)) {
+                    return response()->json([
+                        'msg' => 'Time slot already booked',
+                        'status' => 422,
+                        'errors' => [
+                            'appointment_time' => ['This time slot is already booked for this doctor.'],
+                        ],
+                    ], 422);
+                }
+
+                if ($existing->status === 'cancelled') {
+                    $existing->update([
+                        'patient_id' => $data['patient_id'],
+                        'doctor_name' => $doctorName,
+                        'status' => 'scheduled',
+                        'notes' => $data['notes'] ?? null,
+                        'created_by' => $request->user()->id,
+                        'appointment_date' => $date,
+                        'appointment_time' => $time,
+                    ]);
+
+                    // ✅ Auto-create consultation invoice for rebooked cancelled slot if not exists
+                    $existingInvoice = \App\Models\Invoice::query()
+                        ->where('company_id', $companyId)
+                        ->where('appointment_id', $existing->id)
+                        ->first();
+
+                    if (!$existingInvoice) {
+                        $consultationProduct = \App\Models\Product::query()
+                            ->where('company_id', $companyId)
+                            ->where('title_en', 'Consultation')
+                            ->first();
+
+                        if ($consultationProduct) {
+                            $consultationTotal = (float) ($consultationProduct->unit_price ?? 0);
+
+                            if ($consultationTotal > 0) {
+                                $order = \App\Models\Order::create([
+                                    'company_id'  => $companyId,
+                                    'customer_id' => $existing->patient_id,
+                                    'title_en'    => 'Consultation Visit',
+                                    'title_ar'    => 'رسوم كشف',
+                                    'status'      => 'confirmed',
+                                    'total'       => $consultationTotal,
+                                    'created_by'  => $request->user()->id,
+                                ]);
+
+                                \App\Models\OrderItem::create([
+                                    'company_id' => $companyId,
+                                    'order_id'   => $order->id,
+                                    'product_id' => $consultationProduct->id,
+                                    'quantity'   => 1,
+                                    'unit_price' => $consultationTotal,
+                                    'total'      => $consultationTotal,
+                                ]);
+
+                                $number = \App\Services\InvoiceNumberService::generate($companyId);
+
+                                $invoice = \App\Models\Invoice::create([
+                                    'company_id'        => $companyId,
+                                    'number'            => $number,
+                                    'order_id'          => $order->id,
+                                    'appointment_id'    => $existing->id,
+                                    'treatment_plan_id' => null,
+                                    'customer_id'       => $existing->patient_id,
+                                    'total'             => $consultationTotal,
+                                    'status'            => 'unpaid',
+                                    'issued_at'         => now(),
+                                ]);
+
+                                \App\Models\InvoiceItem::create([
+                                    'company_id' => $companyId,
+                                    'invoice_id' => $invoice->id,
+                                    'product_id' => $consultationProduct->id,
+                                    'quantity'   => 1,
+                                    'unit_price' => $consultationTotal,
+                                    'total'      => $consultationTotal,
+                                ]);
+
+                                CustomerLedgerEntry::create([
+                                    'company_id'  => $companyId,
+                                    'customer_id' => $invoice->customer_id,
+                                    'invoice_id'  => $invoice->id,
+                                    'payment_id'  => null,
+                                    'refund_id'   => null,
+                                    'type'        => 'invoice',
+                                    'debit'       => $invoice->total,
+                                    'credit'      => 0,
+                                    'entry_date'  => $invoice->issued_at ?? now(),
+                                    'description' => 'Consultation invoice #' . $invoice->number,
+                                ]);
+                            }
+                        }
+                    }
+
+                    ActivityLogger::log(
+                        $companyId,
+                        $request->user(),
+                        'appointment.rebooked',
+                        Appointment::class,
+                        $existing->id,
+                        [
+                            'doctor_id'  => $existing->doctor_id,
+                            'patient_id' => $existing->patient_id,
+                            'date'       => Carbon::parse($existing->appointment_date)->toDateString(),
+                            'time'       => substr((string) $existing->appointment_time, 0, 5),
+                        ]
+                    );
+
+                    return response()->json([
+                        'msg' => 'Appointment rebooked',
+                        'status' => 200,
+                        'data' => $existing->fresh()->load([
+                            'patient:id,name,email,company_id',
+                            'doctor:id,name,company_id,work_start,work_end,slot_minutes',
+                        ]),
+                    ], 200);
+                }
+            }
+
+            try {
+                $appointment = Appointment::create([
+                    'company_id' => $companyId,
+                    'patient_id' => $data['patient_id'],
+                    'doctor_id'  => $doctorId,
+                    'doctor_name' => $doctorName,
+                    'appointment_date' => $date,
+                    'appointment_time' => $time,
+                    'status' => 'scheduled',
+                    'notes' => $data['notes'] ?? null,
+                    'created_by' => $request->user()->id,
+                ]);
+            } catch (QueryException $e) {
+                if ((string) $e->getCode() === '23000') {
+                    return response()->json([
+                        'msg' => 'Time slot already booked',
+                        'status' => 422,
+                        'errors' => [
+                            'appointment_time' => ['This time slot is already booked for this doctor.'],
+                        ],
+                    ], 422);
+                }
+
+                throw $e;
+            }
+
+            // ✅ Auto-create consultation invoice for newly booked appointment
+            $existingInvoice = \App\Models\Invoice::query()
+                ->where('company_id', $companyId)
+                ->where('appointment_id', $appointment->id)
+                ->first();
+
+            if (!$existingInvoice) {
+                $consultationProduct = \App\Models\Product::query()
+                    ->where('company_id', $companyId)
+                    ->where('title_en', 'Consultation')
+                    ->first();
+
+                if ($consultationProduct) {
+                    $consultationTotal = (float) ($consultationProduct->unit_price ?? 0);
+
+                    if ($consultationTotal > 0) {
+                        $order = \App\Models\Order::create([
+                            'company_id'  => $companyId,
+                            'customer_id' => $appointment->patient_id,
+                            'title_en'    => 'Consultation Visit',
+                            'title_ar'    => 'رسوم كشف',
+                            'status'      => 'confirmed',
+                            'total'       => $consultationTotal,
+                            'created_by'  => $request->user()->id,
+                        ]);
+
+                        \App\Models\OrderItem::create([
+                            'company_id' => $companyId,
+                            'order_id'   => $order->id,
+                            'product_id' => $consultationProduct->id,
+                            'quantity'   => 1,
+                            'unit_price' => $consultationTotal,
+                            'total'      => $consultationTotal,
+                        ]);
+
+                        $number = \App\Services\InvoiceNumberService::generate($companyId);
+
+                        $invoice = \App\Models\Invoice::create([
+                            'company_id'        => $companyId,
+                            'number'            => $number,
+                            'order_id'          => $order->id,
+                            'appointment_id'    => $appointment->id,
+                            'treatment_plan_id' => null,
+                            'customer_id'       => $appointment->patient_id,
+                            'total'             => $consultationTotal,
+                            'status'            => 'unpaid',
+                            'issued_at'         => now(),
+                        ]);
+
+                        \App\Models\InvoiceItem::create([
+                            'company_id' => $companyId,
+                            'invoice_id' => $invoice->id,
+                            'product_id' => $consultationProduct->id,
+                            'quantity'   => 1,
+                            'unit_price' => $consultationTotal,
+                            'total'      => $consultationTotal,
+                        ]);
+
+                        CustomerLedgerEntry::create([
+                            'company_id'  => $companyId,
+                            'customer_id' => $invoice->customer_id,
+                            'invoice_id'  => $invoice->id,
+                            'payment_id'  => null,
+                            'refund_id'   => null,
+                            'type'        => 'invoice',
+                            'debit'       => $invoice->total,
+                            'credit'      => 0,
+                            'entry_date'  => $invoice->issued_at ?? now(),
+                            'description' => 'Consultation invoice #' . $invoice->number,
+                        ]);
+                    }
+                }
+            }
+
+            ActivityLogger::log(
+                $companyId,
+                $request->user(),
+                'appointment.booked',
+                Appointment::class,
+                $appointment->id,
+                [
+                    'doctor_id'  => $appointment->doctor_id,
+                    'patient_id' => $appointment->patient_id,
+                    'date'       => Carbon::parse($appointment->appointment_date)->toDateString(),
+                    'time'       => substr((string) $appointment->appointment_time, 0, 5),
+                ]
+            );
+
+            return response()->json([
+                'msg' => 'Appointment booked',
+                'status' => 201,
+                'data' => $appointment->load([
+                    'patient:id,name,email,company_id',
+                    'doctor:id,name,company_id,work_start,work_end,slot_minutes',
+                ]),
+            ], 201);
+        });
+    }
+
+    //book method for dental clinic only with consultaion fee
+    public function complete(Request $request, $id)
+    {
+        $companyId = $request->user()->company_id;
+
+        $appointment = Appointment::query()
+            ->where('company_id', $companyId)
+            ->findOrFail($id);
+
+        $data = $request->validate([
+            'total' => ['nullable', 'numeric', 'min:0.01'],
+            'doctor_name' => ['nullable', 'string', 'max:190'],
+            'notes' => ['nullable', 'string'],
+            'treatment_plan_id' => [
+                'nullable',
+                'integer',
+                Rule::exists('treatment_plans', 'id')->where(fn($q) => $q->where('company_id', $companyId)),
+            ],
+        ]);
+
+        $serviceProduct = \App\Models\Product::where('company_id', $companyId)
+            ->where('title_en', 'Consultation')
+            ->first();
+
+        if (!$serviceProduct) {
+            return response()->json([
+                'msg' => 'Missing service product (Consultation). Create it first.',
+                'status' => 422,
+            ], 422);
+        }
+
+        return DB::transaction(function () use ($request, $companyId, $data, $appointment, $serviceProduct) {
+            $appointment = Appointment::query()
+                ->where('company_id', $companyId)
+                ->lockForUpdate()
+                ->findOrFail($appointment->id);
+
+            if ($appointment->status === 'completed') {
+                return response()->json([
+                    'msg' => 'Appointment already completed',
+                    'status' => 409,
+                ], 409);
+            }
+
+            if (!in_array($appointment->status, ['scheduled'], true)) {
+                return response()->json([
+                    'msg' => 'Only scheduled appointments can be completed',
+                    'status' => 422,
+                    'errors' => [
+                        'status' => ['Cancelled or no-show appointments cannot be completed directly.'],
+                    ],
+                ], 422);
+            }
+
+            $planId = $data['treatment_plan_id'] ?? null;
+            $plan = null;
+
+            if ($planId) {
+                $plan = TreatmentPlan::query()
+                    ->where('company_id', $companyId)
+                    ->findOrFail($planId);
+
+                if ((int) $plan->customer_id !== (int) $appointment->patient_id) {
+                    return response()->json([
+                        'msg' => 'Treatment plan does not belong to this customer',
+                        'status' => 422,
+                        'errors' => [
+                            'treatment_plan_id' => ['Treatment plan customer_id mismatch.'],
+                        ],
+                    ], 422);
+                }
+            }
+
+            $appointment->update([
+                'doctor_name' => $data['doctor_name'] ?? $appointment->doctor_name,
+                'notes' => $data['notes'] ?? $appointment->notes,
+            ]);
+
+            $total = (float) ($data['total'] ?? 0);
+
+            // ✅ حالة كشف فقط: consultation invoice already exists, no new treatment invoice needed
+            if (!$plan && $total <= 0) {
+                $appointment->update(['status' => 'completed']);
+
+                ActivityLogger::log(
+                    $companyId,
+                    $request->user(),
+                    'appointment.completed',
+                    Appointment::class,
+                    $appointment->id,
+                    [
+                        'invoice_id' => null,
+                        'invoice_number' => null,
+                        'treatment_plan_id' => null,
+                        'total' => 0,
+                        'mode' => 'consultation_only',
+                    ]
+                );
+
+                return response()->json([
+                    'msg' => 'Appointment completed successfully',
+                    'status' => 200,
+                    'invoice_id' => null,
+                    'order_id' => null,
+                    'invoice_number' => null,
+                    'treatment_plan_id' => null,
+                    'total' => 0,
+                ]);
+            }
+
+            // ✅ لا نمنع بسبب consultation invoice
+            // ✅ نمنع فقط وجود treatment/services invoice سابق لنفس الموعد
+            $existingTreatmentInvoice = Invoice::query()
+                ->where('company_id', $companyId)
+                ->where('appointment_id', $appointment->id)
+                ->whereHas('order', function ($q) {
+                    $q->where('title_en', 'Appointment Services');
+                })
+                ->lockForUpdate()
+                ->first();
+
+            if ($existingTreatmentInvoice) {
+                return response()->json([
+                    'msg' => 'Treatment invoice already exists for this appointment',
+                    'status' => 409,
+                    'invoice_id' => $existingTreatmentInvoice->id,
+                    'invoice_number' => $existingTreatmentInvoice->number,
+                    'treatment_plan_id' => $existingTreatmentInvoice->treatment_plan_id,
+                ], 409);
+            }
+
+            $lines = [];
+
+            if ($plan) {
+                $items = \App\Models\TreatmentPlanItem::query()
+                    ->where('company_id', $companyId)
+                    ->where('treatment_plan_id', $plan->id)
+                    ->orderBy('id', 'asc')
+                    ->get();
+
+                if ($items->isEmpty()) {
+                    return response()->json([
+                        'msg' => 'Treatment plan has no items',
+                        'status' => 422,
+                        'errors' => [
+                            'treatment_plan_id' => ['Treatment plan must have at least 1 item to complete appointment.'],
+                        ],
+                    ], 422);
+                }
+
+                foreach ($items as $it) {
+                    $price = (float) $it->price;
+
+                    $lines[] = [
+                        'product_id' => $serviceProduct->id,
+                        'quantity' => 1,
+                        'unit_price' => $price,
+                        'total' => $price,
+                        'desc' => $it->procedure ?? 'Treatment Item',
+                    ];
+                }
+            } else {
+                if ($total <= 0) {
+                    return response()->json([
+                        'msg' => 'total is required when no treatment_plan_id is provided',
+                        'status' => 422,
+                        'errors' => [
+                            'total' => ['total is required when no treatment_plan_id is provided'],
+                        ],
+                    ], 422);
+                }
+
+                $lines[] = [
+                    'product_id' => $serviceProduct->id,
+                    'quantity' => 1,
+                    'unit_price' => $total,
+                    'total' => $total,
+                    'desc' => 'Appointment Service',
+                ];
+            }
+
+            $grandTotal = array_sum(array_map(fn($l) => (float) $l['total'], $lines));
+
+            $order = \App\Models\Order::create([
+                'company_id' => $companyId,
+                'customer_id' => $appointment->patient_id,
+                'title_en' => 'Appointment Services',
+                'title_ar' => 'خدمات الموعد',
+                'status' => 'confirmed',
+                'total' => $grandTotal,
+                'created_by' => $request->user()->id,
+            ]);
+
+            foreach ($lines as $l) {
+                \App\Models\OrderItem::create([
+                    'company_id' => $companyId,
+                    'order_id' => $order->id,
+                    'product_id' => $l['product_id'],
+                    'quantity' => $l['quantity'],
+                    'unit_price' => $l['unit_price'],
+                    'total' => $l['total'],
+                ]);
+            }
+
+            $number = \App\Services\InvoiceNumberService::generate($companyId);
+
+            $invoice = \App\Models\Invoice::create([
+                'company_id' => $companyId,
+                'number' => $number,
+                'order_id' => $order->id,
+                'appointment_id' => $appointment->id,
+                'treatment_plan_id' => $plan ? $plan->id : null,
+                'customer_id' => $appointment->patient_id,
+                'total' => $grandTotal,
+                'status' => 'unpaid',
+                'issued_at' => now(),
+            ]);
+
+            foreach ($lines as $l) {
+                \App\Models\InvoiceItem::create([
+                    'company_id' => $companyId,
+                    'invoice_id' => $invoice->id,
+                    'product_id' => $l['product_id'],
+                    'quantity' => $l['quantity'],
+                    'unit_price' => $l['unit_price'],
+                    'total' => $l['total'],
+                ]);
+            }
+
+            $exists = CustomerLedgerEntry::query()
+                ->where('company_id', $companyId)
+                ->where('invoice_id', $invoice->id)
+                ->where('type', 'invoice')
+                ->exists();
+
+            if (!$exists) {
+                CustomerLedgerEntry::create([
+                    'company_id' => $companyId,
+                    'customer_id' => $invoice->customer_id,
+                    'invoice_id' => $invoice->id,
+                    'payment_id' => null,
+                    'refund_id' => null,
+                    'type' => 'invoice',
+                    'debit' => $invoice->total,
+                    'credit' => 0,
+                    'entry_date' => $invoice->issued_at ?? now(),
+                    'description' => 'Invoice issued #' . $invoice->number,
+                ]);
+            }
+
+            $appointment->update(['status' => 'completed']);
+
+            ActivityLogger::log(
+                $companyId,
+                $request->user(),
+                'appointment.completed',
+                Appointment::class,
+                $appointment->id,
+                [
+                    'invoice_id' => $invoice->id,
+                    'invoice_number' => $invoice->number,
+                    'treatment_plan_id' => $invoice->treatment_plan_id,
+                    'total' => (float) $invoice->total,
+                ]
+            );
+
+            return response()->json([
+                'msg' => 'Appointment completed and invoice created',
+                'status' => 200,
+                'invoice_id' => $invoice->id,
+                'order_id' => $order->id,
+                'invoice_number' => $invoice->number,
+                'treatment_plan_id' => $invoice->treatment_plan_id,
+                'total' => (float) $invoice->total,
+            ]);
         });
     }
 }
