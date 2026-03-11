@@ -1531,9 +1531,18 @@ class AppointmentController extends Controller
 
             $total = (float) ($data['total'] ?? 0);
 
-            // ✅ حالة كشف فقط: consultation invoice already exists, no new treatment invoice needed
+            // ✅ consultation only: no treatment invoice
             if (!$plan && $total <= 0) {
                 $appointment->update(['status' => 'completed']);
+
+                // ✅ لو الموعد مرتبط بـ treatment_plan_item نعلّمه completed
+                \App\Models\TreatmentPlanItem::query()
+                    ->where('company_id', $companyId)
+                    ->where('appointment_id', $appointment->id)
+                    ->update([
+                        'status' => 'completed',
+                        'completed_at' => now(),
+                    ]);
 
                 ActivityLogger::log(
                     $companyId,
@@ -1562,7 +1571,7 @@ class AppointmentController extends Controller
             }
 
             // ✅ لا نمنع بسبب consultation invoice
-            // ✅ نمنع فقط وجود treatment/services invoice سابق لنفس الموعد
+            // ✅ نمنع فقط treatment/services invoice سابق لنفس الموعد
             $existingTreatmentInvoice = Invoice::query()
                 ->where('company_id', $companyId)
                 ->where('appointment_id', $appointment->id)
@@ -1702,6 +1711,15 @@ class AppointmentController extends Controller
             }
 
             $appointment->update(['status' => 'completed']);
+
+            // ✅ لو الموعد ده ناتج من Start Procedure، نكمل الـ item
+            \App\Models\TreatmentPlanItem::query()
+                ->where('company_id', $companyId)
+                ->where('appointment_id', $appointment->id)
+                ->update([
+                    'status' => 'completed',
+                    'completed_at' => now(),
+                ]);
 
             ActivityLogger::log(
                 $companyId,
