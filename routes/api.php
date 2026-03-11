@@ -336,7 +336,7 @@ Route::prefix('erp')
             ->get('/procedures', [ProcedureController::class, 'index']);
 
         Route::middleware('permission:procedures.view')
-            ->get('/erp/procedures/{id}', [ProcedureController::class, 'show']);
+            ->get('/procedures/{id}', [ProcedureController::class, 'show']);
 
         Route::middleware('permission:procedures.manage')
             ->post('/procedures', [ProcedureController::class, 'store']);
