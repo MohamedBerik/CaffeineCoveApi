@@ -17,9 +17,13 @@ class ProcedureController extends Controller
             ->where('company_id', $companyId)
             ->orderByDesc('id');
 
-        // optional filters
         if ($request->has('is_active')) {
-            $isActive = filter_var($request->query('is_active'), FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
+            $isActive = filter_var(
+                $request->query('is_active'),
+                FILTER_VALIDATE_BOOLEAN,
+                FILTER_NULL_ON_FAILURE
+            );
+
             if (!is_null($isActive)) {
                 $q->where('is_active', $isActive);
             }
@@ -36,6 +40,21 @@ class ProcedureController extends Controller
         ]);
     }
 
+    public function show(Request $request, $id)
+    {
+        $companyId = $request->user()->company_id;
+
+        $procedure = Procedure::query()
+            ->where('company_id', $companyId)
+            ->findOrFail($id);
+
+        return response()->json([
+            'msg' => 'Procedure details',
+            'status' => 200,
+            'data' => $procedure,
+        ]);
+    }
+
     public function store(Request $request)
     {
         $companyId = $request->user()->company_id;
@@ -45,7 +64,9 @@ class ProcedureController extends Controller
                 'required',
                 'string',
                 'max:190',
-                Rule::unique('procedures', 'name')->where(fn($q) => $q->where('company_id', $companyId)),
+                Rule::unique('procedures', 'name')->where(
+                    fn($q) => $q->where('company_id', $companyId)
+                ),
             ],
             'default_price' => ['nullable', 'numeric', 'min:0'],
             'is_active' => ['nullable', 'boolean'],
@@ -53,7 +74,7 @@ class ProcedureController extends Controller
 
         $procedure = Procedure::create([
             'company_id' => $companyId,
-            'name' => $data['name'],
+            'name' => trim($data['name']),
             'default_price' => (float) ($data['default_price'] ?? 0),
             'is_active' => (bool) ($data['is_active'] ?? true),
         ]);
@@ -85,7 +106,15 @@ class ProcedureController extends Controller
             'is_active' => ['sometimes', 'nullable', 'boolean'],
         ]);
 
-        $procedure->update($data);
+        $procedure->update([
+            'name' => array_key_exists('name', $data) ? trim($data['name']) : $procedure->name,
+            'default_price' => array_key_exists('default_price', $data)
+                ? (float) ($data['default_price'] ?? 0)
+                : $procedure->default_price,
+            'is_active' => array_key_exists('is_active', $data)
+                ? (bool) $data['is_active']
+                : $procedure->is_active,
+        ]);
 
         return response()->json([
             'msg' => 'Procedure updated',
@@ -95,8 +124,7 @@ class ProcedureController extends Controller
     }
 
     /**
-     * بدل ما نمسح فعليًا (ممكن يكون مرتبط بخطط علاج):
-     * نخليه inactive
+     * بدل الحذف الفعلي نخليه inactive
      */
     public function destroy(Request $request, $id)
     {
