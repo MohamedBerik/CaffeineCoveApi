@@ -419,86 +419,86 @@ class TreatmentPlanController extends Controller
         ]);
     }
 
-    public function addItem(Request $request, $id)
-    {
-        $companyId = $request->user()->company_id;
+    // public function addItem(Request $request, $id)
+    // {
+    //     $companyId = $request->user()->company_id;
 
-        $plan = TreatmentPlan::where('company_id', $companyId)->findOrFail($id);
+    //     $plan = TreatmentPlan::where('company_id', $companyId)->findOrFail($id);
 
-        $data = $request->validate([
-            'procedure_id' => ['required', 'integer'],
-            'tooth_number' => ['nullable', 'string', 'max:10'],
-            'surface' => ['nullable', 'string', 'max:50'],
-            'notes' => ['nullable', 'string'],
-            'price' => ['nullable', 'numeric', 'min:0'],
-        ]);
+    //     $data = $request->validate([
+    //         'procedure_id' => ['required', 'integer'],
+    //         'tooth_number' => ['nullable', 'string', 'max:10'],
+    //         'surface' => ['nullable', 'string', 'max:50'],
+    //         'notes' => ['nullable', 'string'],
+    //         'price' => ['nullable', 'numeric', 'min:0'],
+    //     ]);
 
-        $procedure = Procedure::where('company_id', $companyId)
-            ->findOrFail($data['procedure_id']);
+    //     $procedure = Procedure::where('company_id', $companyId)
+    //         ->findOrFail($data['procedure_id']);
 
-        $price = $data['price'] ?? $procedure->default_price;
+    //     $price = $data['price'] ?? $procedure->default_price;
 
-        $item = TreatmentPlanItem::create([
-            'company_id' => $companyId,
-            'treatment_plan_id' => $plan->id,
-            'procedure_id' => $procedure->id,
-            'procedure' => $procedure->name,
-            'tooth_number' => $data['tooth_number'] ?? null,
-            'surface' => $data['surface'] ?? null,
-            'notes' => $data['notes'] ?? null,
-            'price' => $price,
-        ]);
+    //     $item = TreatmentPlanItem::create([
+    //         'company_id' => $companyId,
+    //         'treatment_plan_id' => $plan->id,
+    //         'procedure_id' => $procedure->id,
+    //         'procedure' => $procedure->name,
+    //         'tooth_number' => $data['tooth_number'] ?? null,
+    //         'surface' => $data['surface'] ?? null,
+    //         'notes' => $data['notes'] ?? null,
+    //         'price' => $price,
+    //     ]);
 
-        $this->recalculatePlanTotal($companyId, $plan->id);
+    //     $this->recalculatePlanTotal($companyId, $plan->id);
 
-        return response()->json([
-            'msg' => 'Item added',
-            'status' => 201,
-            'data' => $item->load('procedureRef'),
-        ], 201);
-    }
+    //     return response()->json([
+    //         'msg' => 'Item added',
+    //         'status' => 201,
+    //         'data' => $item->load('procedureRef'),
+    //     ], 201);
+    // }
 
-    public function updateItem(Request $request, $itemId)
-    {
-        $companyId = $request->user()->company_id;
+    // public function updateItem(Request $request, $itemId)
+    // {
+    //     $companyId = $request->user()->company_id;
 
-        $item = TreatmentPlanItem::where('company_id', $companyId)->findOrFail($itemId);
+    //     $item = TreatmentPlanItem::where('company_id', $companyId)->findOrFail($itemId);
 
-        $data = $request->validate([
-            'procedure_id' => ['sometimes', 'required', 'integer'],
-            'tooth_number' => ['sometimes', 'nullable', 'string', 'max:10'],
-            'surface' => ['sometimes', 'nullable', 'string', 'max:50'],
-            'notes' => ['sometimes', 'nullable', 'string'],
-            'price' => ['sometimes', 'nullable', 'numeric', 'min:0'],
-        ]);
+    //     $data = $request->validate([
+    //         'procedure_id' => ['sometimes', 'required', 'integer'],
+    //         'tooth_number' => ['sometimes', 'nullable', 'string', 'max:10'],
+    //         'surface' => ['sometimes', 'nullable', 'string', 'max:50'],
+    //         'notes' => ['sometimes', 'nullable', 'string'],
+    //         'price' => ['sometimes', 'nullable', 'numeric', 'min:0'],
+    //     ]);
 
-        if (isset($data['procedure_id'])) {
-            $procedure = Procedure::where('company_id', $companyId)
-                ->findOrFail($data['procedure_id']);
+    //     if (isset($data['procedure_id'])) {
+    //         $procedure = Procedure::where('company_id', $companyId)
+    //             ->findOrFail($data['procedure_id']);
 
-            $item->procedure_id = $procedure->id;
-            $item->procedure = $procedure->name;
+    //         $item->procedure_id = $procedure->id;
+    //         $item->procedure = $procedure->name;
 
-            if (!isset($data['price'])) {
-                $item->price = $procedure->default_price;
-            }
-        }
+    //         if (!isset($data['price'])) {
+    //             $item->price = $procedure->default_price;
+    //         }
+    //     }
 
-        $item->update([
-            'tooth_number' => $data['tooth_number'] ?? $item->tooth_number,
-            'surface' => $data['surface'] ?? $item->surface,
-            'notes' => $data['notes'] ?? $item->notes,
-            'price' => $data['price'] ?? $item->price,
-        ]);
+    //     $item->update([
+    //         'tooth_number' => $data['tooth_number'] ?? $item->tooth_number,
+    //         'surface' => $data['surface'] ?? $item->surface,
+    //         'notes' => $data['notes'] ?? $item->notes,
+    //         'price' => $data['price'] ?? $item->price,
+    //     ]);
 
-        $this->recalculatePlanTotal($companyId, $item->treatment_plan_id);
+    //     $this->recalculatePlanTotal($companyId, $item->treatment_plan_id);
 
-        return response()->json([
-            'msg' => 'Item updated',
-            'status' => 200,
-            'data' => $item->fresh()->load('procedureRef'),
-        ]);
-    }
+    //     return response()->json([
+    //         'msg' => 'Item updated',
+    //         'status' => 200,
+    //         'data' => $item->fresh()->load('procedureRef'),
+    //     ]);
+    // }
 
     public function deleteItem(Request $request, $itemId)
     {
@@ -688,5 +688,109 @@ class TreatmentPlanController extends Controller
                 ],
             ], 201);
         });
+    }
+
+    //New copy
+    public function addItem(Request $request, $id)
+    {
+        $companyId = $request->user()->company_id;
+
+        $plan = TreatmentPlan::where('company_id', $companyId)->findOrFail($id);
+
+        $data = $request->validate([
+            'procedure_id' => ['required', 'integer'],
+            'tooth_number' => ['nullable', 'string', 'max:10'],
+            'surface' => ['nullable', 'string', 'max:50'],
+            'notes' => ['nullable', 'string'],
+            'price' => ['nullable', 'numeric', 'min:0'],
+            'planned_sessions' => ['nullable', 'integer', 'min:1', 'max:20'],
+        ]);
+
+        $procedure = Procedure::where('company_id', $companyId)
+            ->findOrFail($data['procedure_id']);
+
+        $price = $data['price'] ?? $procedure->default_price;
+
+        $plannedSessions = (int) ($data['planned_sessions'] ?? 1);
+
+        $item = TreatmentPlanItem::create([
+            'company_id' => $companyId,
+            'treatment_plan_id' => $plan->id,
+            'procedure_id' => $procedure->id,
+            'procedure' => $procedure->name,
+            'tooth_number' => $data['tooth_number'] ?? null,
+            'surface' => $data['surface'] ?? null,
+            'notes' => $data['notes'] ?? null,
+            'price' => $price,
+            'planned_sessions' => $plannedSessions,
+            'completed_sessions' => 0,
+            'status' => 'planned',
+        ]);
+
+        $this->recalculatePlanTotal($companyId, $plan->id);
+
+        return response()->json([
+            'msg' => 'Item added',
+            'status' => 201,
+            'data' => $item->load('procedureRef'),
+        ], 201);
+    }
+
+    //New copy
+    public function updateItem(Request $request, $itemId)
+    {
+        $companyId = $request->user()->company_id;
+
+        $item = TreatmentPlanItem::where('company_id', $companyId)->findOrFail($itemId);
+
+        $data = $request->validate([
+            'procedure_id' => ['sometimes', 'required', 'integer'],
+            'tooth_number' => ['sometimes', 'nullable', 'string', 'max:10'],
+            'surface' => ['sometimes', 'nullable', 'string', 'max:50'],
+            'notes' => ['sometimes', 'nullable', 'string'],
+            'price' => ['sometimes', 'nullable', 'numeric', 'min:0'],
+            'planned_sessions' => ['sometimes', 'integer', 'min:1', 'max:20'],
+        ]);
+
+        if (isset($data['procedure_id'])) {
+
+            $procedure = Procedure::where('company_id', $companyId)
+                ->findOrFail($data['procedure_id']);
+
+            $item->procedure_id = $procedure->id;
+            $item->procedure = $procedure->name;
+
+            if (!isset($data['price'])) {
+                $item->price = $procedure->default_price;
+            }
+        }
+
+        if (isset($data['planned_sessions'])) {
+
+            if ($item->completed_sessions > 0) {
+                return response()->json([
+                    'msg' => 'Cannot change sessions after treatment has started',
+                    'status' => 422,
+                ], 422);
+            }
+
+            $item->planned_sessions = (int) $data['planned_sessions'];
+        }
+
+        $item->update([
+            'tooth_number' => $data['tooth_number'] ?? $item->tooth_number,
+            'surface' => $data['surface'] ?? $item->surface,
+            'notes' => $data['notes'] ?? $item->notes,
+            'price' => $data['price'] ?? $item->price,
+            'planned_sessions' => $item->planned_sessions,
+        ]);
+
+        $this->recalculatePlanTotal($companyId, $item->treatment_plan_id);
+
+        return response()->json([
+            'msg' => 'Item updated',
+            'status' => 200,
+            'data' => $item->fresh()->load('procedureRef'),
+        ]);
     }
 }
