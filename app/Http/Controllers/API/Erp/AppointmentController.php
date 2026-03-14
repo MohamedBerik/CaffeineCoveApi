@@ -1707,9 +1707,17 @@ class AppointmentController extends Controller
                     'status' => 'completed',
                 ]);
 
+                $currentCompleted = (int) ($linkedPlanItem->completed_sessions ?? 0);
+                $plannedSessions = max((int) ($linkedPlanItem->planned_sessions ?? 1), 1);
+
+                $newCompleted = min($currentCompleted + 1, $plannedSessions);
+                $remainingAfterComplete = max($plannedSessions - $newCompleted, 0);
+
                 $linkedPlanItem->update([
-                    'status' => 'completed',
-                    'completed_at' => now(),
+                    'completed_sessions' => $newCompleted,
+                    'status' => $remainingAfterComplete > 0 ? 'planned' : 'completed',
+                    'appointment_id' => null,
+                    'completed_at' => $remainingAfterComplete === 0 ? now() : null,
                 ]);
 
                 ActivityLogger::log(
