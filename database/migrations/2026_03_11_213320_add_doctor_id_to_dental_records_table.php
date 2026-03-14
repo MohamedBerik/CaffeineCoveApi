@@ -13,8 +13,14 @@ class AddDoctorIdToDentalRecordsTable extends Migration
      */
     public function up()
     {
+
         Schema::table('dental_records', function (Blueprint $table) {
-            //
+            $table->unsignedBigInteger('doctor_id')->nullable()->after('appointment_id');
+
+            $table->foreign('doctor_id')
+                ->references('id')
+                ->on('doctors')
+                ->nullOnDelete();
         });
     }
 
@@ -26,12 +32,7 @@ class AddDoctorIdToDentalRecordsTable extends Migration
     public function down()
     {
         Schema::table('dental_records', function (Blueprint $table) {
-            $table->unsignedBigInteger('doctor_id')->nullable()->after('appointment_id');
-
-            $table->foreign('doctor_id')
-                ->references('id')
-                ->on('doctors')
-                ->nullOnDelete();
+            //
         });
     }
 }

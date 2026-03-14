@@ -646,6 +646,7 @@ class TreatmentPlanController extends Controller
                 'doctor_name' => $doctor->name ?? 'Doctor',
                 'appointment_date' => $date,
                 'appointment_time' => $time,
+                'appointment_type' => 'treatment',
                 'status' => 'scheduled',
                 'notes' => $data['notes'] ?? $item->notes,
                 'created_by' => $request->user()->id,
