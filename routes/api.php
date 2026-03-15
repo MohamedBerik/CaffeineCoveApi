@@ -279,6 +279,8 @@ Route::prefix('erp')
             ->get('/appointments', [AppointmentController::class, 'index']);
         Route::middleware('permission:appointments.view')
             ->get('/appointments/available-slots', [AppointmentAvailabilityController::class, 'index']);
+        Route::middleware('permission:appointments.view')
+            ->get('/appointments/{id}', [AppointmentController::class, 'show']);
         Route::middleware('permission:appointments.manage')
             ->post('/appointments/book', [AppointmentController::class, 'book']);
         Route::middleware('permission:appointments.manage')
