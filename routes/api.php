@@ -203,7 +203,7 @@ Route::prefix('erp')
         Route::middleware('permission:finance.view')
             ->get('/invoices/{invoiceId}/journal-entries', [InvoiceJournalController::class, 'index']);
 
-
+        Route::post('/invoices/{invoice}/apply-credit', [InvoicePaymentController::class, 'applyCustomerCredit']);
         /*
         |--------------------------------------------------------------------------
         | Payments / Refunds
