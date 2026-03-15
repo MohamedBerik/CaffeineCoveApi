@@ -145,23 +145,6 @@ class InvoiceController extends Controller
         // (اختياري) لو تحب تعرض إجمالي cash دخل فعليًا:
         $totalCashReceived = $payments->sum(fn($p) => (float) $p->amount);
 
-        //لخصم ما تم استهلاكه من رصيد العميل
-        $totalCustomerCreditIssued = DB::table('customer_credits')
-            ->where('company_id', $companyId)
-            ->where('customer_id', $invoice->customer_id)
-            ->where('type', 'credit')
-            ->sum('amount');
-
-        $totalCustomerCreditUsed = DB::table('customer_credits')
-            ->where('company_id', $companyId)
-            ->where('customer_id', $invoice->customer_id)
-            ->where('type', 'debit')
-            ->sum('amount');
-
-        $customerCreditBalance = max(
-            0,
-            (float) $totalCustomerCreditIssued - (float) $totalCustomerCreditUsed
-        );
         return [
             'id' => $invoice->id,
             'number' => $invoice->number,
@@ -186,11 +169,6 @@ class InvoiceController extends Controller
             'credit_issued' => (float) $totalCreditIssued,
             'credit_refunded' => (float) $totalRefundedCredit,
             'net_credit' => (float) $netCredit,
-
-            //لخصم ما تم استهلاكه من رصيد العميل
-            'customer_credit_issued_total' => (float) $totalCustomerCreditIssued,
-            'customer_credit_used_total' => (float) $totalCustomerCreditUsed,
-            'customer_credit_balance' => (float) $customerCreditBalance,
 
             // (اختياري للـ UI/Debug)
             'cash_received' => (float) $totalCashReceived,
@@ -217,7 +195,6 @@ class InvoiceController extends Controller
 
                     // لو تحب ترجع refunds نفسها للـ UI:
                     'refunds' => $p->refunds->values(),
-
                 ];
             })->values(),
         ];
