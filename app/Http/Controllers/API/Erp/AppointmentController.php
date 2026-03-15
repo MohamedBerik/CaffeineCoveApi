@@ -1544,11 +1544,12 @@ class AppointmentController extends Controller
                     Appointment::class,
                     $appointment->id,
                     [
-                        'appointment_type'   => 'consultation',
-                        'invoice_id'         => $existingConsultationInvoice->id,
-                        'invoice_number'     => $existingConsultationInvoice->number,
-                        'treatment_plan_id'  => $existingConsultationInvoice->treatment_plan_id,
-                        'total'              => (float) $existingConsultationInvoice->total,
+                        'appointment_type'  => 'consultation',
+                        'invoice_id'        => $existingConsultationInvoice->id,
+                        'invoice_number'    => $existingConsultationInvoice->number,
+                        'treatment_plan_id' => $existingConsultationInvoice->treatment_plan_id,
+                        'total'             => (float) $existingConsultationInvoice->total,
+                        'invoice_status'    => $existingConsultationInvoice->status,
                     ]
                 );
 
@@ -1559,6 +1560,7 @@ class AppointmentController extends Controller
                     'order_id' => $existingConsultationInvoice->order_id,
                     'invoice_number' => $existingConsultationInvoice->number,
                     'treatment_plan_id' => $existingConsultationInvoice->treatment_plan_id,
+                    'invoice_status' => $existingConsultationInvoice->status,
                     'total' => (float) $existingConsultationInvoice->total,
                 ], 200);
             }
@@ -1570,6 +1572,7 @@ class AppointmentController extends Controller
         | - appointment must come from Start Procedure
         | - it must be linked to one treatment_plan_item
         | - complete creates invoice for THIS item only
+        | - then auto-apply any available customer credit
         */
             if ($appointmentType === 'treatment') {
                 $linkedPlanItem = \App\Models\TreatmentPlanItem::query()
@@ -1625,6 +1628,7 @@ class AppointmentController extends Controller
                         'invoice_id' => $existingTreatmentInvoice->id,
                         'invoice_number' => $existingTreatmentInvoice->number,
                         'treatment_plan_id' => $existingTreatmentInvoice->treatment_plan_id,
+                        'invoice_status' => $existingTreatmentInvoice->status,
                     ], 409);
                 }
 
@@ -1703,6 +1707,10 @@ class AppointmentController extends Controller
                     ]);
                 }
 
+                // ✅ Auto-apply available customer credit
+                $this->autoApplyCustomerCredit($invoice, $request->user());
+                $invoice->refresh();
+
                 $appointment->update([
                     'status' => 'completed',
                 ]);
@@ -1727,12 +1735,13 @@ class AppointmentController extends Controller
                     Appointment::class,
                     $appointment->id,
                     [
-                        'appointment_type'      => 'treatment',
-                        'invoice_id'            => $invoice->id,
-                        'invoice_number'        => $invoice->number,
-                        'treatment_plan_id'     => $invoice->treatment_plan_id,
+                        'appointment_type'       => 'treatment',
+                        'invoice_id'             => $invoice->id,
+                        'invoice_number'         => $invoice->number,
+                        'treatment_plan_id'      => $invoice->treatment_plan_id,
                         'treatment_plan_item_id' => $linkedPlanItem->id,
-                        'total'                 => (float) $invoice->total,
+                        'total'                  => (float) $invoice->total,
+                        'invoice_status'         => $invoice->status,
                     ]
                 );
 
@@ -1744,6 +1753,7 @@ class AppointmentController extends Controller
                     'invoice_number' => $invoice->number,
                     'treatment_plan_id' => $invoice->treatment_plan_id,
                     'treatment_plan_item_id' => $linkedPlanItem->id,
+                    'invoice_status' => $invoice->status,
                     'total' => (float) $invoice->total,
                 ], 200);
             }
@@ -1756,5 +1766,129 @@ class AppointmentController extends Controller
                 ],
             ], 422);
         });
+    }
+
+    private function autoApplyCustomerCredit(Invoice $invoice, $user): void
+    {
+        $companyId = $invoice->company_id;
+
+        $totalCustomerCredit = DB::table('customer_credits')
+            ->where('company_id', $companyId)
+            ->where('customer_id', $invoice->customer_id)
+            ->where('type', 'credit')
+            ->sum('amount');
+
+        $totalCustomerDebit = DB::table('customer_credits')
+            ->where('company_id', $companyId)
+            ->where('customer_id', $invoice->customer_id)
+            ->where('type', 'debit')
+            ->sum('amount');
+
+        $availableCredit = max(0, (float) $totalCustomerCredit - (float) $totalCustomerDebit);
+
+        if ($availableCredit <= 0) {
+            return;
+        }
+
+        $totalApplied = Payment::where('company_id', $companyId)
+            ->where('invoice_id', $invoice->id)
+            ->sum('applied_amount');
+
+        $totalRefunded = DB::table('payment_refunds')
+            ->join('payments', 'payments.id', '=', 'payment_refunds.payment_id')
+            ->where('payments.company_id', $companyId)
+            ->where('payments.invoice_id', $invoice->id)
+            ->where('payment_refunds.company_id', $companyId)
+            ->where('payment_refunds.applies_to', 'invoice')
+            ->sum('payment_refunds.amount');
+
+        $totalCreditApplied = DB::table('customer_credits')
+            ->where('company_id', $companyId)
+            ->where('invoice_id', $invoice->id)
+            ->where('type', 'debit')
+            ->sum('amount');
+
+        $netPaid = (float) $totalApplied - (float) $totalRefunded + (float) $totalCreditApplied;
+        $remaining = max(0, (float) $invoice->total - (float) $netPaid);
+
+        if ($remaining <= 0) {
+            return;
+        }
+
+        $creditToApply = min($availableCredit, $remaining);
+
+        if ($creditToApply <= 0) {
+            return;
+        }
+
+        DB::table('customer_credits')->insert([
+            'company_id'  => $companyId,
+            'customer_id' => $invoice->customer_id,
+            'invoice_id'  => $invoice->id,
+            'payment_id'  => null,
+            'type'        => 'debit',
+            'amount'      => $creditToApply,
+            'entry_date'  => now(),
+            'description' => 'Customer credit auto-applied to invoice #' . $invoice->number,
+            'created_by'  => $user->id ?? null,
+            'created_at'  => now(),
+            'updated_at'  => now(),
+        ]);
+
+        CustomerLedgerEntry::create([
+            'company_id'  => $companyId,
+            'customer_id' => $invoice->customer_id,
+            'invoice_id'  => $invoice->id,
+            'payment_id'  => null,
+            'refund_id'   => null,
+            'type'        => 'credit_apply',
+            'debit'       => 0,
+            'credit'      => $creditToApply,
+            'entry_date'  => now(),
+            'description' => 'Customer credit auto-applied to invoice #' . $invoice->number,
+        ]);
+
+        $arAccount = \App\Models\Account::where('company_id', $companyId)
+            ->where('code', '1100')
+            ->first();
+
+        $creditAccount = \App\Models\Account::where('company_id', $companyId)
+            ->where('code', '2100')
+            ->first();
+
+        if ($arAccount && $creditAccount) {
+            \App\Services\AccountingService::createEntry(
+                $invoice,
+                'Customer credit auto-applied to invoice #' . $invoice->number,
+                [
+                    [
+                        'account_id' => $creditAccount->id,
+                        'debit' => $creditToApply,
+                        'credit' => 0,
+                    ],
+                    [
+                        'account_id' => $arAccount->id,
+                        'debit' => 0,
+                        'credit' => $creditToApply,
+                    ],
+                ],
+                $user->id ?? null,
+                now()->toDateString()
+            );
+        }
+
+        $netAfter = $netPaid + $creditToApply;
+
+        if ($netAfter <= 0) {
+            $status = 'unpaid';
+        } elseif ($netAfter < (float) $invoice->total) {
+            $status = 'partially_paid';
+        } else {
+            $status = 'paid';
+        }
+
+        $invoice->update([
+            'status' => $status,
+        ]);
     }
 }
