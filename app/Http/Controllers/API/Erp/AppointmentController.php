@@ -1184,7 +1184,6 @@ class AppointmentController extends Controller
         }
 
         $doctorName = trim((string) ($data['doctor_name'] ?? '')) ?: ($doctor->name ?? 'Doctor');
-
         $blockedStatuses = ['scheduled', 'completed', 'no_show'];
 
         return DB::transaction(function () use (
@@ -1225,12 +1224,14 @@ class AppointmentController extends Controller
                         'created_by' => $request->user()->id,
                         'appointment_date' => $date,
                         'appointment_time' => $time,
+                        'appointment_type' => 'consultation',
                     ]);
 
-                    // ✅ Auto-create consultation invoice for rebooked cancelled slot if not exists
+                    // Auto-create consultation invoice for rebooked cancelled slot if not exists
                     $existingInvoice = \App\Models\Invoice::query()
                         ->where('company_id', $companyId)
                         ->where('appointment_id', $existing->id)
+                        ->lockForUpdate()
                         ->first();
 
                     if (!$existingInvoice) {
@@ -1297,6 +1298,9 @@ class AppointmentController extends Controller
                                     'entry_date'  => $invoice->issued_at ?? now(),
                                     'description' => 'Consultation invoice #' . $invoice->number,
                                 ]);
+
+                                // ✅ Auto-apply available customer credit
+                                $this->autoApplyCustomerCredit($invoice, $request->user());
                             }
                         }
                     }
@@ -1330,7 +1334,7 @@ class AppointmentController extends Controller
                 $appointment = Appointment::create([
                     'company_id' => $companyId,
                     'patient_id' => $data['patient_id'],
-                    'doctor_id'  => $doctorId,
+                    'doctor_id' => $doctorId,
                     'doctor_name' => $doctorName,
                     'appointment_date' => $date,
                     'appointment_time' => $time,
@@ -1353,10 +1357,11 @@ class AppointmentController extends Controller
                 throw $e;
             }
 
-            // ✅ Auto-create consultation invoice for newly booked appointment
+            // Auto-create consultation invoice for newly booked appointment
             $existingInvoice = \App\Models\Invoice::query()
                 ->where('company_id', $companyId)
                 ->where('appointment_id', $appointment->id)
+                ->lockForUpdate()
                 ->first();
 
             if (!$existingInvoice) {
@@ -1423,6 +1428,9 @@ class AppointmentController extends Controller
                             'entry_date'  => $invoice->issued_at ?? now(),
                             'description' => 'Consultation invoice #' . $invoice->number,
                         ]);
+
+                        // ✅ Auto-apply available customer credit
+                        $this->autoApplyCustomerCredit($invoice, $request->user());
                     }
                 }
             }
