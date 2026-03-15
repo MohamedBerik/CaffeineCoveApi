@@ -7,6 +7,7 @@ use App\Models\Appointment;
 use App\Models\CustomerLedgerEntry;
 use App\Models\Doctor;
 use App\Models\Invoice;
+use App\Models\Payment;
 use App\Models\TreatmentPlan;
 use App\Services\ActivityLogger;
 use Carbon\Carbon;
