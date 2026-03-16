@@ -59,4 +59,9 @@ class Appointment extends Model
         if (!$value) return null;
         return \Carbon\Carbon::parse($value)->format('H:i');
     }
+
+    public function treatmentPlanItem()
+    {
+        return $this->hasOne(\App\Models\TreatmentPlanItem::class);
+    }
 }
