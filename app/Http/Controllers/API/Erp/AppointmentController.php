@@ -271,6 +271,10 @@ class AppointmentController extends Controller
                 'treatment_plan_id' => $appointment->invoice?->treatment_plan_id,
 
                 'treatment_plan_item_id' => $planItem?->id,
+
+                'clinical_notes' => $appointment->clinical_notes,
+                'diagnosis'      => $appointment->diagnosis,
+                'next_step'      => $appointment->next_step,
             ],
         ]);
     }
@@ -294,10 +298,14 @@ class AppointmentController extends Controller
             ], 422);
         }
 
-        // ✅ A: update بسيط (notes/status فقط)
         $v = Validator::make($request->all(), [
             'notes'  => ['nullable', 'string'],
             'status' => ['sometimes', Rule::in(['scheduled', 'cancelled', 'no_show'])],
+
+            // ✅ NEW
+            'clinical_notes' => ['nullable', 'string'],
+            'diagnosis'      => ['nullable', 'string'],
+            'next_step'      => ['nullable', 'string'],
         ]);
 
         if ($v->fails()) {
@@ -1085,6 +1093,11 @@ class AppointmentController extends Controller
         $data = $request->validate([
             'doctor_name' => ['nullable', 'string', 'max:190'],
             'notes' => ['nullable', 'string'],
+
+            // ✅ NEW
+            'clinical_notes' => ['nullable', 'string'],
+            'diagnosis'      => ['nullable', 'string'],
+            'next_step'      => ['nullable', 'string'],
         ]);
 
         $serviceProduct = \App\Models\Product::query()
@@ -1125,8 +1138,13 @@ class AppointmentController extends Controller
             $appointmentType = (string) ($appointment->appointment_type ?? 'consultation');
 
             $appointment->update([
-                'doctor_name' => $data['doctor_name'] ?? $appointment->doctor_name,
-                'notes' => $data['notes'] ?? $appointment->notes,
+                'doctor_name'    => $data['doctor_name'] ?? $appointment->doctor_name,
+                'notes'          => $data['notes'] ?? $appointment->notes,
+
+                // ✅ NEW
+                'clinical_notes' => $data['clinical_notes'] ?? $appointment->clinical_notes,
+                'diagnosis'      => $data['diagnosis'] ?? $appointment->diagnosis,
+                'next_step'      => $data['next_step'] ?? $appointment->next_step,
             ]);
 
             /*
