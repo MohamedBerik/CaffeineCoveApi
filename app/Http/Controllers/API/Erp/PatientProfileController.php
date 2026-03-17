@@ -8,6 +8,7 @@ use App\Models\Customer;
 use App\Models\DentalRecord;
 use App\Models\Invoice;
 use App\Models\Payment;
+use App\Models\Procedure;
 use App\Models\TreatmentPlan;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -41,7 +42,7 @@ class PatientProfileController extends Controller
                 'procedure:id,company_id,name,default_price',
             ])
             ->orderByDesc('id')
-            ->limit(20)
+            // ->limit(20)
             ->get();
 
         $treatmentPlans = TreatmentPlan::query()
@@ -162,6 +163,11 @@ class PatientProfileController extends Controller
 
         $invoicesRemaining = max(0, $invoicesTotal - $invoicesPaid);
 
+        $procedures = Procedure::query()
+            ->where('company_id', $companyId)
+            ->orderBy('name', 'asc')
+            ->get(['id', 'company_id', 'name', 'default_price']);
+
         return response()->json([
             'msg' => 'Patient profile',
             'status' => 200,
@@ -180,6 +186,8 @@ class PatientProfileController extends Controller
                     'created_at' => $customer->created_at,
                     'updated_at' => $customer->updated_at,
                 ],
+
+                'procedures' => $procedures,
 
                 'appointments' => $appointments,
                 'dental_records' => $dentalRecords,
