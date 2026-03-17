@@ -118,6 +118,7 @@ class DentalRecordController extends Controller
             ->with([
                 'customer:id,name,email,company_id',
                 'appointment:id,company_id,appointment_date,appointment_time,status',
+                'doctor:id,name,company_id',
                 'procedure:id,company_id,name,default_price',
             ])
             ->findOrFail($id);
@@ -125,12 +126,7 @@ class DentalRecordController extends Controller
         return response()->json([
             'msg' => 'Dental record details',
             'status' => 200,
-            'data' => $record->load([
-                'customer:id,name,email,company_id',
-                'appointment:id,company_id,appointment_date,appointment_time,status',
-                'doctor:id,name,company_id',
-                'procedure:id,company_id,name,default_price',
-            ]),
+            'data' => $record,
         ]);
     }
 
@@ -166,7 +162,7 @@ class DentalRecordController extends Controller
         return response()->json([
             'msg' => 'Dental record updated',
             'status' => 200,
-            'data' => $record->load([
+            'data' => $record->fresh()->load([
                 'customer:id,name,email,company_id',
                 'appointment:id,company_id,appointment_date,appointment_time,status',
                 'doctor:id,name,company_id',
