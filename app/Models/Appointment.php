@@ -22,6 +22,9 @@ class Appointment extends Model
         'status',
         'notes',
         'created_by',
+        'clinical_notes',
+        'diagnosis',
+        'next_step',
     ];
 
     protected $casts = [

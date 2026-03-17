@@ -256,6 +256,9 @@ class AppointmentController extends Controller
                 'appointment_type' => $appointment->appointment_type,
                 'status' => $appointment->status,
                 'notes' => $appointment->notes,
+                'clinical_notes' => $appointment->clinical_notes,
+                'diagnosis'      => $appointment->diagnosis,
+                'next_step'      => $appointment->next_step,
                 'created_at' => $appointment->created_at,
                 'updated_at' => $appointment->updated_at,
 
@@ -271,10 +274,6 @@ class AppointmentController extends Controller
                 'treatment_plan_id' => $appointment->invoice?->treatment_plan_id,
 
                 'treatment_plan_item_id' => $planItem?->id,
-
-                'clinical_notes' => $appointment->clinical_notes,
-                'diagnosis'      => $appointment->diagnosis,
-                'next_step'      => $appointment->next_step,
             ],
         ]);
     }
@@ -287,22 +286,10 @@ class AppointmentController extends Controller
             ->where('company_id', $companyId)
             ->findOrFail($id);
 
-        // ✅ A: لا تعديل على completed
-        if ($appointment->status === 'completed') {
-            return response()->json([
-                'msg' => 'Completed appointments cannot be modified.',
-                'status' => 422,
-                'errors' => [
-                    'status' => ['Completed appointments cannot be modified.'],
-                ],
-            ], 422);
-        }
-
         $v = Validator::make($request->all(), [
             'notes'  => ['nullable', 'string'],
             'status' => ['sometimes', Rule::in(['scheduled', 'cancelled', 'no_show'])],
 
-            // ✅ NEW
             'clinical_notes' => ['nullable', 'string'],
             'diagnosis'      => ['nullable', 'string'],
             'next_step'      => ['nullable', 'string'],
@@ -318,14 +305,41 @@ class AppointmentController extends Controller
 
         $data = $v->validated();
 
-        // ✅ track فعلي للحقول المسموح تعديلها
-        $track = ['notes', 'status'];
+        /*
+    |--------------------------------------------------------------------------
+    | Rule: completed appointment
+    |--------------------------------------------------------------------------
+    | - allow editing clinical content only
+    | - block operational status changes after completion
+    */
+        if ($appointment->status === 'completed' && array_key_exists('status', $data)) {
+            return response()->json([
+                'msg' => 'Completed appointments status cannot be changed.',
+                'status' => 422,
+                'errors' => [
+                    'status' => ['Completed appointments status cannot be changed.'],
+                ],
+            ], 422);
+        }
+
+        $track = ['notes', 'clinical_notes', 'diagnosis', 'next_step', 'status'];
         $before = $appointment->only($track);
 
+        $updateData = [
+            'notes' => array_key_exists('notes', $data) ? $data['notes'] : $appointment->notes,
+            'clinical_notes' => array_key_exists('clinical_notes', $data) ? $data['clinical_notes'] : $appointment->clinical_notes,
+            'diagnosis' => array_key_exists('diagnosis', $data) ? $data['diagnosis'] : $appointment->diagnosis,
+            'next_step' => array_key_exists('next_step', $data) ? $data['next_step'] : $appointment->next_step,
+        ];
+
+        // status only if appointment is not completed
+        if ($appointment->status !== 'completed' && array_key_exists('status', $data)) {
+            $updateData['status'] = $data['status'];
+        }
+
         try {
-            $appointment->update($data);
+            $appointment->update($updateData);
         } catch (QueryException $e) {
-            // هنا غالباً مفيش 23000 أصلاً لأننا لا نغير slot
             throw $e;
         }
 
@@ -334,12 +348,11 @@ class AppointmentController extends Controller
 
         $changedFields = [];
         foreach ($track as $k) {
-            if ((string)($before[$k] ?? '') !== (string)($after[$k] ?? '')) {
+            if ((string) ($before[$k] ?? '') !== (string) ($after[$k] ?? '')) {
                 $changedFields[] = $k;
             }
         }
 
-        // ✅ log updated
         ActivityLogger::log(
             $companyId,
             $request->user(),
@@ -353,6 +366,9 @@ class AppointmentController extends Controller
                 'date'           => Carbon::parse($appointment->appointment_date)->toDateString(),
                 'time'           => substr((string) $appointment->appointment_time, 0, 5),
                 'status'         => $appointment->status,
+                'clinical_notes' => $appointment->clinical_notes,
+                'diagnosis'      => $appointment->diagnosis,
+                'next_step'      => $appointment->next_step,
             ]
         );
 
@@ -1138,13 +1154,11 @@ class AppointmentController extends Controller
             $appointmentType = (string) ($appointment->appointment_type ?? 'consultation');
 
             $appointment->update([
-                'doctor_name'    => $data['doctor_name'] ?? $appointment->doctor_name,
-                'notes'          => $data['notes'] ?? $appointment->notes,
-
-                // ✅ NEW
-                'clinical_notes' => $data['clinical_notes'] ?? $appointment->clinical_notes,
-                'diagnosis'      => $data['diagnosis'] ?? $appointment->diagnosis,
-                'next_step'      => $data['next_step'] ?? $appointment->next_step,
+                'doctor_name' => $data['doctor_name'] ?? $appointment->doctor_name,
+                'notes' => array_key_exists('notes', $data) ? $data['notes'] : $appointment->notes,
+                'clinical_notes' => array_key_exists('clinical_notes', $data) ? $data['clinical_notes'] : $appointment->clinical_notes,
+                'diagnosis' => array_key_exists('diagnosis', $data) ? $data['diagnosis'] : $appointment->diagnosis,
+                'next_step' => array_key_exists('next_step', $data) ? $data['next_step'] : $appointment->next_step,
             ]);
 
             /*
