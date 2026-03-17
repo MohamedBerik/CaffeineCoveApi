@@ -6,7 +6,6 @@ use App\Http\Controllers\Controller;
 use App\Models\DentalRecord;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
-use App\Models\TreatmentPlan;
 use App\Models\TreatmentPlanItem;
 
 class DentalRecordController extends Controller
@@ -126,7 +125,12 @@ class DentalRecordController extends Controller
         return response()->json([
             'msg' => 'Dental record details',
             'status' => 200,
-            'data' => $record,
+            'data' => $record->load([
+                'customer:id,name,email,company_id',
+                'appointment:id,company_id,appointment_date,appointment_time,status',
+                'doctor:id,name,company_id',
+                'procedure:id,company_id,name,default_price',
+            ]),
         ]);
     }
 
@@ -162,9 +166,10 @@ class DentalRecordController extends Controller
         return response()->json([
             'msg' => 'Dental record updated',
             'status' => 200,
-            'data' => $record->fresh()->load([
+            'data' => $record->load([
                 'customer:id,name,email,company_id',
                 'appointment:id,company_id,appointment_date,appointment_time,status',
+                'doctor:id,name,company_id',
                 'procedure:id,company_id,name,default_price',
             ]),
         ]);
@@ -263,6 +268,18 @@ class DentalRecordController extends Controller
             'surface'           => $record->surface,
             'notes'             => $record->notes,
             'price'             => $price,
+            'planned_sessions'  => 1,
+            'completed_sessions' => 0,
+            'status'            => 'planned',
+        ]);
+
+        $sum = TreatmentPlanItem::query()
+            ->where('company_id', $companyId)
+            ->where('treatment_plan_id', $plan->id)
+            ->sum('price');
+
+        $plan->update([
+            'total_cost' => $sum,
         ]);
 
         return response()->json([

@@ -165,7 +165,6 @@ Route::prefix('erp')
         | Orders
         |--------------------------------------------------------------------------
         */
-
         Route::middleware('permission:orders.manage')
             ->post('/orders', [OrderController::class, 'storeErp']);
 
@@ -187,7 +186,6 @@ Route::prefix('erp')
         | Invoices
         |--------------------------------------------------------------------------
         */
-
         Route::middleware('permission:finance.view')
             ->get('/invoices', [InvoiceController::class, 'indexErp']);
 
@@ -209,7 +207,6 @@ Route::prefix('erp')
         | Payments / Refunds
         |--------------------------------------------------------------------------
         */
-
         Route::middleware('permission:payments.refund')
             ->post('/payments/{payment}/refund', [PaymentRefundController::class, 'refund']);
 
@@ -219,7 +216,6 @@ Route::prefix('erp')
         | Purchase Orders
         |--------------------------------------------------------------------------
         */
-
         Route::middleware('permission:purchases.manage')
             ->post('/purchase-orders', [PurchaseOrderController::class, 'store']);
 
@@ -250,25 +246,26 @@ Route::prefix('erp')
         | Statements
         |--------------------------------------------------------------------------
         */
-
         Route::middleware('permission:finance.view')
             ->get('/customers/{customerId}/statement', [CustomerStatementController::class, 'show']);
 
         Route::middleware('permission:finance.view')
             ->get('/suppliers/{supplier}/statement', [SupplierStatementController::class, 'show']);
 
-
         /*
         |--------------------------------------------------------------------------
         | Dashboard & logs
         |--------------------------------------------------------------------------
         */
-
         Route::middleware('permission:finance.view')
             ->get('/dashboard/finance', [FinanceDashboardController::class, 'index']);
 
         Route::middleware('permission:finance.view')
             ->get('/activity-logs', [ActivityLogController::class, 'index']);
+
+        Route::middleware('permission:finance.view')
+            ->get('/dashboard', [ErpDashboardController::class, 'index']);
+
 
         /*
         |--------------------------------------------------------------------------
@@ -329,6 +326,7 @@ Route::prefix('erp')
         Route::put('/treatment-plan-items/{itemId}', [TreatmentPlanController::class, 'updateItem']);
         Route::delete('/treatment-plan-items/{itemId}', [TreatmentPlanController::class, 'deleteItem']);
         Route::post('/treatment-plan-items/{itemId}/start', [TreatmentPlanController::class, 'startItem']);
+
         /*
         |--------------------------------------------------------------------------
         | Procedure
@@ -348,6 +346,7 @@ Route::prefix('erp')
 
         Route::middleware('permission:procedures.manage')
             ->delete('/procedures/{id}', [ProcedureController::class, 'destroy']);
+
         /*
         |--------------------------------------------------------------------------
         | Doctors
@@ -382,6 +381,17 @@ Route::prefix('erp')
 
         /*
         |--------------------------------------------------------------------------
+        | Patients
+        |--------------------------------------------------------------------------
+        */
+        Route::middleware('permission:patients.view')
+            ->get('/customers/{customerId}/profile', [PatientProfileController::class, 'show']);
+
+        Route::middleware('permission:patients.view')
+            ->get('/customers/{customerId}/timeline', [PatientTimelineController::class, 'index']);
+
+        /*
+        |--------------------------------------------------------------------------
         | DentalRecord
         |--------------------------------------------------------------------------
         */
@@ -403,15 +413,11 @@ Route::prefix('erp')
         Route::middleware('permission:treatment_plans.manage')
             ->post('/dental-records/{id}/to-treatment-plan-item', [DentalRecordController::class, 'toTreatmentPlanItem']);
 
-        Route::middleware('permission:patients.view')
-            ->get('/customers/{customerId}/profile', [PatientProfileController::class, 'show']);
-
-        Route::middleware('permission:patients.view')
-            ->get('/customers/{customerId}/timeline', [PatientTimelineController::class, 'index']);
-
-        Route::middleware('permission:finance.view')
-            ->get('/dashboard', [ErpDashboardController::class, 'index']);
-
+        /*
+        |--------------------------------------------------------------------------
+        | Clinic settings
+        |--------------------------------------------------------------------------
+        */
         Route::get('/clinic-settings', [ClinicSettingController::class, 'show']);
         Route::put('/clinic-settings', [ClinicSettingController::class, 'update']);
     });
