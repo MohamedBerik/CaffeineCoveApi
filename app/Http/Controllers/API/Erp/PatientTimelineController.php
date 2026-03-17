@@ -25,7 +25,10 @@ class PatientTimelineController extends Controller
         $appointments = Appointment::query()
             ->where('company_id', $companyId)
             ->where('patient_id', $customer->id)
-            ->with(['doctor:id,name,company_id'])
+            ->with([
+                'doctor:id,name,company_id',
+                'invoice:id,appointment_id,treatment_plan_id'
+            ])
             ->get()
             ->map(function ($row) {
                 return [
@@ -34,12 +37,26 @@ class PatientTimelineController extends Controller
                     'created_at' => optional($row->created_at)?->toISOString(),
                     'data' => [
                         'id' => $row->id,
+                        'patient_id' => $row->patient_id,
                         'status' => $row->status,
+                        'appointment_type' => $row->appointment_type,
+
                         'appointment_date' => $row->appointment_date,
                         'appointment_time' => substr((string) $row->appointment_time, 0, 5),
+
                         'doctor_id' => $row->doctor_id,
                         'doctor_name' => $row->doctor->name ?? $row->doctor_name,
+
                         'notes' => $row->notes,
+
+                        // 🔹 Clinical Data
+                        'clinical_notes' => $row->clinical_notes,
+                        'diagnosis' => $row->diagnosis,
+                        'next_step' => $row->next_step,
+
+                        // 🔹 Links
+                        'invoice_id' => $row->invoice?->id,
+                        'treatment_plan_id' => $row->invoice?->treatment_plan_id,
                     ],
                 ];
             });
