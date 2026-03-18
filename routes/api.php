@@ -326,7 +326,7 @@ Route::prefix('erp')
         Route::put('/treatment-plan-items/{itemId}', [TreatmentPlanController::class, 'updateItem']);
         Route::delete('/treatment-plan-items/{itemId}', [TreatmentPlanController::class, 'deleteItem']);
         Route::post('/treatment-plan-items/{itemId}/start', [TreatmentPlanController::class, 'startItem']);
-
+        Route::post('/treatment-plan-items/{id}/attach-appointment', [TreatmentPlanController::class, 'attachAppointment']);
         /*
         |--------------------------------------------------------------------------
         | Procedure
