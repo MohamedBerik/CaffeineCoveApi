@@ -21,6 +21,7 @@ class DentalRecord extends Model
         'surface',
         'status',
         'notes',
+        'treatment_plan_item_id',
     ];
 
     public function customer()
@@ -41,5 +42,10 @@ class DentalRecord extends Model
     public function doctor()
     {
         return $this->belongsTo(Doctor::class);
+    }
+
+    public function treatmentPlanItem()
+    {
+        return $this->belongsTo(\App\Models\TreatmentPlanItem::class);
     }
 }

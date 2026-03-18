@@ -269,6 +269,10 @@ class DentalRecordController extends Controller
             'status'            => 'planned',
         ]);
 
+        $record->update([
+            'treatment_plan_item_id' => $item->id,
+        ]);
+
         $sum = TreatmentPlanItem::query()
             ->where('company_id', $companyId)
             ->where('treatment_plan_id', $plan->id)
