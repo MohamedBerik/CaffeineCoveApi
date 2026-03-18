@@ -40,10 +40,9 @@ class PatientProfileController extends Controller
             ->with([
                 'appointment:id,company_id,appointment_date,appointment_time,status',
                 'procedure:id,company_id,name,default_price',
-                'treatmentPlanItem:id,treatment_plan_id,procedure_id,tooth_number,surface,status,completed_sessions,planned_sessions',
+                'treatmentPlanItem:id,treatment_plan_id,appointment_id,procedure_id,tooth_number,surface,status,completed_sessions,planned_sessions',
             ])
             ->orderByDesc('id')
-            // ->limit(20)
             ->get();
 
         $treatmentPlans = TreatmentPlan::query()
