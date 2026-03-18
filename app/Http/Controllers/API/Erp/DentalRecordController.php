@@ -7,6 +7,7 @@ use App\Models\DentalRecord;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 use App\Models\TreatmentPlanItem;
+use Illuminate\Support\Facades\DB;
 
 class DentalRecordController extends Controller
 {
@@ -210,7 +211,9 @@ class DentalRecordController extends Controller
             'treatment_plan_id' => [
                 'required',
                 'integer',
-                Rule::exists('treatment_plans', 'id')->where(fn($q) => $q->where('company_id', $companyId)),
+                Rule::exists('treatment_plans', 'id')->where(
+                    fn($q) => $q->where('company_id', $companyId)
+                ),
             ],
             'price' => ['nullable', 'numeric', 'min:0'],
         ]);
@@ -254,6 +257,10 @@ class DentalRecordController extends Controller
             ->first();
 
         if ($duplicate) {
+            $record->update([
+                'treatment_plan_item_id' => $duplicate->id,
+            ]);
+
             return response()->json([
                 'msg' => 'Dental record already converted to treatment plan item',
                 'status' => 409,
@@ -263,39 +270,41 @@ class DentalRecordController extends Controller
             ], 409);
         }
 
-        $price = $data['price'] ?? (float) ($record->procedure->default_price ?? 0);
+        return DB::transaction(function () use ($companyId, $record, $plan, $data) {
+            $price = $data['price'] ?? (float) ($record->procedure->default_price ?? 0);
 
-        $item = \App\Models\TreatmentPlanItem::create([
-            'company_id'        => $companyId,
-            'treatment_plan_id' => $plan->id,
-            'procedure_id'      => $record->procedure_id,
-            'procedure'         => $record->procedure->name,
-            'tooth_number'      => $record->tooth_number,
-            'surface'           => $record->surface,
-            'notes'             => $record->notes,
-            'price'             => $price,
-            'planned_sessions'  => 1,
-            'completed_sessions' => 0,
-            'status'            => 'planned',
-        ]);
+            $item = \App\Models\TreatmentPlanItem::create([
+                'company_id'         => $companyId,
+                'treatment_plan_id'  => $plan->id,
+                'procedure_id'       => $record->procedure_id,
+                'procedure'          => $record->procedure->name,
+                'tooth_number'       => $record->tooth_number,
+                'surface'            => $record->surface,
+                'notes'              => $record->notes,
+                'price'              => $price,
+                'planned_sessions'   => 1,
+                'completed_sessions' => 0,
+                'status'             => 'planned',
+            ]);
 
-        $record->update([
-            'treatment_plan_item_id' => $item->id,
-        ]);
+            $record->update([
+                'treatment_plan_item_id' => $item->id,
+            ]);
 
-        $sum = TreatmentPlanItem::query()
-            ->where('company_id', $companyId)
-            ->where('treatment_plan_id', $plan->id)
-            ->sum('price');
+            $sum = TreatmentPlanItem::query()
+                ->where('company_id', $companyId)
+                ->where('treatment_plan_id', $plan->id)
+                ->sum('price');
 
-        $plan->update([
-            'total_cost' => $sum,
-        ]);
+            $plan->update([
+                'total_cost' => $sum,
+            ]);
 
-        return response()->json([
-            'msg' => 'Dental record converted to treatment plan item',
-            'status' => 201,
-            'data' => $item->fresh()->load('procedureRef'),
-        ], 201);
+            return response()->json([
+                'msg' => 'Dental record converted to treatment plan item',
+                'status' => 201,
+                'data' => $item->fresh()->load('procedureRef'),
+            ], 201);
+        });
     }
 }
