@@ -196,6 +196,16 @@ class DentalRecordController extends Controller
             ->with('procedure')
             ->findOrFail($id);
 
+        if ($record->treatment_plan_item_id) {
+            return response()->json([
+                'msg' => 'Dental record already converted to treatment plan item',
+                'status' => 409,
+                'data' => [
+                    'treatment_plan_item_id' => $record->treatment_plan_item_id,
+                ],
+            ], 409);
+        }
+
         $data = $request->validate([
             'treatment_plan_id' => [
                 'required',
