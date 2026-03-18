@@ -321,12 +321,28 @@ Route::prefix('erp')
         Route::middleware('permission:treatment_plans.view')
             ->get('/treatment-plans/{id}/cash-summary', [TreatmentPlanController::class, 'cashSummary']);
 
-        Route::get('/treatment-plans/{id}/items', [TreatmentPlanController::class, 'items']);
-        Route::post('/treatment-plans/{id}/items', [TreatmentPlanController::class, 'addItem']);
-        Route::put('/treatment-plan-items/{itemId}', [TreatmentPlanController::class, 'updateItem']);
-        Route::delete('/treatment-plan-items/{itemId}', [TreatmentPlanController::class, 'deleteItem']);
-        Route::post('/treatment-plan-items/{itemId}/start', [TreatmentPlanController::class, 'startItem']);
-        Route::post('/treatment-plan-items/{id}/attach-appointment', [TreatmentPlanController::class, 'attachAppointment']);
+        /*
+        |--------------------------------------------------------------------------
+        | TreatmentPlanItem
+        |--------------------------------------------------------------------------
+       */
+        Route::middleware('permission:treatment_plans.view')
+            ->get('/treatment-plans/{itemId}/items', [TreatmentPlanController::class, 'items']);
+
+        Route::middleware('permission:treatment_plans.manage')
+            ->post('/treatment-plans/{itemId}/items', [TreatmentPlanController::class, 'addItem']);
+
+        Route::middleware('permission:treatment_plans.manage')
+            ->put('/treatment-plan-items/{itemId}', [TreatmentPlanController::class, 'updateItem']);
+
+        Route::middleware('permission:treatment_plans.manage')
+            ->delete('/treatment-plan-items/{itemId}', [TreatmentPlanController::class, 'deleteItem']);
+
+        Route::middleware('permission:treatment_plans.manage')
+            ->post('/treatment-plan-items/{itemId}/start', [TreatmentPlanController::class, 'startItem']);
+
+        Route::middleware('permission:treatment_plans.manage')
+            ->post('/treatment-plan-items/{itemId}/attach-appointment', [TreatmentPlanController::class, 'attachAppointment']);
         /*
         |--------------------------------------------------------------------------
         | Procedure

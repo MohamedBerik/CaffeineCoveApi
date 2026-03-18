@@ -399,11 +399,32 @@ class TreatmentPlanController extends Controller
         ]);
     }
 
-    public function items(Request $request, $id)
+    private function recalculatePlanTotal(int $companyId, int $planId): void
+    {
+        $sum = (float) TreatmentPlanItem::query()
+            ->where('company_id', $companyId)
+            ->where('treatment_plan_id', $planId)
+            ->sum('price');
+
+        TreatmentPlan::query()
+            ->where('company_id', $companyId)
+            ->where('id', $planId)
+            ->update([
+                'total_cost' => $sum,
+                'updated_at' => now(),
+            ]);
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | TreatmentPlanItem
+    |--------------------------------------------------------------------------
+    */
+    public function items(Request $request, $itemId)
     {
         $companyId = $request->user()->company_id;
 
-        $plan = TreatmentPlan::where('company_id', $companyId)->findOrFail($id);
+        $plan = TreatmentPlan::where('company_id', $companyId)->findOrFail($itemId);
 
         $items = TreatmentPlanItem::query()
             ->where('company_id', $companyId)
@@ -436,27 +457,11 @@ class TreatmentPlanController extends Controller
         ]);
     }
 
-    private function recalculatePlanTotal(int $companyId, int $planId): void
-    {
-        $sum = (float) TreatmentPlanItem::query()
-            ->where('company_id', $companyId)
-            ->where('treatment_plan_id', $planId)
-            ->sum('price');
-
-        TreatmentPlan::query()
-            ->where('company_id', $companyId)
-            ->where('id', $planId)
-            ->update([
-                'total_cost' => $sum,
-                'updated_at' => now(),
-            ]);
-    }
-
-    public function addItem(Request $request, $id)
+    public function addItem(Request $request, $itemId)
     {
         $companyId = $request->user()->company_id;
 
-        $plan = TreatmentPlan::where('company_id', $companyId)->findOrFail($id);
+        $plan = TreatmentPlan::where('company_id', $companyId)->findOrFail($itemId);
 
         $data = $request->validate([
             'procedure_id' => ['required', 'integer'],
@@ -538,10 +543,10 @@ class TreatmentPlanController extends Controller
         }
 
         $item->update([
-            'tooth_number' => $data['tooth_number'] ?? $item->tooth_number,
-            'surface' => $data['surface'] ?? $item->surface,
-            'notes' => $data['notes'] ?? $item->notes,
-            'price' => $data['price'] ?? $item->price,
+            'tooth_number' => array_key_exists('tooth_number', $data) ? $data['tooth_number'] : $item->tooth_number,
+            'surface' => array_key_exists('surface', $data) ? $data['surface'] : $item->surface,
+            'notes' => array_key_exists('notes', $data) ? $data['notes'] : $item->notes,
+            'price' => array_key_exists('price', $data) ? $data['price'] : $item->price,
             'planned_sessions' => $item->planned_sessions,
         ]);
 
@@ -731,14 +736,14 @@ class TreatmentPlanController extends Controller
         });
     }
 
-    public function attachAppointment(Request $request, $id)
+    public function attachAppointment(Request $request, $itemId)
     {
         $companyId = $request->user()->company_id;
 
         $item = \App\Models\TreatmentPlanItem::query()
             ->where('company_id', $companyId)
             ->with('plan')
-            ->findOrFail($id);
+            ->findOrFail($itemId);
 
         $data = $request->validate([
             'appointment_id' => [
