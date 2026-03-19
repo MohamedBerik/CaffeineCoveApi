@@ -27,7 +27,7 @@ class PatientTimelineController extends Controller
             ->where('patient_id', $customer->id)
             ->with([
                 'doctor:id,name,company_id',
-                'invoice:id,appointment_id,treatment_plan_id'
+                'invoice:id,appointment_id,treatment_plan_id',
             ])
             ->get()
             ->map(function ($row) {
@@ -40,21 +40,14 @@ class PatientTimelineController extends Controller
                         'patient_id' => $row->patient_id,
                         'status' => $row->status,
                         'appointment_type' => $row->appointment_type,
-
                         'appointment_date' => $row->appointment_date,
                         'appointment_time' => substr((string) $row->appointment_time, 0, 5),
-
                         'doctor_id' => $row->doctor_id,
                         'doctor_name' => $row->doctor->name ?? $row->doctor_name,
-
                         'notes' => $row->notes,
-
-                        // 🔹 Clinical Data
                         'clinical_notes' => $row->clinical_notes,
                         'diagnosis' => $row->diagnosis,
                         'next_step' => $row->next_step,
-
-                        // 🔹 Links
                         'invoice_id' => $row->invoice?->id,
                         'treatment_plan_id' => $row->invoice?->treatment_plan_id,
                     ],
@@ -64,7 +57,10 @@ class PatientTimelineController extends Controller
         $dentalRecords = DentalRecord::query()
             ->where('company_id', $companyId)
             ->where('customer_id', $customer->id)
-            ->with(['procedure:id,name,default_price'])
+            ->with([
+                'procedure:id,name,default_price',
+                'treatmentPlanItem:id,treatment_plan_id,appointment_id,procedure_id,tooth_number,surface,status,planned_sessions,completed_sessions',
+            ])
             ->get()
             ->map(function ($row) {
                 return [
@@ -80,6 +76,23 @@ class PatientTimelineController extends Controller
                         'surface' => $row->surface,
                         'status' => $row->status,
                         'notes' => $row->notes,
+
+                        'treatment_plan_item' => $row->treatmentPlanItem ? [
+                            'id' => $row->treatmentPlanItem->id,
+                            'treatment_plan_id' => $row->treatmentPlanItem->treatment_plan_id,
+                            'appointment_id' => $row->treatmentPlanItem->appointment_id,
+                            'procedure_id' => $row->treatmentPlanItem->procedure_id,
+                            'tooth_number' => $row->treatmentPlanItem->tooth_number,
+                            'surface' => $row->treatmentPlanItem->surface,
+                            'status' => $row->treatmentPlanItem->status,
+                            'planned_sessions' => (int) ($row->treatmentPlanItem->planned_sessions ?? 1),
+                            'completed_sessions' => (int) ($row->treatmentPlanItem->completed_sessions ?? 0),
+                            'remaining_sessions' => max(
+                                (int) ($row->treatmentPlanItem->planned_sessions ?? 1) -
+                                    (int) ($row->treatmentPlanItem->completed_sessions ?? 0),
+                                0
+                            ),
+                        ] : null,
                     ],
                 ];
             });
@@ -157,7 +170,9 @@ class PatientTimelineController extends Controller
                     'event_at' => $row->refunded_at
                         ? \Illuminate\Support\Carbon::parse($row->refunded_at)->toISOString()
                         : ($row->created_at ? \Illuminate\Support\Carbon::parse($row->created_at)->toISOString() : null),
-                    'created_at' => $row->created_at ? \Illuminate\Support\Carbon::parse($row->created_at)->toISOString() : null,
+                    'created_at' => $row->created_at
+                        ? \Illuminate\Support\Carbon::parse($row->created_at)->toISOString()
+                        : null,
                     'data' => [
                         'id' => $row->id,
                         'payment_id' => $row->payment_id,
@@ -189,6 +204,7 @@ class PatientTimelineController extends Controller
                     'name' => $customer->name,
                     'email' => $customer->email,
                     'phone' => $customer->phone ?? null,
+                    'patient_code' => $customer->patient_code ?? null,
                 ],
                 'timeline' => $timeline,
             ],
