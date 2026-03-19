@@ -122,11 +122,11 @@ class PatientTimelineController extends Controller
 
         $payments = Payment::query()
             ->where('company_id', $companyId)
-            ->whereIn('invoice_id', function ($q) use ($companyId, $customerId) {
+            ->whereIn('invoice_id', function ($q) use ($companyId, $customer) {
                 $q->select('id')
                     ->from('invoices')
                     ->where('company_id', $companyId)
-                    ->where('customer_id', $customerId);
+                    ->where('customer_id', $customer->id);
             })
             ->get()
             ->map(function ($row) {
