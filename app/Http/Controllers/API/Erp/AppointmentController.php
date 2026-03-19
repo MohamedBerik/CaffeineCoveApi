@@ -31,15 +31,19 @@ class AppointmentController extends Controller
             ->with([
                 'patient:id,name,email,company_id',
                 'doctor:id,name,company_id,work_start,work_end,slot_minutes',
+                'invoice:id,appointment_id,treatment_plan_id',
             ])
             ->orderByDesc('appointment_date')
             ->orderByDesc('appointment_time');
 
-        // ✅ safe scoped search (no leakage due to OR)
+        // safe scoped search
         if ($search = trim((string) $request->get('search', ''))) {
             $query->where(function ($q) use ($search) {
                 $q->where('doctor_name', 'like', "%{$search}%")
                     ->orWhere('notes', 'like', "%{$search}%")
+                    ->orWhere('appointment_type', 'like', "%{$search}%")
+                    ->orWhere('status', 'like', "%{$search}%")
+                    ->orWhereDate('appointment_date', $search)
                     ->orWhereHas('patient', function ($p) use ($search) {
                         $p->where('name', 'like', "%{$search}%")
                             ->orWhere('email', 'like', "%{$search}%");
@@ -50,10 +54,36 @@ class AppointmentController extends Controller
         $perPage = (int) ($request->get('per_page', 20));
         $data = $query->paginate($perPage);
 
+        $rows = collect($data->items())->map(function ($appointment) {
+            return [
+                'id' => $appointment->id,
+                'company_id' => $appointment->company_id,
+                'patient_id' => $appointment->patient_id,
+                'doctor_id' => $appointment->doctor_id,
+                'doctor_name' => $appointment->doctor_name,
+                'appointment_date' => $appointment->appointment_date,
+                'appointment_time' => $appointment->appointment_time,
+                'appointment_type' => $appointment->appointment_type,
+                'status' => $appointment->status,
+                'notes' => $appointment->notes,
+                'clinical_notes' => $appointment->clinical_notes,
+                'diagnosis' => $appointment->diagnosis,
+                'next_step' => $appointment->next_step,
+                'created_at' => $appointment->created_at,
+                'updated_at' => $appointment->updated_at,
+
+                'invoice_id' => $appointment->invoice?->id,
+                'treatment_plan_id' => $appointment->invoice?->treatment_plan_id,
+
+                'patient' => $appointment->patient,
+                'doctor' => $appointment->doctor,
+            ];
+        })->values();
+
         return response()->json([
             'msg' => 'Appointments list',
             'status' => 200,
-            'data' => $data->items(),
+            'data' => $rows,
             'meta' => [
                 'current_page' => $data->currentPage(),
                 'last_page'    => $data->lastPage(),
