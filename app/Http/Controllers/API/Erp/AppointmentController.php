@@ -5,11 +5,13 @@ namespace App\Http\Controllers\API\Erp;
 use App\Http\Controllers\Controller;
 use App\Models\Appointment;
 use App\Models\CustomerLedgerEntry;
+use App\Models\DentalRecord;
 use App\Models\Doctor;
 use App\Models\Invoice;
 use App\Models\Payment;
 use App\Models\TreatmentPlan;
 use App\Services\ActivityLogger;
+use App\Services\InvoiceNumberService;
 use Carbon\Carbon;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
@@ -1110,25 +1112,12 @@ class AppointmentController extends Controller
             'doctor_name' => ['nullable', 'string', 'max:190'],
             'notes' => ['nullable', 'string'],
 
-            // ✅ NEW
             'clinical_notes' => ['nullable', 'string'],
-            'diagnosis'      => ['nullable', 'string'],
-            'next_step'      => ['nullable', 'string'],
+            'diagnosis' => ['nullable', 'string'],
+            'next_step' => ['nullable', 'string'],
         ]);
 
-        $serviceProduct = \App\Models\Product::query()
-            ->where('company_id', $companyId)
-            ->where('title_en', 'Consultation')
-            ->first();
-
-        if (!$serviceProduct) {
-            return response()->json([
-                'msg' => 'Missing service product (Consultation). Create it first.',
-                'status' => 422,
-            ], 422);
-        }
-
-        return DB::transaction(function () use ($request, $companyId, $data, $appointment, $serviceProduct) {
+        return DB::transaction(function () use ($request, $companyId, $data, $appointment) {
             $appointment = Appointment::query()
                 ->where('company_id', $companyId)
                 ->lockForUpdate()
@@ -1197,12 +1186,12 @@ class AppointmentController extends Controller
                     Appointment::class,
                     $appointment->id,
                     [
-                        'appointment_type'  => 'consultation',
-                        'invoice_id'        => $existingConsultationInvoice->id,
-                        'invoice_number'    => $existingConsultationInvoice->number,
+                        'appointment_type' => 'consultation',
+                        'invoice_id' => $existingConsultationInvoice->id,
+                        'invoice_number' => $existingConsultationInvoice->number,
                         'treatment_plan_id' => $existingConsultationInvoice->treatment_plan_id,
-                        'total'             => (float) $existingConsultationInvoice->total,
-                        'invoice_status'    => $existingConsultationInvoice->status,
+                        'total' => (float) $existingConsultationInvoice->total,
+                        'invoice_status' => $existingConsultationInvoice->status,
                     ]
                 );
 
@@ -1226,6 +1215,7 @@ class AppointmentController extends Controller
         | - it must be linked to one treatment_plan_item
         | - complete creates invoice for THIS item only
         | - then auto-apply any available customer credit
+        | - then create dental record automatically
         */
             if ($appointmentType === 'treatment') {
                 $linkedPlanItem = \App\Models\TreatmentPlanItem::query()
@@ -1279,9 +1269,12 @@ class AppointmentController extends Controller
                         'msg' => 'Treatment invoice already exists for this appointment',
                         'status' => 409,
                         'invoice_id' => $existingTreatmentInvoice->id,
+                        'order_id' => $existingTreatmentInvoice->order_id,
                         'invoice_number' => $existingTreatmentInvoice->number,
                         'treatment_plan_id' => $existingTreatmentInvoice->treatment_plan_id,
+                        'treatment_plan_item_id' => $linkedPlanItem->id,
                         'invoice_status' => $existingTreatmentInvoice->status,
+                        'total' => (float) $existingTreatmentInvoice->total,
                     ], 409);
                 }
 
@@ -1293,6 +1286,21 @@ class AppointmentController extends Controller
                         'status' => 422,
                         'errors' => [
                             'appointment' => ['The linked treatment item must have a valid price.'],
+                        ],
+                    ], 422);
+                }
+
+                $treatmentServiceProduct = \App\Models\Product::query()
+                    ->where('company_id', $companyId)
+                    ->where('title_en', 'Appointment Service')
+                    ->first();
+
+                if (!$treatmentServiceProduct) {
+                    return response()->json([
+                        'msg' => 'Missing service product (Appointment Service). Create it first.',
+                        'status' => 422,
+                        'errors' => [
+                            'product' => ['Appointment Service product is required for treatment invoicing.'],
                         ],
                     ], 422);
                 }
@@ -1310,13 +1318,13 @@ class AppointmentController extends Controller
                 \App\Models\OrderItem::create([
                     'company_id' => $companyId,
                     'order_id' => $order->id,
-                    'product_id' => $serviceProduct->id,
+                    'product_id' => $treatmentServiceProduct->id,
                     'quantity' => 1,
                     'unit_price' => $price,
                     'total' => $price,
                 ]);
 
-                $number = \App\Services\InvoiceNumberService::generate($companyId);
+                $number = InvoiceNumberService::generate($companyId);
 
                 $invoice = \App\Models\Invoice::create([
                     'company_id' => $companyId,
@@ -1333,7 +1341,7 @@ class AppointmentController extends Controller
                 \App\Models\InvoiceItem::create([
                     'company_id' => $companyId,
                     'invoice_id' => $invoice->id,
-                    'product_id' => $serviceProduct->id,
+                    'product_id' => $treatmentServiceProduct->id,
                     'quantity' => 1,
                     'unit_price' => $price,
                     'total' => $price,
@@ -1360,7 +1368,7 @@ class AppointmentController extends Controller
                     ]);
                 }
 
-                // ✅ Auto-apply available customer credit
+                // Auto-apply available customer credit
                 $this->autoApplyCustomerCredit($invoice, $request->user());
                 $invoice->refresh();
 
@@ -1381,6 +1389,19 @@ class AppointmentController extends Controller
                     'completed_at' => $remainingAfterComplete === 0 ? now() : null,
                 ]);
 
+                DentalRecord::create([
+                    'company_id' => $companyId,
+                    'customer_id' => $appointment->patient_id,
+                    'appointment_id' => $appointment->id,
+                    'doctor_id' => $appointment->doctor_id,
+                    'procedure_id' => $linkedPlanItem->procedure_id,
+                    'tooth_number' => $linkedPlanItem->tooth_number,
+                    'surface' => $linkedPlanItem->surface,
+                    'status' => 'completed',
+                    'notes' => $data['clinical_notes'] ?? $data['notes'] ?? $linkedPlanItem->notes,
+                    'treatment_plan_item_id' => $linkedPlanItem->id,
+                ]);
+
                 ActivityLogger::log(
                     $companyId,
                     $request->user(),
@@ -1388,13 +1409,30 @@ class AppointmentController extends Controller
                     Appointment::class,
                     $appointment->id,
                     [
-                        'appointment_type'       => 'treatment',
-                        'invoice_id'             => $invoice->id,
-                        'invoice_number'         => $invoice->number,
-                        'treatment_plan_id'      => $invoice->treatment_plan_id,
+                        'appointment_type' => 'treatment',
+                        'invoice_id' => $invoice->id,
+                        'invoice_number' => $invoice->number,
+                        'treatment_plan_id' => $invoice->treatment_plan_id,
                         'treatment_plan_item_id' => $linkedPlanItem->id,
-                        'total'                  => (float) $invoice->total,
-                        'invoice_status'         => $invoice->status,
+                        'total' => (float) $invoice->total,
+                        'invoice_status' => $invoice->status,
+                    ]
+                );
+
+                ActivityLogger::log(
+                    $companyId,
+                    $request->user(),
+                    'treatment_plan_item.session_completed',
+                    \App\Models\TreatmentPlanItem::class,
+                    $linkedPlanItem->id,
+                    [
+                        'appointment_id' => $appointment->id,
+                        'invoice_id' => $invoice->id,
+                        'treatment_plan_id' => $plan->id,
+                        'completed_sessions' => $newCompleted,
+                        'planned_sessions' => $plannedSessions,
+                        'remaining_sessions' => $remainingAfterComplete,
+                        'item_status' => $remainingAfterComplete > 0 ? 'planned' : 'completed',
                     ]
                 );
 
@@ -1408,6 +1446,10 @@ class AppointmentController extends Controller
                     'treatment_plan_item_id' => $linkedPlanItem->id,
                     'invoice_status' => $invoice->status,
                     'total' => (float) $invoice->total,
+                    'completed_sessions' => $newCompleted,
+                    'planned_sessions' => $plannedSessions,
+                    'remaining_sessions' => $remainingAfterComplete,
+                    'item_status' => $remainingAfterComplete > 0 ? 'planned' : 'completed',
                 ], 200);
             }
 
