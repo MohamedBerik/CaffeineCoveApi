@@ -8,7 +8,11 @@ use App\Models\CustomerLedgerEntry;
 use App\Models\DentalRecord;
 use App\Models\Doctor;
 use App\Models\Invoice;
+use App\Models\InvoiceItem;
+use App\Models\Order;
+use App\Models\OrderItem;
 use App\Models\Payment;
+use App\Models\Product;
 use App\Models\TreatmentPlan;
 use App\Services\ActivityLogger;
 use App\Services\InvoiceNumberService;
@@ -830,10 +834,13 @@ class AppointmentController extends Controller
             ],
             'doctor_id' => ['nullable', 'integer'],
             'doctor_name' => ['nullable', 'string', 'max:190'],
+            'appointment_type' => ['nullable', 'in:consultation'],
             'appointment_date' => ['required', 'date'],
             'appointment_time' => ['required', 'date_format:H:i'],
             'notes' => ['nullable', 'string'],
         ]);
+
+        $appointmentType = $data['appointment_type'] ?? 'consultation';
 
         $date = Carbon::parse($data['appointment_date'])->toDateString();
         $time = $data['appointment_time'];
@@ -848,44 +855,37 @@ class AppointmentController extends Controller
             $doctor = Doctor::query()
                 ->where('company_id', $companyId)
                 ->where('is_active', true)
-                ->orderBy('id', 'asc')
+                ->orderBy('id')
                 ->first();
 
             if (!$doctor) {
                 return response()->json([
-                    'msg' => 'No active doctor found. Create a doctor first.',
+                    'msg' => 'No active doctor found.',
                     'status' => 422,
                 ], 422);
             }
         }
 
         $doctorId = (int) $doctor->id;
+        $doctorName = trim((string) ($data['doctor_name'] ?? '')) ?: $doctor->name;
 
-        // working settings
-        $startTime = $doctor->work_start ?? '09:00';
-        $endTime = $doctor->work_end ?? '17:00';
-        $slotMinutes = (int) ($doctor->slot_minutes ?? 30);
-
-        $start = Carbon::parse("$date $startTime");
-        $end = Carbon::parse("$date $endTime");
+        // working hours validation
+        $start = Carbon::parse("$date " . ($doctor->work_start ?? '09:00'));
+        $end = Carbon::parse("$date " . ($doctor->work_end ?? '17:00'));
         $requested = Carbon::parse("$date $time");
 
         if ($requested->lt($start) || $requested->gte($end)) {
             throw ValidationException::withMessages([
-                'appointment_time' => ['Time is outside working hours.'],
+                'appointment_time' => ['Outside working hours'],
             ]);
         }
 
-        $diff = $start->diffInMinutes($requested);
-
-        if ($slotMinutes <= 0 || ($diff % $slotMinutes !== 0)) {
+        $slotMinutes = (int) ($doctor->slot_minutes ?? 30);
+        if ($start->diffInMinutes($requested) % $slotMinutes !== 0) {
             throw ValidationException::withMessages([
-                'appointment_time' => ['Time must match slot interval.'],
+                'appointment_time' => ['Invalid slot interval'],
             ]);
         }
-
-        $doctorName = trim((string) ($data['doctor_name'] ?? '')) ?: ($doctor->name ?? 'Doctor');
-        $blockedStatuses = ['scheduled', 'completed', 'no_show'];
 
         return DB::transaction(function () use (
             $request,
@@ -895,8 +895,9 @@ class AppointmentController extends Controller
             $time,
             $doctorId,
             $doctorName,
-            $blockedStatuses
+            $appointmentType,
         ) {
+
             $existing = Appointment::query()
                 ->where('company_id', $companyId)
                 ->where('doctor_id', $doctorId)
@@ -905,236 +906,58 @@ class AppointmentController extends Controller
                 ->lockForUpdate()
                 ->first();
 
-            if ($existing) {
-                if (in_array($existing->status, $blockedStatuses, true)) {
-                    return response()->json([
-                        'msg' => 'Time slot already booked',
-                        'status' => 422,
-                        'errors' => [
-                            'appointment_time' => ['This time slot is already booked for this doctor.'],
-                        ],
-                    ], 422);
-                }
-
-                if ($existing->status === 'cancelled') {
-                    $existing->update([
-                        'patient_id' => $data['patient_id'],
-                        'doctor_name' => $doctorName,
-                        'status' => 'scheduled',
-                        'notes' => $data['notes'] ?? null,
-                        'created_by' => $request->user()->id,
-                        'appointment_date' => $date,
-                        'appointment_time' => $time,
-                        'appointment_type' => 'consultation',
-                    ]);
-
-                    // Auto-create consultation invoice for rebooked cancelled slot if not exists
-                    $existingInvoice = \App\Models\Invoice::query()
-                        ->where('company_id', $companyId)
-                        ->where('appointment_id', $existing->id)
-                        ->lockForUpdate()
-                        ->first();
-
-                    if (!$existingInvoice) {
-                        $consultationProduct = \App\Models\Product::query()
-                            ->where('company_id', $companyId)
-                            ->where('title_en', 'Consultation')
-                            ->first();
-
-                        if ($consultationProduct) {
-                            $consultationTotal = (float) ($consultationProduct->unit_price ?? 0);
-
-                            if ($consultationTotal > 0) {
-                                $order = \App\Models\Order::create([
-                                    'company_id'  => $companyId,
-                                    'customer_id' => $existing->patient_id,
-                                    'title_en'    => 'Consultation Visit',
-                                    'title_ar'    => 'رسوم كشف',
-                                    'status'      => 'confirmed',
-                                    'total'       => $consultationTotal,
-                                    'created_by'  => $request->user()->id,
-                                ]);
-
-                                \App\Models\OrderItem::create([
-                                    'company_id' => $companyId,
-                                    'order_id'   => $order->id,
-                                    'product_id' => $consultationProduct->id,
-                                    'quantity'   => 1,
-                                    'unit_price' => $consultationTotal,
-                                    'total'      => $consultationTotal,
-                                ]);
-
-                                $number = \App\Services\InvoiceNumberService::generate($companyId);
-
-                                $invoice = \App\Models\Invoice::create([
-                                    'company_id'        => $companyId,
-                                    'number'            => $number,
-                                    'order_id'          => $order->id,
-                                    'appointment_id'    => $existing->id,
-                                    'treatment_plan_id' => null,
-                                    'customer_id'       => $existing->patient_id,
-                                    'total'             => $consultationTotal,
-                                    'status'            => 'unpaid',
-                                    'issued_at'         => now(),
-                                ]);
-
-                                \App\Models\InvoiceItem::create([
-                                    'company_id' => $companyId,
-                                    'invoice_id' => $invoice->id,
-                                    'product_id' => $consultationProduct->id,
-                                    'quantity'   => 1,
-                                    'unit_price' => $consultationTotal,
-                                    'total'      => $consultationTotal,
-                                ]);
-
-                                CustomerLedgerEntry::create([
-                                    'company_id'  => $companyId,
-                                    'customer_id' => $invoice->customer_id,
-                                    'invoice_id'  => $invoice->id,
-                                    'payment_id'  => null,
-                                    'refund_id'   => null,
-                                    'type'        => 'invoice',
-                                    'debit'       => $invoice->total,
-                                    'credit'      => 0,
-                                    'entry_date'  => $invoice->issued_at ?? now(),
-                                    'description' => 'Consultation invoice #' . $invoice->number,
-                                ]);
-
-                                // ✅ Auto-apply available customer credit
-                                $this->autoApplyCustomerCredit($invoice, $request->user());
-                            }
-                        }
-                    }
-
-                    ActivityLogger::log(
-                        $companyId,
-                        $request->user(),
-                        'appointment.rebooked',
-                        Appointment::class,
-                        $existing->id,
-                        [
-                            'doctor_id'  => $existing->doctor_id,
-                            'patient_id' => $existing->patient_id,
-                            'date'       => Carbon::parse($existing->appointment_date)->toDateString(),
-                            'time'       => substr((string) $existing->appointment_time, 0, 5),
-                        ]
-                    );
-
-                    return response()->json([
-                        'msg' => 'Appointment rebooked',
-                        'status' => 200,
-                        'data' => $existing->fresh()->load([
-                            'patient:id,name,email,company_id',
-                            'doctor:id,name,company_id,work_start,work_end,slot_minutes',
-                        ]),
-                    ], 200);
-                }
+            if ($existing && in_array($existing->status, ['scheduled', 'completed', 'no_show'], true)) {
+                return response()->json([
+                    'msg' => 'Time slot already booked',
+                    'status' => 422,
+                ], 422);
             }
 
-            try {
-                $appointment = Appointment::create([
-                    'company_id' => $companyId,
+            if ($existing && $existing->status === 'cancelled') {
+                $existing->update([
                     'patient_id' => $data['patient_id'],
-                    'doctor_id' => $doctorId,
                     'doctor_name' => $doctorName,
-                    'appointment_date' => $date,
-                    'appointment_time' => $time,
-                    'appointment_type' => 'consultation',
                     'status' => 'scheduled',
                     'notes' => $data['notes'] ?? null,
+                    'appointment_type' => $appointmentType,
                     'created_by' => $request->user()->id,
                 ]);
-            } catch (QueryException $e) {
-                if ((string) $e->getCode() === '23000') {
-                    return response()->json([
-                        'msg' => 'Time slot already booked',
-                        'status' => 422,
-                        'errors' => [
-                            'appointment_time' => ['This time slot is already booked for this doctor.'],
-                        ],
-                    ], 422);
-                }
 
-                throw $e;
+                $this->createConsultationInvoiceIfMissing($existing, $request);
+
+                ActivityLogger::log(
+                    $companyId,
+                    $request->user(),
+                    'appointment.rebooked',
+                    Appointment::class,
+                    $existing->id,
+                    [
+                        'appointment_type' => $appointmentType,
+                        'patient_id' => $existing->patient_id,
+                    ]
+                );
+
+                return response()->json([
+                    'msg' => 'Appointment rebooked',
+                    'status' => 200,
+                    'data' => $existing->fresh(),
+                ]);
             }
 
-            // Auto-create consultation invoice for newly booked appointment
-            $existingInvoice = \App\Models\Invoice::query()
-                ->where('company_id', $companyId)
-                ->where('appointment_id', $appointment->id)
-                ->lockForUpdate()
-                ->first();
+            $appointment = Appointment::create([
+                'company_id' => $companyId,
+                'patient_id' => $data['patient_id'],
+                'doctor_id' => $doctorId,
+                'doctor_name' => $doctorName,
+                'appointment_date' => $date,
+                'appointment_time' => $time,
+                'appointment_type' => $appointmentType,
+                'status' => 'scheduled',
+                'notes' => $data['notes'] ?? null,
+                'created_by' => $request->user()->id,
+            ]);
 
-            if (!$existingInvoice) {
-                $consultationProduct = \App\Models\Product::query()
-                    ->where('company_id', $companyId)
-                    ->where('title_en', 'Consultation')
-                    ->first();
-
-                if ($consultationProduct) {
-                    $consultationTotal = (float) ($consultationProduct->unit_price ?? 0);
-
-                    if ($consultationTotal > 0) {
-                        $order = \App\Models\Order::create([
-                            'company_id'  => $companyId,
-                            'customer_id' => $appointment->patient_id,
-                            'title_en'    => 'Consultation Visit',
-                            'title_ar'    => 'رسوم كشف',
-                            'status'      => 'confirmed',
-                            'total'       => $consultationTotal,
-                            'created_by'  => $request->user()->id,
-                        ]);
-
-                        \App\Models\OrderItem::create([
-                            'company_id' => $companyId,
-                            'order_id'   => $order->id,
-                            'product_id' => $consultationProduct->id,
-                            'quantity'   => 1,
-                            'unit_price' => $consultationTotal,
-                            'total'      => $consultationTotal,
-                        ]);
-
-                        $number = \App\Services\InvoiceNumberService::generate($companyId);
-
-                        $invoice = \App\Models\Invoice::create([
-                            'company_id'        => $companyId,
-                            'number'            => $number,
-                            'order_id'          => $order->id,
-                            'appointment_id'    => $appointment->id,
-                            'treatment_plan_id' => null,
-                            'customer_id'       => $appointment->patient_id,
-                            'total'             => $consultationTotal,
-                            'status'            => 'unpaid',
-                            'issued_at'         => now(),
-                        ]);
-
-                        \App\Models\InvoiceItem::create([
-                            'company_id' => $companyId,
-                            'invoice_id' => $invoice->id,
-                            'product_id' => $consultationProduct->id,
-                            'quantity'   => 1,
-                            'unit_price' => $consultationTotal,
-                            'total'      => $consultationTotal,
-                        ]);
-
-                        CustomerLedgerEntry::create([
-                            'company_id'  => $companyId,
-                            'customer_id' => $invoice->customer_id,
-                            'invoice_id'  => $invoice->id,
-                            'payment_id'  => null,
-                            'refund_id'   => null,
-                            'type'        => 'invoice',
-                            'debit'       => $invoice->total,
-                            'credit'      => 0,
-                            'entry_date'  => $invoice->issued_at ?? now(),
-                            'description' => 'Consultation invoice #' . $invoice->number,
-                        ]);
-
-                        // ✅ Auto-apply available customer credit
-                        $this->autoApplyCustomerCredit($invoice, $request->user());
-                    }
-                }
-            }
+            $this->createConsultationInvoiceIfMissing($appointment, $request);
 
             ActivityLogger::log(
                 $companyId,
@@ -1143,20 +966,15 @@ class AppointmentController extends Controller
                 Appointment::class,
                 $appointment->id,
                 [
-                    'doctor_id'  => $appointment->doctor_id,
+                    'appointment_type' => $appointmentType,
                     'patient_id' => $appointment->patient_id,
-                    'date'       => Carbon::parse($appointment->appointment_date)->toDateString(),
-                    'time'       => substr((string) $appointment->appointment_time, 0, 5),
                 ]
             );
 
             return response()->json([
                 'msg' => 'Appointment booked',
                 'status' => 201,
-                'data' => $appointment->load([
-                    'patient:id,name,email,company_id',
-                    'doctor:id,name,company_id,work_start,work_end,slot_minutes',
-                ]),
+                'data' => $appointment,
             ], 201);
         });
     }
@@ -1647,5 +1465,78 @@ class AppointmentController extends Controller
         $invoice->update([
             'status' => $status,
         ]);
+    }
+
+    private function createConsultationInvoiceIfMissing($appointment, $request)
+    {
+        $companyId = $appointment->company_id;
+
+        $exists = Invoice::query()
+            ->where('company_id', $companyId)
+            ->where('appointment_id', $appointment->id)
+            ->exists();
+
+        if ($exists) return;
+
+        $product = Product::query()
+            ->where('company_id', $companyId)
+            ->where('title_en', 'Consultation')
+            ->first();
+
+        if (!$product) return;
+
+        $price = (float) ($product->unit_price ?? 0);
+        if ($price <= 0) return;
+
+        $order = Order::create([
+            'company_id' => $companyId,
+            'customer_id' => $appointment->patient_id,
+            'title_en' => 'Consultation Visit',
+            'status' => 'confirmed',
+            'total' => $price,
+            'created_by' => $request->user()->id,
+        ]);
+
+        OrderItem::create([
+            'company_id' => $companyId,
+            'order_id' => $order->id,
+            'product_id' => $product->id,
+            'quantity' => 1,
+            'unit_price' => $price,
+            'total' => $price,
+        ]);
+
+        $invoice = Invoice::create([
+            'company_id' => $companyId,
+            'number' => app(InvoiceNumberService::class)->generate($companyId),
+            'order_id' => $order->id,
+            'appointment_id' => $appointment->id,
+            'customer_id' => $appointment->patient_id,
+            'total' => $price,
+            'status' => 'unpaid',
+            'issued_at' => now(),
+        ]);
+
+        InvoiceItem::create([
+            'company_id' => $companyId,
+            'invoice_id' => $invoice->id,
+            'product_id' => $product->id,
+            'quantity' => 1,
+            'unit_price' => $price,
+            'total' => $price,
+        ]);
+
+        CustomerLedgerEntry::create([
+            'company_id' => $companyId,
+            'customer_id' => $invoice->customer_id,
+            'invoice_id' => $invoice->id,
+            'type' => 'invoice',
+            'debit' => $invoice->total,
+            'credit' => 0,
+            'entry_date' => now(),
+            'description' => 'Consultation invoice #' . $invoice->number,
+        ]);
+
+        $this->autoApplyCustomerCredit($invoice, $request->user());
     }
 }
