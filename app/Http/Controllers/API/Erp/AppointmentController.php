@@ -1477,39 +1477,39 @@ class AppointmentController extends Controller
             ->where('code', '2100')
             ->first();
 
-        // if ($arAccount && $creditAccount) {
-        //     \App\Services\AccountingService::createEntry(
-        //         $invoice,
-        //         'Customer credit auto-applied to invoice #' . $invoice->number,
-        //         [
-        //             [
-        //                 'account_id' => $creditAccount->id,
-        //                 'debit' => $creditToApply,
-        //                 'credit' => 0,
-        //             ],
-        //             [
-        //                 'account_id' => $arAccount->id,
-        //                 'debit' => 0,
-        //                 'credit' => $creditToApply,
-        //             ],
-        //         ],
-        //         $user->id ?? null,
-        //         now()->toDateString()
-        //     );
-        // }
+        if ($arAccount && $creditAccount) {
+            \App\Services\AccountingService::createEntry(
+                $invoice,
+                'Customer credit auto-applied to invoice #' . $invoice->number,
+                [
+                    [
+                        'account_id' => $creditAccount->id,
+                        'debit' => $creditToApply,
+                        'credit' => 0,
+                    ],
+                    [
+                        'account_id' => $arAccount->id,
+                        'debit' => 0,
+                        'credit' => $creditToApply,
+                    ],
+                ],
+                $user->id ?? null,
+                now()->toDateString()
+            );
+        }
 
-        // $netAfter = $netPaid + $creditToApply;
+        $netAfter = $netPaid + $creditToApply;
 
-        // if ($netAfter <= 0) {
-        //     $status = 'unpaid';
-        // } elseif ($netAfter < (float) $invoice->total) {
-        //     $status = 'partially_paid';
-        // } else {
-        //     $status = 'paid';
-        // }
+        if ($netAfter <= 0) {
+            $status = 'unpaid';
+        } elseif ($netAfter < (float) $invoice->total) {
+            $status = 'partially_paid';
+        } else {
+            $status = 'paid';
+        }
 
-        // $invoice->update([
-        //     'status' => $status,
-        // ]);
+        $invoice->update([
+            'status' => $status,
+        ]);
     }
 }
