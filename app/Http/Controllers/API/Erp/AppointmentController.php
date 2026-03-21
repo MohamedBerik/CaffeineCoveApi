@@ -1189,7 +1189,7 @@ class AppointmentController extends Controller
                     'company_id' => $companyId,
                     'customer_id' => $appointment->patient_id,
                     'title_en' => 'Appointment Service',
-                    'title_ar' => 'خدمات الموعد',
+                    'title_ar' => 'خدمة موعد',
                     'status' => 'confirmed',
                     'total' => $price,
                     'created_by' => $request->user()->id,
