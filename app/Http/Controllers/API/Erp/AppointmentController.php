@@ -1139,7 +1139,7 @@ class AppointmentController extends Controller
                     ->where('company_id', $companyId)
                     ->where('appointment_id', $appointment->id)
                     ->whereHas('order', function ($q) {
-                        $q->where('title_en', 'Appointment Services');
+                        $q->where('title_en', 'Appointment Service');
                     })
                     ->lockForUpdate()
                     ->first();
@@ -1188,7 +1188,7 @@ class AppointmentController extends Controller
                 $order = \App\Models\Order::create([
                     'company_id' => $companyId,
                     'customer_id' => $appointment->patient_id,
-                    'title_en' => 'Appointment Services',
+                    'title_en' => 'Appointment Service',
                     'title_ar' => 'خدمات الموعد',
                     'status' => 'confirmed',
                     'total' => $price,
