@@ -201,9 +201,10 @@ class PatientProfileController extends Controller
                 */
                 'customer_credit_balance' => (float) $netCredit,
                 'invoices_total' => (float) $invoicesTotal,
+                'invoices_direct_paid' => (float) $totalAppliedPayments,
+                'invoices_credit_applied' => (float) $totalCreditAppliedToInvoices,
                 'invoices_paid' => (float) $invoicesPaid,
                 'invoices_remaining' => (float) $invoicesRemaining,
-
                 /*
                 |--------------------------------------------------------------------------
                 | Detailed Credit Summary
