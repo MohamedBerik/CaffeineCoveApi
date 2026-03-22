@@ -249,8 +249,8 @@ class TreatmentPlanController extends Controller
                     ],
                     'totals' => [
                         'total_invoiced' => 0.0,
-                        'total_direct_paid' => 0.0,
-                        'total_credit_applied' => 0.0,
+                        'direct_paid' => 0.0,
+                        'credit_applied' => 0.0,
                         'total_paid' => 0.0,
                         'total_refunded' => 0.0,
                         'net_paid' => 0.0,
@@ -264,12 +264,13 @@ class TreatmentPlanController extends Controller
         $paidByInvoice = DB::table('payments')
             ->where('company_id', $companyId)
             ->whereIn('invoice_id', $invoiceIds)
-            ->select('invoice_id', DB::raw('SUM(applied_amount) as total_direct_paid'))
+            ->select('invoice_id', DB::raw('SUM(applied_amount) as total_paid'))
             ->groupBy('invoice_id')
-            ->pluck('total_direct_paid', 'invoice_id');
+            ->pluck('total_paid', 'invoice_id');
 
         $creditAppliedByInvoice = DB::table('customer_credits')
             ->where('company_id', $companyId)
+            ->where('customer_id', $plan->customer_id)
             ->whereIn('invoice_id', $invoiceIds)
             ->where('type', 'debit')
             ->select('invoice_id', DB::raw('SUM(amount) as total_credit_applied'))
@@ -289,10 +290,9 @@ class TreatmentPlanController extends Controller
         $invoiceRows = $invoices->map(function ($inv) use ($paidByInvoice, $creditAppliedByInvoice, $refundedByInvoice) {
             $directPaid = (float) ($paidByInvoice[$inv->id] ?? 0);
             $creditApplied = (float) ($creditAppliedByInvoice[$inv->id] ?? 0);
-            $refunded = (float) ($refundedByInvoice[$inv->id] ?? 0);
-
-            $grossPaid = $directPaid + $creditApplied;
-            $netPaid = $grossPaid - $refunded;
+            $ref = (float) ($refundedByInvoice[$inv->id] ?? 0);
+            $totalPaid = $directPaid + $creditApplied;
+            $net = $totalPaid - $ref;
 
             return [
                 'id' => $inv->id,
@@ -303,18 +303,18 @@ class TreatmentPlanController extends Controller
                 'status' => $inv->status,
                 'issued_at' => $inv->issued_at,
 
-                'total_direct_paid' => $directPaid,
-                'total_credit_applied' => $creditApplied,
-                'total_paid' => $grossPaid,
-                'total_refunded' => $refunded,
-                'net_paid' => $netPaid,
-                'remaining' => max(0, (float) $inv->total - $netPaid),
+                'direct_paid' => $directPaid,
+                'credit_applied' => $creditApplied,
+                'total_paid' => $totalPaid,
+                'total_refunded' => $ref,
+                'net_paid' => $net,
+                'remaining' => max(0, (float) $inv->total - $net),
             ];
         });
 
         $totalInvoiced = (float) $invoices->sum(fn($i) => (float) $i->total);
-        $totalDirectPaid = (float) $invoiceRows->sum('total_direct_paid');
-        $totalCreditApplied = (float) $invoiceRows->sum('total_credit_applied');
+        $directPaid = (float) $invoiceRows->sum('direct_paid');
+        $creditApplied = (float) $invoiceRows->sum('credit_applied');
         $totalPaid = (float) $invoiceRows->sum('total_paid');
         $totalRefunded = (float) $invoiceRows->sum('total_refunded');
         $netPaid = (float) $invoiceRows->sum('net_paid');
@@ -336,8 +336,8 @@ class TreatmentPlanController extends Controller
                 ],
                 'totals' => [
                     'total_invoiced' => $totalInvoiced,
-                    'total_direct_paid' => $totalDirectPaid,
-                    'total_credit_applied' => $totalCreditApplied,
+                    'direct_paid' => $directPaid,
+                    'credit_applied' => $creditApplied,
                     'total_paid' => $totalPaid,
                     'total_refunded' => $totalRefunded,
                     'net_paid' => $netPaid,
