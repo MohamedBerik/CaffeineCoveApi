@@ -1499,6 +1499,8 @@ class AppointmentController extends Controller
             'reminder_sent_count' => (int) ($appointment->reminder_sent_count ?? 0) + 1,
         ]);
 
+        $appointment->refresh();
+
         ActivityLogger::log(
             $companyId,
             $request->user(),
