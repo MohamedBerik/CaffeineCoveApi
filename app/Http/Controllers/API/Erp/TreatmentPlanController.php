@@ -827,6 +827,41 @@ class TreatmentPlanController extends Controller
             ], 422);
         }
 
+        if ($appointment->status !== 'scheduled') {
+            return response()->json([
+                'msg' => 'Only scheduled appointments can be linked',
+                'status' => 422,
+                'errors' => [
+                    'appointment_id' => ['You can only link a treatment item to a scheduled appointment.'],
+                ],
+            ], 422);
+        }
+
+        $existingInvoice = \App\Models\Invoice::query()
+            ->where('company_id', $companyId)
+            ->where('appointment_id', $appointment->id)
+            ->exists();
+
+        if ($existingInvoice) {
+            return response()->json([
+                'msg' => 'This appointment already has an invoice',
+                'status' => 422,
+                'errors' => [
+                    'appointment_id' => ['Cannot link to an appointment that has already been invoiced.'],
+                ],
+            ], 422);
+        }
+
+        if (!empty($item->appointment_id) && (int) $item->appointment_id !== (int) $appointment->id) {
+            return response()->json([
+                'msg' => 'This treatment item is already linked to another appointment',
+                'status' => 422,
+                'errors' => [
+                    'appointment_id' => ['This treatment item is already linked to another appointment.'],
+                ],
+            ], 422);
+        }
+
         $item->update([
             'appointment_id' => $appointment->id,
             'status' => $item->status === 'planned' ? 'in_progress' : $item->status,
