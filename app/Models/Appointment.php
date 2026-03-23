@@ -25,12 +25,19 @@ class Appointment extends Model
         'clinical_notes',
         'diagnosis',
         'next_step',
+        'reminder_status',
+        'last_reminder_at',
+        'next_reminder_at',
+        'reminder_sent_count',
     ];
 
     protected $casts = [
         'appointment_date' => 'date',
         'doctor_id' => 'integer',
         'patient_id' => 'integer',
+        'last_reminder_at' => 'datetime',
+        'next_reminder_at' => 'datetime',
+        'reminder_sent_count' => 'integer',
     ];
 
     public function patient()

@@ -193,11 +193,17 @@ class AppointmentController extends Controller
                     $existing->update([
                         'patient_id' => $data['patient_id'],
                         'doctor_name' => $doctorName,
-                        'status' => $requestedStatus, // غالباً scheduled
+                        'status' => $requestedStatus,
                         'notes' => $data['notes'] ?? null,
                         'created_by' => $request->user()->id,
                         'appointment_date' => $date,
                         'appointment_time' => $time,
+
+                        'appointment_type' => 'consultation',
+                        'reminder_status' => 'pending',
+                        'last_reminder_at' => null,
+                        'next_reminder_at' => Carbon::parse($date . ' ' . $time)->subDay(),
+                        'reminder_sent_count' => 0,
                     ]);
 
                     // ✅ log rebook (FIX: use $existing not $appointment)
@@ -743,6 +749,8 @@ class AppointmentController extends Controller
 
                 $from->update([
                     'status' => 'cancelled',
+                    'reminder_status' => 'not_needed',
+                    'next_reminder_at' => null,
                 ]);
 
                 ActivityLogger::log(
@@ -1466,6 +1474,58 @@ class AppointmentController extends Controller
         });
     }
 
+    public function sendReminder(Request $request, $id)
+    {
+        $companyId = $request->user()->company_id;
+
+        $appointment = Appointment::query()
+            ->where('company_id', $companyId)
+            ->findOrFail($id);
+
+        if ($appointment->status !== 'scheduled') {
+            return response()->json([
+                'msg' => 'Only scheduled appointments can receive reminders',
+                'status' => 422,
+            ], 422);
+        }
+
+        // هنا لاحقًا تربط WhatsApp / SMS / Email
+        // حالياً manual internal reminder فقط
+
+        $appointment->update([
+            'reminder_status' => 'sent',
+            'last_reminder_at' => now(),
+            'next_reminder_at' => null,
+            'reminder_sent_count' => (int) ($appointment->reminder_sent_count ?? 0) + 1,
+        ]);
+
+        ActivityLogger::log(
+            $companyId,
+            $request->user(),
+            'appointment.reminder_sent',
+            Appointment::class,
+            $appointment->id,
+            [
+                'patient_id' => $appointment->patient_id,
+                'doctor_id' => $appointment->doctor_id,
+                'appointment_date' => $appointment->appointment_date,
+                'appointment_time' => substr((string) $appointment->appointment_time, 0, 5),
+                'reminder_sent_count' => (int) ($appointment->reminder_sent_count ?? 0),
+            ]
+        );
+
+        return response()->json([
+            'msg' => 'Reminder sent successfully',
+            'status' => 200,
+            'data' => [
+                'id' => $appointment->id,
+                'reminder_status' => $appointment->reminder_status,
+                'last_reminder_at' => $appointment->last_reminder_at,
+                'reminder_sent_count' => (int) $appointment->reminder_sent_count,
+            ],
+        ]);
+    }
+
     private function autoApplyCustomerCredit(Invoice $invoice, $user): void
     {
         $companyId = $invoice->company_id;
@@ -1587,57 +1647,6 @@ class AppointmentController extends Controller
 
         $invoice->update([
             'status' => $status,
-        ]);
-    }
-
-    public function sendReminder(Request $request, $id)
-    {
-        $companyId = $request->user()->company_id;
-
-        $appointment = Appointment::query()
-            ->where('company_id', $companyId)
-            ->findOrFail($id);
-
-        if ($appointment->status !== 'scheduled') {
-            return response()->json([
-                'msg' => 'Only scheduled appointments can receive reminders',
-                'status' => 422,
-            ], 422);
-        }
-
-        // هنا لاحقًا تربط WhatsApp / SMS / Email
-        // حالياً manual internal reminder فقط
-
-        $appointment->update([
-            'reminder_status' => 'sent',
-            'last_reminder_at' => now(),
-            'reminder_sent_count' => (int) ($appointment->reminder_sent_count ?? 0) + 1,
-        ]);
-
-        ActivityLogger::log(
-            $companyId,
-            $request->user(),
-            'appointment.reminder_sent',
-            Appointment::class,
-            $appointment->id,
-            [
-                'patient_id' => $appointment->patient_id,
-                'doctor_id' => $appointment->doctor_id,
-                'appointment_date' => $appointment->appointment_date,
-                'appointment_time' => substr((string) $appointment->appointment_time, 0, 5),
-                'reminder_sent_count' => (int) ($appointment->reminder_sent_count ?? 0),
-            ]
-        );
-
-        return response()->json([
-            'msg' => 'Reminder sent successfully',
-            'status' => 200,
-            'data' => [
-                'id' => $appointment->id,
-                'reminder_status' => $appointment->reminder_status,
-                'last_reminder_at' => $appointment->last_reminder_at,
-                'reminder_sent_count' => (int) $appointment->reminder_sent_count,
-            ],
         ]);
     }
 }
