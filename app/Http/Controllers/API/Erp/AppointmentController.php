@@ -1317,22 +1317,46 @@ class AppointmentController extends Controller
                 ]);
 
                 $dentalRecordCreated = false;
+                $dentalRecordUpdated = false;
 
                 if (!empty($linkedPlanItem->tooth_number)) {
-                    DentalRecord::create([
-                        'company_id' => $companyId,
-                        'customer_id' => $appointment->patient_id,
-                        'appointment_id' => $appointment->id,
-                        'doctor_id' => $appointment->doctor_id,
-                        'procedure_id' => $linkedPlanItem->procedure_id,
-                        'tooth_number' => $linkedPlanItem->tooth_number,
-                        'surface' => $linkedPlanItem->surface,
-                        'status' => 'completed',
-                        'notes' => $data['clinical_notes'] ?? $data['notes'] ?? $linkedPlanItem->notes,
-                        'treatment_plan_item_id' => $linkedPlanItem->id,
-                    ]);
+                    $existingDentalRecord = DentalRecord::query()
+                        ->where('company_id', $companyId)
+                        ->where('treatment_plan_item_id', $linkedPlanItem->id)
+                        ->lockForUpdate()
+                        ->first();
 
-                    $dentalRecordCreated = true;
+                    $dentalRecordStatus = $remainingAfterComplete > 0 ? 'in_progress' : 'completed';
+                    $dentalRecordNotes = $data['clinical_notes'] ?? $data['notes'] ?? $linkedPlanItem->notes;
+
+                    if ($existingDentalRecord) {
+                        $existingDentalRecord->update([
+                            'appointment_id' => $appointment->id,
+                            'doctor_id' => $appointment->doctor_id,
+                            'procedure_id' => $linkedPlanItem->procedure_id,
+                            'tooth_number' => $linkedPlanItem->tooth_number,
+                            'surface' => $linkedPlanItem->surface,
+                            'status' => $dentalRecordStatus,
+                            'notes' => $dentalRecordNotes,
+                        ]);
+
+                        $dentalRecordUpdated = true;
+                    } else {
+                        DentalRecord::create([
+                            'company_id' => $companyId,
+                            'customer_id' => $appointment->patient_id,
+                            'appointment_id' => $appointment->id,
+                            'doctor_id' => $appointment->doctor_id,
+                            'procedure_id' => $linkedPlanItem->procedure_id,
+                            'tooth_number' => $linkedPlanItem->tooth_number,
+                            'surface' => $linkedPlanItem->surface,
+                            'status' => $dentalRecordStatus,
+                            'notes' => $dentalRecordNotes,
+                            'treatment_plan_item_id' => $linkedPlanItem->id,
+                        ]);
+
+                        $dentalRecordCreated = true;
+                    }
                 }
 
                 ActivityLogger::log(
@@ -1384,6 +1408,7 @@ class AppointmentController extends Controller
                     'remaining_sessions' => $remainingAfterComplete,
                     'item_status' => $remainingAfterComplete > 0 ? 'planned' : 'completed',
                     'dental_record_created' => $dentalRecordCreated,
+                    'dental_record_updated' => $dentalRecordUpdated,
                 ], 200);
             }
 
