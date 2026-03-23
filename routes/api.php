@@ -291,7 +291,7 @@ Route::prefix('erp')
         Route::middleware('permission:appointments.manage')
             ->post('/appointments/{id}/reschedule', [AppointmentController::class, 'reschedule']);
         Route::middleware('permission:appointments.manage')
-            ->post('/appointments/{id}/sendReminder', [AppointmentController::class, 'sendReminder']);
+            ->post('/appointments/{id}/send-reminder', [AppointmentController::class, 'sendReminder']);
         Route::middleware('permission:finance.view')
             ->get('/appointments/{id}/activity', [AppointmentActivityController::class, 'index']);
 
