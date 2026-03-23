@@ -246,7 +246,7 @@ class AppointmentController extends Controller
 
                     'appointment_type' => 'consultation',
                     'reminder_status' => 'pending',
-                    'next_reminder_at' => Carbon::parse($date . ' ' . $time)->subDay(),
+                    'next_reminder_at' => $this->resolveNextReminderAt($date, $time),
                     'reminder_sent_count' => 0,
                 ]);
             } catch (QueryException $e) {
@@ -744,7 +744,7 @@ class AppointmentController extends Controller
 
                     'reminder_status' => 'pending',
                     'last_reminder_at' => null,
-                    'next_reminder_at' => Carbon::parse($newDate . ' ' . $newTime)->subDay(),
+                    'next_reminder_at' => $this->resolveNextReminderAt($newDate, $newTime),
                 ]);
 
                 $from->update([
@@ -791,7 +791,7 @@ class AppointmentController extends Controller
 
                     'reminder_status' => 'pending',
                     'last_reminder_at' => null,
-                    'next_reminder_at' => Carbon::parse($newDate . ' ' . $newTime)->subDay(),
+                    'next_reminder_at' => $this->resolveNextReminderAt($newDate, $newTime),
                 ]);
             } catch (QueryException $e) {
                 if ((string) $e->getCode() === '23000') {
@@ -937,7 +937,7 @@ class AppointmentController extends Controller
 
                     'reminder_status' => 'pending',
                     'last_reminder_at' => null,
-                    'next_reminder_at' => Carbon::parse($date . ' ' . $time)->subDay(),
+                    'next_reminder_at' => $this->resolveNextReminderAt($date, $time),
                     'reminder_sent_count' => 0,
                 ]);
 
@@ -975,7 +975,7 @@ class AppointmentController extends Controller
                 'created_by' => $request->user()->id,
 
                 'reminder_status' => 'pending',
-                'next_reminder_at' => Carbon::parse($date . ' ' . $time)->subDay(),
+                'next_reminder_at' => $this->resolveNextReminderAt($date, $time),
                 'reminder_sent_count' => 0,
             ]);
 
@@ -999,6 +999,18 @@ class AppointmentController extends Controller
                 'data' => $appointment,
             ], 201);
         });
+    }
+
+    private function resolveNextReminderAt(string $date, string $time)
+    {
+        $appointmentAt = Carbon::parse($date . ' ' . $time);
+        $nextReminderAt = $appointmentAt->copy()->subDay();
+
+        if ($nextReminderAt->lt(now())) {
+            $nextReminderAt = now();
+        }
+
+        return $nextReminderAt;
     }
 
     private function createConsultationInvoiceIfMissing($appointment, $request)
