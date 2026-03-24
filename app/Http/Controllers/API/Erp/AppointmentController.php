@@ -1547,20 +1547,20 @@ class AppointmentController extends Controller
 
         $appointment->refresh();
 
-        ActivityLogger::log(
-            $companyId,
-            $request->user(),
-            'appointment.reminder_sent',
-            Appointment::class,
-            $appointment->id,
-            [
-                'patient_id' => $appointment->patient_id,
-                'doctor_id' => $appointment->doctor_id,
-                'appointment_date' => $appointment->appointment_date,
-                'appointment_time' => substr((string) $appointment->appointment_time, 0, 5),
-                'reminder_sent_count' => (int) ($appointment->reminder_sent_count ?? 0),
-            ]
-        );
+        // ActivityLogger::log(
+        //     $companyId,
+        //     $request->user(),
+        //     'appointment.reminder_sent',
+        //     Appointment::class,
+        //     $appointment->id,
+        //     [
+        //         'patient_id' => $appointment->patient_id,
+        //         'doctor_id' => $appointment->doctor_id,
+        //         'appointment_date' => $appointment->appointment_date,
+        //         'appointment_time' => substr((string) $appointment->appointment_time, 0, 5),
+        //         'reminder_sent_count' => (int) ($appointment->reminder_sent_count ?? 0),
+        //     ]
+        // );
 
         return response()->json([
             'msg' => 'Reminder sent successfully',
