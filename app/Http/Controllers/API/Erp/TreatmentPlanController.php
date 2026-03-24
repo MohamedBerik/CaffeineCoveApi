@@ -16,7 +16,6 @@ use Illuminate\Validation\Rule;
 use App\Traits\ValidatesAppointments;
 use App\Traits\HandlesAppointmentReminders;
 use Carbon\Carbon;
-use Illuminate\Support\Facades\Log;
 
 class TreatmentPlanController extends Controller
 {
@@ -789,7 +788,7 @@ class TreatmentPlanController extends Controller
             ],
         ]);
 
-        $appointment = \App\Models\Appointment::query()
+        $appointment = Appointment::query()
             ->where('company_id', $companyId)
             ->findOrFail($data['appointment_id']);
 
@@ -832,7 +831,7 @@ class TreatmentPlanController extends Controller
             ], 422);
         }
 
-        $existingInvoice = \App\Models\Invoice::query()
+        $existingInvoice = Invoice::query()
             ->where('company_id', $companyId)
             ->where('appointment_id', $appointment->id)
             ->exists();
@@ -872,6 +871,10 @@ class TreatmentPlanController extends Controller
                 ],
             ], 422);
         }
+
+        $appointment->update([
+            'appointment_type' => 'treatment',
+        ]);
 
         $item->update([
             'appointment_id' => $appointment->id,
