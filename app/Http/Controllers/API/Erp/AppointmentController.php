@@ -1500,87 +1500,87 @@ class AppointmentController extends Controller
         });
     }
 
-    public function sendReminder(Request $request, $id)
-    {
-        $companyId = $request->user()->company_id;
+    // public function sendReminder(Request $request, $id)
+    // {
+    //     $companyId = $request->user()->company_id;
 
-        $appointment = Appointment::query()
-            ->where('company_id', $companyId)
-            ->findOrFail($id);
+    //     $appointment = Appointment::query()
+    //         ->where('company_id', $companyId)
+    //         ->findOrFail($id);
 
-        if ($appointment->status !== 'scheduled') {
-            return response()->json([
-                'msg' => 'Only scheduled appointments can receive reminders',
-                'status' => 422,
-            ], 422);
-        }
+    //     if ($appointment->status !== 'scheduled') {
+    //         return response()->json([
+    //             'msg' => 'Only scheduled appointments can receive reminders',
+    //             'status' => 422,
+    //         ], 422);
+    //     }
 
-        if ($appointment->reminder_status === 'not_needed') {
-            return response()->json([
-                'msg' => 'Reminder is not needed for this appointment',
-                'status' => 422,
-            ], 422);
-        }
+    //     if ($appointment->reminder_status === 'not_needed') {
+    //         return response()->json([
+    //             'msg' => 'Reminder is not needed for this appointment',
+    //             'status' => 422,
+    //         ], 422);
+    //     }
 
-        $appointmentDateTime = Carbon::parse(
-            $appointment->appointment_date . ' ' . $appointment->appointment_time
-        );
+    //     $appointmentDateTime = Carbon::parse(
+    //         $appointment->appointment_date . ' ' . $appointment->appointment_time
+    //     );
 
-        if ($appointmentDateTime->lt(now())) {
-            return response()->json([
-                'msg' => 'Cannot send reminder for past appointments',
-                'status' => 422,
-            ], 422);
-        }
+    //     if ($appointmentDateTime->lt(now())) {
+    //         return response()->json([
+    //             'msg' => 'Cannot send reminder for past appointments',
+    //             'status' => 422,
+    //         ], 422);
+    //     }
 
-        if (
-            !empty($appointment->next_reminder_at) &&
-            Carbon::parse($appointment->next_reminder_at)->gt(now())
-        ) {
-            return response()->json([
-                'msg' => 'Reminder is not due yet',
-                'status' => 422,
-            ], 422);
-        }
+    //     if (
+    //         !empty($appointment->next_reminder_at) &&
+    //         Carbon::parse($appointment->next_reminder_at)->gt(now())
+    //     ) {
+    //         return response()->json([
+    //             'msg' => 'Reminder is not due yet',
+    //             'status' => 422,
+    //         ], 422);
+    //     }
 
-        $newCount = (int) ($appointment->reminder_sent_count ?? 0) + 1;
+    //     $newCount = (int) ($appointment->reminder_sent_count ?? 0) + 1;
 
-        $appointment->update([
-            'reminder_status' => 'sent',
-            'last_reminder_at' => now(),
-            'next_reminder_at' => null,
-            'reminder_sent_count' => $newCount,
-        ]);
+    //     $appointment->update([
+    //         'reminder_status' => 'sent',
+    //         'last_reminder_at' => now(),
+    //         'next_reminder_at' => null,
+    //         'reminder_sent_count' => $newCount,
+    //     ]);
 
-        $appointment->refresh();
+    //     $appointment->refresh();
 
-        ActivityLogger::log(
-            $companyId,
-            $request->user(),
-            'appointment.reminder_sent',
-            Appointment::class,
-            $appointment->id,
-            [
-                'patient_id' => $appointment->patient_id,
-                'doctor_id' => $appointment->doctor_id,
-                'appointment_date' => $appointment->appointment_date,
-                'appointment_time' => substr((string) $appointment->appointment_time, 0, 5),
-                'reminder_sent_count' => $newCount,
-            ]
-        );
+    //     ActivityLogger::log(
+    //         $companyId,
+    //         $request->user(),
+    //         'appointment.reminder_sent',
+    //         Appointment::class,
+    //         $appointment->id,
+    //         [
+    //             'patient_id' => $appointment->patient_id,
+    //             'doctor_id' => $appointment->doctor_id,
+    //             'appointment_date' => $appointment->appointment_date,
+    //             'appointment_time' => substr((string) $appointment->appointment_time, 0, 5),
+    //             'reminder_sent_count' => $newCount,
+    //         ]
+    //     );
 
-        return response()->json([
-            'msg' => 'Reminder sent successfully',
-            'status' => 200,
-            'data' => [
-                'id' => $appointment->id,
-                'reminder_status' => $appointment->reminder_status,
-                'last_reminder_at' => $appointment->last_reminder_at,
-                'next_reminder_at' => $appointment->next_reminder_at,
-                'reminder_sent_count' => (int) $appointment->reminder_sent_count,
-            ],
-        ], 200);
-    }
+    //     return response()->json([
+    //         'msg' => 'Reminder sent successfully',
+    //         'status' => 200,
+    //         'data' => [
+    //             'id' => $appointment->id,
+    //             'reminder_status' => $appointment->reminder_status,
+    //             'last_reminder_at' => $appointment->last_reminder_at,
+    //             'next_reminder_at' => $appointment->next_reminder_at,
+    //             'reminder_sent_count' => (int) $appointment->reminder_sent_count,
+    //         ],
+    //     ], 200);
+    // }
 
     private function autoApplyCustomerCredit(Invoice $invoice, $user): void
     {
@@ -1704,5 +1704,111 @@ class AppointmentController extends Controller
         $invoice->update([
             'status' => $status,
         ]);
+    }
+
+    public function sendReminder(Request $request, $id)
+    {
+        try {
+            $companyId = $request->user()->company_id;
+
+            $appointment = Appointment::query()
+                ->where('company_id', $companyId)
+                ->findOrFail($id);
+
+            if ($appointment->status !== 'scheduled') {
+                return response()->json([
+                    'msg' => 'Only scheduled appointments can receive reminders',
+                    'status' => 422,
+                ], 422);
+            }
+
+            if ($appointment->reminder_status === 'not_needed') {
+                return response()->json([
+                    'msg' => 'Reminder is not needed for this appointment',
+                    'status' => 422,
+                ], 422);
+            }
+
+            $appointmentDateTime = Carbon::parse(
+                $appointment->appointment_date . ' ' . $appointment->appointment_time
+            );
+
+            if ($appointmentDateTime->lt(now())) {
+                return response()->json([
+                    'msg' => 'Cannot send reminder for past appointments',
+                    'status' => 422,
+                ], 422);
+            }
+
+            if (
+                !empty($appointment->next_reminder_at) &&
+                Carbon::parse($appointment->next_reminder_at)->gt(now())
+            ) {
+                return response()->json([
+                    'msg' => 'Reminder is not due yet',
+                    'status' => 422,
+                ], 422);
+            }
+
+            $newCount = (int) ($appointment->reminder_sent_count ?? 0) + 1;
+
+            $appointment->update([
+                'reminder_status' => 'sent',
+                'last_reminder_at' => now(),
+                'next_reminder_at' => null,
+                'reminder_sent_count' => $newCount,
+            ]);
+
+            $appointment->refresh();
+
+            ActivityLogger::log(
+                $companyId,
+                $request->user(),
+                'appointment.reminder_sent',
+                Appointment::class,
+                $appointment->id,
+                [
+                    'patient_id' => $appointment->patient_id,
+                    'doctor_id' => $appointment->doctor_id,
+                    'appointment_date' => $appointment->appointment_date,
+                    'appointment_time' => substr((string) $appointment->appointment_time, 0, 5),
+                    'reminder_sent_count' => $newCount,
+                ]
+            );
+
+            return response()->json([
+                'msg' => 'Reminder sent successfully',
+                'status' => 200,
+                'data' => [
+                    'id' => $appointment->id,
+                    'reminder_status' => $appointment->reminder_status,
+                    'last_reminder_at' => $appointment->last_reminder_at,
+                    'next_reminder_at' => $appointment->next_reminder_at,
+                    'reminder_sent_count' => (int) $appointment->reminder_sent_count,
+                ],
+            ], 200);
+        } catch (\Exception $e) {
+            // تسجيل الخطأ في الـ log
+            \Log::error('Error in sendReminder function:', [
+                'appointment_id' => $id ?? 'unknown',
+                'user_id' => $request->user()?->id ?? 'unknown',
+                'company_id' => $request->user()?->company_id ?? 'unknown',
+                'error_message' => $e->getMessage(),
+                'error_file' => $e->getFile(),
+                'error_line' => $e->getLine(),
+                'error_trace' => $e->getTraceAsString(),
+            ]);
+
+            // إرجاع رسالة خطأ واضحة للـ frontend
+            return response()->json([
+                'msg' => 'An error occurred while sending the reminder: ' . $e->getMessage(),
+                'status' => 500,
+                'error_details' => [
+                    'message' => $e->getMessage(),
+                    'file' => $e->getFile(),
+                    'line' => $e->getLine(),
+                ]
+            ], 500);
+        }
     }
 }
