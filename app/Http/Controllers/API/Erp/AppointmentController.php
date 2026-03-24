@@ -24,9 +24,13 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
+use App\Traits\ValidatesAppointments;
+use App\Traits\HandlesAppointmentReminders;
 
 class AppointmentController extends Controller
 {
+    use ValidatesAppointments, HandlesAppointmentReminders;
+
     public function index(Request $request)
     {
         $companyId = $request->user()->company_id;
@@ -115,6 +119,7 @@ class AppointmentController extends Controller
         ]);
     }
 
+    //reuse with trait
     public function store(Request $request)
     {
         $companyId = $request->user()->company_id;
@@ -123,12 +128,16 @@ class AppointmentController extends Controller
             'patient_id' => [
                 'required',
                 'integer',
-                Rule::exists('customers', 'id')->where(fn($q) => $q->where('company_id', $companyId)),
+                Rule::exists('customers', 'id')->where(
+                    fn($q) => $q->where('company_id', $companyId)
+                ),
             ],
             'doctor_id' => [
                 'required',
                 'integer',
-                Rule::exists('doctors', 'id')->where(fn($q) => $q->where('company_id', $companyId)->where('is_active', true)),
+                Rule::exists('doctors', 'id')->where(
+                    fn($q) => $q->where('company_id', $companyId)->where('is_active', true)
+                ),
             ],
             'doctor_name' => ['nullable', 'string', 'max:190'],
             'appointment_date' => ['required', 'date'],
@@ -155,58 +164,13 @@ class AppointmentController extends Controller
             ->where('is_active', true)
             ->findOrFail((int) $data['doctor_id']);
 
-        $doctorName = trim((string)($data['doctor_name'] ?? '')) ?: ($doctor->name ?? 'Doctor');
+        $doctorName = trim((string) ($data['doctor_name'] ?? '')) ?: ($doctor->name ?? 'Doctor');
 
         $requestedStatus = $data['status'] ?? 'scheduled';
         $blockedStatuses = ['scheduled', 'completed', 'no_show'];
 
-        // 🔥 VALIDATION (قبل DB)
-        $start = Carbon::parse("$date " . ($doctor->work_start ?? '09:00'))->startOfMinute();
-        $end   = Carbon::parse("$date " . ($doctor->work_end ?? '17:00'))->startOfMinute();
-        $requested = Carbon::parse("$date $time")->startOfMinute();
-        $now = now()->startOfMinute();
-
-        // ❌ منع الماضي
-        if ($requested->lte($now)) {
-            return response()->json([
-                'msg' => 'Appointment must be in the future',
-                'status' => 422,
-                'errors' => [
-                    'appointment_time' => ['Appointment must be in the future'],
-                ],
-            ], 422);
-        }
-
-        // ❌ خارج مواعيد العمل
-        if ($requested->lt($start) || $requested->gte($end)) {
-            return response()->json([
-                'msg' => 'Time is outside working hours.',
-                'status' => 422,
-                'errors' => [
-                    'appointment_time' => ['Time is outside working hours.'],
-                ],
-            ], 422);
-        }
-
-        // ❌ slot validation
-        $slotMinutes = (int) ($doctor->slot_minutes ?? 30);
-
-        if ($slotMinutes <= 0) {
-            return response()->json([
-                'msg' => 'Invalid doctor slot configuration',
-                'status' => 422,
-            ], 422);
-        }
-
-        if ($start->diffInMinutes($requested) % $slotMinutes !== 0) {
-            return response()->json([
-                'msg' => 'Invalid slot interval',
-                'status' => 422,
-                'errors' => [
-                    'appointment_time' => ['Invalid slot interval'],
-                ],
-            ], 422);
-        }
+        // validation من الـ trait
+        $this->validateAppointmentDateTime($doctor, $date, $time);
 
         return DB::transaction(function () use (
             $request,
@@ -217,10 +181,8 @@ class AppointmentController extends Controller
             $doctor,
             $doctorName,
             $blockedStatuses,
-            $requestedStatus,
-            $requested
+            $requestedStatus
         ) {
-
             $existing = Appointment::query()
                 ->where('company_id', $companyId)
                 ->where('doctor_id', $doctor->id)
@@ -241,9 +203,6 @@ class AppointmentController extends Controller
                 }
 
                 if ($existing->status === 'cancelled') {
-
-                    $nextReminder = $this->resolveNextReminderAt($date, $time);
-
                     $existing->update([
                         'patient_id' => $data['patient_id'],
                         'doctor_name' => $doctorName,
@@ -252,12 +211,8 @@ class AppointmentController extends Controller
                         'created_by' => $request->user()->id,
                         'appointment_date' => $date,
                         'appointment_time' => $time,
-
                         'appointment_type' => 'consultation',
-                        'reminder_status' => 'pending',
-                        'last_reminder_at' => null,
-                        'next_reminder_at' => $nextReminder,
-                        'reminder_sent_count' => 0,
+                        ...$this->buildPendingReminder($date, $time),
                     ]);
 
                     ActivityLogger::log(
@@ -286,27 +241,27 @@ class AppointmentController extends Controller
                 $appointment = Appointment::create([
                     'company_id' => $companyId,
                     'patient_id' => $data['patient_id'],
-                    'doctor_id'  => $doctor->id,
+                    'doctor_id' => $doctor->id,
                     'doctor_name' => $doctorName,
                     'appointment_date' => $date,
                     'appointment_time' => $time,
                     'status' => $requestedStatus,
                     'notes' => $data['notes'] ?? null,
                     'created_by' => $request->user()->id,
-
                     'appointment_type' => 'consultation',
-                    'reminder_status' => 'pending',
-                    'last_reminder_at' => null,
-                    'next_reminder_at' => $this->resolveNextReminderAt($date, $time),
-                    'reminder_sent_count' => 0,
+                    ...$this->buildPendingReminder($date, $time),
                 ]);
             } catch (QueryException $e) {
                 if ((string) $e->getCode() === '23000') {
                     return response()->json([
                         'msg' => 'Time slot already booked',
                         'status' => 422,
+                        'errors' => [
+                            'appointment_time' => ['This time slot is already booked for this doctor.'],
+                        ],
                     ], 422);
                 }
+
                 throw $e;
             }
 
@@ -878,7 +833,7 @@ class AppointmentController extends Controller
         });
     }
 
-    //book method for dental clinic only with consultaion fee
+    //book method for dental clinic only with consultaion fee + use trait
     public function book(Request $request)
     {
         $companyId = $request->user()->company_id;
@@ -887,7 +842,9 @@ class AppointmentController extends Controller
             'patient_id' => [
                 'required',
                 'integer',
-                Rule::exists('customers', 'id')->where(fn($q) => $q->where('company_id', $companyId)),
+                Rule::exists('customers', 'id')->where(
+                    fn($q) => $q->where('company_id', $companyId)
+                ),
             ],
             'doctor_id' => ['nullable', 'integer'],
             'doctor_name' => ['nullable', 'string', 'max:190'],
@@ -925,36 +882,8 @@ class AppointmentController extends Controller
         $doctorId = (int) $doctor->id;
         $doctorName = trim((string) ($data['doctor_name'] ?? '')) ?: $doctor->name;
 
-        $start = Carbon::parse("$date " . ($doctor->work_start ?? '09:00'))->startOfMinute();
-        $end = Carbon::parse("$date " . ($doctor->work_end ?? '17:00'))->startOfMinute();
-        $requested = Carbon::parse("$date $time")->startOfMinute();
-        $now = now()->startOfMinute();
-
-        if ($requested->lte($now)) {
-            throw ValidationException::withMessages([
-                'appointment_time' => ['Appointment must be in the future.'],
-            ]);
-        }
-
-        if ($requested->lt($start) || $requested->gte($end)) {
-            throw ValidationException::withMessages([
-                'appointment_time' => ['Outside working hours'],
-            ]);
-        }
-
-        $slotMinutes = (int) ($doctor->slot_minutes ?? 30);
-
-        if ($slotMinutes <= 0) {
-            throw ValidationException::withMessages([
-                'appointment_time' => ['Invalid doctor slot interval'],
-            ]);
-        }
-
-        if ($start->diffInMinutes($requested) % $slotMinutes !== 0) {
-            throw ValidationException::withMessages([
-                'appointment_time' => ['Invalid slot interval'],
-            ]);
-        }
+        // validation من الـ trait
+        $this->validateAppointmentDateTime($doctor, $date, $time);
 
         return DB::transaction(function () use (
             $request,
@@ -978,6 +907,9 @@ class AppointmentController extends Controller
                 return response()->json([
                     'msg' => 'Time slot already booked',
                     'status' => 422,
+                    'errors' => [
+                        'appointment_time' => ['This time slot is already booked'],
+                    ],
                 ], 422);
             }
 
@@ -989,11 +921,7 @@ class AppointmentController extends Controller
                     'notes' => $data['notes'] ?? null,
                     'appointment_type' => $appointmentType,
                     'created_by' => $request->user()->id,
-
-                    'reminder_status' => 'pending',
-                    'last_reminder_at' => null,
-                    'next_reminder_at' => $this->resolveNextReminderAt($date, $time),
-                    'reminder_sent_count' => 0,
+                    ...$this->buildPendingReminder($date, $time),
                 ]);
 
                 $this->createConsultationInvoiceIfMissing($existing, $request);
@@ -1028,11 +956,7 @@ class AppointmentController extends Controller
                 'status' => 'scheduled',
                 'notes' => $data['notes'] ?? null,
                 'created_by' => $request->user()->id,
-
-                'reminder_status' => 'pending',
-                'last_reminder_at' => null,
-                'next_reminder_at' => $this->resolveNextReminderAt($date, $time),
-                'reminder_sent_count' => 0,
+                ...$this->buildPendingReminder($date, $time),
             ]);
 
             $this->createConsultationInvoiceIfMissing($appointment, $request);
@@ -1550,62 +1474,16 @@ class AppointmentController extends Controller
             ->where('company_id', $companyId)
             ->findOrFail($id);
 
-        if ($appointment->status !== 'scheduled') {
-            return response()->json([
-                'msg' => 'Only scheduled appointments can receive reminders',
-                'status' => 422,
-            ], 422);
+        $validationError = $this->validateReminderCanBeSent($appointment);
+
+        if ($validationError) {
+            return response()->json($validationError['body'], $validationError['status']);
         }
 
-        if ($appointment->reminder_status === 'not_needed') {
-            return response()->json([
-                'msg' => 'Reminder is not needed for this appointment',
-                'status' => 422,
-            ], 422);
-        }
-
-        $appointmentDateTime = Carbon::parse($appointment->appointment_date)
-            ->setTimeFromTimeString((string) $appointment->appointment_time)
-            ->startOfMinute();
-
-        $now = now()->startOfMinute();
-
-        // لا نرسل reminder لموعد فات أو بدأ بالفعل
-        if ($appointmentDateTime->lte($now)) {
-            return response()->json([
-                'msg' => 'Cannot send reminder for past or ongoing appointments',
-                'status' => 422,
-            ], 422);
-        }
-
-        // لا نرسل reminder إذا الموعد في نفس اليوم
-        if (Carbon::parse($appointment->appointment_date)->isToday()) {
-            return response()->json([
-                'msg' => 'Same-day reminders are not allowed for this appointment',
-                'status' => 422,
-            ], 422);
-        }
-
-        if (
-            !empty($appointment->next_reminder_at) &&
-            Carbon::parse($appointment->next_reminder_at)->gt($now)
-        ) {
-            return response()->json([
-                'msg' => 'Reminder is not due yet',
-                'status' => 422,
-            ], 422);
-        }
-
-        $newCount = (int) ($appointment->reminder_sent_count ?? 0) + 1;
         $sentAt = now();
+        $newCount = (int) ($appointment->reminder_sent_count ?? 0) + 1;
 
-        $appointment->update([
-            'reminder_status' => 'sent',
-            'last_reminder_at' => $sentAt,
-            'next_reminder_at' => null,
-            'reminder_sent_count' => $newCount,
-        ]);
-
+        $appointment->update($this->buildSentReminderState($sentAt, $newCount));
         $appointment->refresh();
 
         ActivityLogger::log(

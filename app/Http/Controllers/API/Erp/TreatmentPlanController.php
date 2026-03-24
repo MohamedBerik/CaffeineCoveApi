@@ -11,9 +11,13 @@ use App\Services\ActivityLogger;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
+use App\Traits\ValidatesAppointments;
+use App\Traits\HandlesAppointmentReminders;
 
 class TreatmentPlanController extends Controller
 {
+    use ValidatesAppointments, HandlesAppointmentReminders;
+
     public function index(Request $request)
     {
         $companyId = $request->user()->company_id;
@@ -610,6 +614,7 @@ class TreatmentPlanController extends Controller
         ]);
     }
 
+    //reuse with trait
     public function startItem(Request $request, $itemId)
     {
         $companyId = $request->user()->company_id;
@@ -669,34 +674,10 @@ class TreatmentPlanController extends Controller
             $date = \Carbon\Carbon::parse($data['appointment_date'])->toDateString();
             $time = $data['appointment_time'];
 
-            $startTime = $doctor->work_start ?? '09:00';
-            $endTime = $doctor->work_end ?? '17:00';
-            $slotMinutes = (int) ($doctor->slot_minutes ?? 30);
+            $slotValidation = $this->validateAppointmentSlot($doctor, $date, $time);
 
-            $start = \Carbon\Carbon::parse("$date $startTime");
-            $end = \Carbon\Carbon::parse("$date $endTime");
-            $requested = \Carbon\Carbon::parse("$date $time");
-
-            if ($requested->lt($start) || $requested->gte($end)) {
-                return response()->json([
-                    'msg' => 'Time is outside working hours.',
-                    'status' => 422,
-                    'errors' => [
-                        'appointment_time' => ['Time is outside working hours.'],
-                    ],
-                ], 422);
-            }
-
-            $diff = $start->diffInMinutes($requested);
-
-            if ($slotMinutes <= 0 || ($diff % $slotMinutes !== 0)) {
-                return response()->json([
-                    'msg' => 'Time must match slot interval.',
-                    'status' => 422,
-                    'errors' => [
-                        'appointment_time' => ['Time must match slot interval.'],
-                    ],
-                ], 422);
+            if ($slotValidation) {
+                return response()->json($slotValidation['body'], $slotValidation['status']);
             }
 
             $existing = \App\Models\Appointment::query()
@@ -728,6 +709,11 @@ class TreatmentPlanController extends Controller
                 'status' => 'scheduled',
                 'notes' => $data['notes'] ?? $item->notes,
                 'created_by' => $request->user()->id,
+
+                'reminder_status' => 'pending',
+                'last_reminder_at' => null,
+                'next_reminder_at' => $this->resolveNextReminderAt($date, $time),
+                'reminder_sent_count' => 0,
             ]);
 
             $item->update([

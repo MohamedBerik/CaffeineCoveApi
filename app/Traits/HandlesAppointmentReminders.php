@@ -2,6 +2,7 @@
 
 namespace App\Traits;
 
+use App\Models\Appointment;
 use Carbon\Carbon;
 
 trait HandlesAppointmentReminders
@@ -66,47 +67,80 @@ trait HandlesAppointmentReminders
     /**
      * Validation قبل إرسال reminder
      */
-    protected function validateReminderCanBeSent($appointment): void
+    protected function validateReminderCanBeSent(Appointment $appointment): ?array
     {
-        $appointmentDateTime = Carbon::parse(
-            $appointment->appointment_date . ' ' . $appointment->appointment_time
-        )->startOfMinute();
+        if ($appointment->status !== 'scheduled') {
+            return [
+                'status' => 422,
+                'body' => [
+                    'msg' => 'Only scheduled appointments can receive reminders',
+                    'status' => 422,
+                ],
+            ];
+        }
+
+        if ($appointment->reminder_status === 'not_needed') {
+            return [
+                'status' => 422,
+                'body' => [
+                    'msg' => 'Reminder is not needed for this appointment',
+                    'status' => 422,
+                ],
+            ];
+        }
+
+        $appointmentDateTime = Carbon::parse($appointment->appointment_date)
+            ->setTimeFromTimeString((string) $appointment->appointment_time)
+            ->startOfMinute();
 
         $now = now()->startOfMinute();
 
-        // ❌ لو المعاد فات أو بدأ
         if ($appointmentDateTime->lte($now)) {
-            abort(response()->json([
-                'msg' => 'Cannot send reminder for past or ongoing appointments',
+            return [
                 'status' => 422,
-            ], 422));
+                'body' => [
+                    'msg' => 'Cannot send reminder for past or ongoing appointments',
+                    'status' => 422,
+                ],
+            ];
         }
 
-        // ❌ لو نفس اليوم
         if (Carbon::parse($appointment->appointment_date)->isToday()) {
-            abort(response()->json([
-                'msg' => 'Same-day reminders are not allowed',
+            return [
                 'status' => 422,
-            ], 422));
+                'body' => [
+                    'msg' => 'Same-day reminders are not allowed for this appointment',
+                    'status' => 422,
+                ],
+            ];
         }
 
-        // ❌ لو لسه بدري
         if (
             !empty($appointment->next_reminder_at) &&
             Carbon::parse($appointment->next_reminder_at)->gt($now)
         ) {
-            abort(response()->json([
-                'msg' => 'Reminder is not due yet',
+            return [
                 'status' => 422,
-            ], 422));
+                'body' => [
+                    'msg' => 'Reminder is not due yet',
+                    'status' => 422,
+                ],
+            ];
         }
 
-        // ❌ لو already not needed
-        if ($appointment->reminder_status === 'not_needed') {
-            abort(response()->json([
-                'msg' => 'Reminder is not needed for this appointment',
-                'status' => 422,
-            ], 422));
-        }
+        return null;
+    }
+
+    protected function buildSentReminderState(?Carbon $sentAt = null, ?int $count = null): array
+    {
+        $sentAt ??= now();
+        $count ??= 1;
+
+        return [
+            'reminder_status' => 'sent',
+            'last_reminder_at' => $sentAt,
+            'next_reminder_at' => null,
+            'reminder_sent_count' => $count,
+        ];
     }
 }
