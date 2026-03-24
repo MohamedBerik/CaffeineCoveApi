@@ -206,6 +206,19 @@ class AppointmentController extends Controller
                         'reminder_sent_count' => 0,
                     ]);
 
+                    $start = Carbon::parse("$date " . ($doctor->work_start ?? '09:00'));
+                    $end   = Carbon::parse("$date " . ($doctor->work_end ?? '17:00'));
+                    $requested = Carbon::parse("$date $time");
+
+                    if ($requested->lt($start) || $requested->gte($end)) {
+                        return response()->json([
+                            'msg' => 'Time is outside working hours.',
+                            'status' => 422,
+                            'errors' => [
+                                'appointment_time' => ['Time is outside working hours.'],
+                            ],
+                        ], 422);
+                    }
                     // ✅ log rebook (FIX: use $existing not $appointment)
                     ActivityLogger::log(
                         $companyId,
@@ -833,7 +846,7 @@ class AppointmentController extends Controller
             ], 200);
         });
     }
-    ////////////////////////////////////////////////////////////////////////////////////
+
     //book method for dental clinic only with consultaion fee
     public function book(Request $request)
     {
@@ -1086,7 +1099,7 @@ class AppointmentController extends Controller
         $this->autoApplyCustomerCredit($invoice, $request->user());
     }
 
-    //book method for dental clinic only with start procedure
+    //complete method for dental clinic only with start procedure
     public function complete(Request $request, $id)
     {
         $companyId = $request->user()->company_id;
@@ -1500,7 +1513,27 @@ class AppointmentController extends Controller
                 'status' => 422,
             ], 422);
         }
+        $appointmentDateTime = Carbon::parse(
+            $appointment->appointment_date . ' ' . $appointment->appointment_time
+        );
 
+        if ($appointmentDateTime->lt(now())) {
+            return response()->json([
+                'msg' => 'Cannot send reminder for past appointments',
+                'status' => 422,
+            ], 422);
+        }
+
+        if (
+            $appointment->next_reminder_at &&
+            Carbon::parse($appointment->next_reminder_at)->gt(now())
+        ) {
+
+            return response()->json([
+                'msg' => 'Reminder is not due yet',
+                'status' => 422,
+            ], 422);
+        }
         // هنا لاحقًا تربط WhatsApp / SMS / Email
         // حالياً manual internal reminder فقط
 
