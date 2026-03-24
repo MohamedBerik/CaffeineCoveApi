@@ -13,9 +13,12 @@ class Kernel extends ConsoleKernel
      * @param  \Illuminate\Console\Scheduling\Schedule  $schedule
      * @return void
      */
-    protected function schedule(Schedule $schedule)
+    protected function schedule(Schedule $schedule): void
     {
-        // $schedule->command('inspire')->hourly();
+        $schedule->command('appointments:send-due-reminders')
+            ->everyMinute()
+            ->withoutOverlapping()
+            ->runInBackground();
     }
     protected $commands = [
         \App\Console\Commands\ResetAccountingForCompany::class,
