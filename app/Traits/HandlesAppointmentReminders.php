@@ -9,17 +9,15 @@ trait HandlesAppointmentReminders
 {
     /**
      * احسب next reminder (قبل المعاد بيوم)
+     * لو وقت التذكير فات بالفعل → null
      */
     protected function resolveNextReminderAt(string $date, string $time): ?Carbon
     {
         $appointmentDateTime = Carbon::parse("$date $time")->startOfMinute();
+        $nextReminder = $appointmentDateTime->copy()->subDay()->startOfMinute();
 
-        // قبل المعاد بيوم
-        $nextReminder = $appointmentDateTime->copy()->subDay();
-
-        // لو بقى في الماضي → نخليه الآن
-        if ($nextReminder->lt(now())) {
-            return now();
+        if ($nextReminder->lte(now()->startOfMinute())) {
+            return null;
         }
 
         return $nextReminder;
@@ -41,11 +39,13 @@ trait HandlesAppointmentReminders
     /**
      * تحديث بعد إرسال reminder
      */
-    protected function markReminderSent($appointment): array
+    protected function markReminderSent(Appointment $appointment, ?Carbon $sentAt = null): array
     {
+        $sentAt ??= now();
+
         return [
             'reminder_status' => 'sent',
-            'last_reminder_at' => now(),
+            'last_reminder_at' => $sentAt,
             'next_reminder_at' => null,
             'reminder_sent_count' => (int) ($appointment->reminder_sent_count ?? 0) + 1,
         ];
@@ -60,7 +60,6 @@ trait HandlesAppointmentReminders
             'reminder_status' => 'not_needed',
             'last_reminder_at' => null,
             'next_reminder_at' => null,
-            'reminder_sent_count' => 0,
         ];
     }
 

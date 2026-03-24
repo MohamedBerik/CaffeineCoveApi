@@ -571,6 +571,7 @@ class AppointmentController extends Controller
         ]);
     }
 
+    //reuse with trait
     public function reschedule(Request $request, $id)
     {
         $companyId = $request->user()->company_id;
@@ -598,8 +599,8 @@ class AppointmentController extends Controller
             ],
         ]);
 
-        $newDate     = Carbon::parse($data['appointment_date'])->toDateString();
-        $newTime     = $data['appointment_time'];
+        $newDate = Carbon::parse($data['appointment_date'])->toDateString();
+        $newTime = $data['appointment_time'];
         $newDoctorId = (int) $data['doctor_id'];
 
         $doctor = Doctor::query()
@@ -607,53 +608,10 @@ class AppointmentController extends Controller
             ->where('is_active', true)
             ->findOrFail($newDoctorId);
 
-        $workStart   = $doctor->work_start ?? '09:00';
-        $workEnd     = $doctor->work_end ?? '17:00';
-        $slotMinutes = (int) ($doctor->slot_minutes ?? 30);
+        $slotValidation = $this->validateAppointmentSlot($doctor, $newDate, $newTime);
 
-        if ($slotMinutes <= 0) {
-            return response()->json([
-                'msg' => 'Invalid doctor slot configuration',
-                'status' => 422,
-                'errors' => [
-                    'slot_minutes' => ['slot_minutes must be > 0'],
-                ],
-            ], 422);
-        }
-
-        $start     = Carbon::parse("$newDate $workStart");
-        $end       = Carbon::parse("$newDate $workEnd");
-        $requested = Carbon::parse("$newDate $newTime");
-
-        if ($end->lte($start)) {
-            return response()->json([
-                'msg' => 'Invalid doctor working hours',
-                'status' => 422,
-                'errors' => [
-                    'work_hours' => ['work_end must be after work_start'],
-                ],
-            ], 422);
-        }
-
-        if ($requested->lt($start) || $requested->gte($end)) {
-            return response()->json([
-                'msg' => 'Time is outside working hours.',
-                'status' => 422,
-                'errors' => [
-                    'appointment_time' => ['Time is outside working hours.'],
-                ],
-            ], 422);
-        }
-
-        $diff = $start->diffInMinutes($requested);
-        if ($diff % $slotMinutes !== 0) {
-            return response()->json([
-                'msg' => 'Time must match slot interval.',
-                'status' => 422,
-                'errors' => [
-                    'appointment_time' => ['Time must match slot interval.'],
-                ],
-            ], 422);
+        if ($slotValidation) {
+            return response()->json($slotValidation['body'], $slotValidation['status']);
         }
 
         $blockedStatuses = ['scheduled', 'completed', 'no_show'];
@@ -719,36 +677,37 @@ class AppointmentController extends Controller
             }
 
             $old = [
-                'old_status'    => $from->status,
+                'old_status' => $from->status,
                 'old_doctor_id' => (int) $from->doctor_id,
-                'old_date'      => Carbon::parse($from->appointment_date)->toDateString(),
-                'old_time'      => substr((string) $from->appointment_time, 0, 5),
+                'old_date' => Carbon::parse($from->appointment_date)->toDateString(),
+                'old_time' => substr((string) $from->appointment_time, 0, 5),
             ];
 
             $newDoctorName = ((int) $from->doctor_id === (int) $newDoctorId)
                 ? $from->doctor_name
                 : ($doctor->name ?? 'Doctor');
 
-            // CASE A: target slot موجود لكنه cancelled → نعيد استخدامه
             if ($to && $to->status === 'cancelled') {
                 $to->update([
-                    'patient_id'       => $from->patient_id,
-                    'doctor_id'        => $newDoctorId,
-                    'doctor_name'      => $newDoctorName,
+                    'patient_id' => $from->patient_id,
+                    'doctor_id' => $newDoctorId,
+                    'doctor_name' => $newDoctorName,
                     'appointment_date' => $newDate,
                     'appointment_time' => $newTime,
-                    'status'           => 'scheduled',
-                    'notes'            => $from->notes,
-                    'created_by'       => $request->user()->id,
+                    'status' => 'scheduled',
+                    'notes' => $from->notes,
+                    'created_by' => $request->user()->id,
 
                     'reminder_status' => 'pending',
                     'last_reminder_at' => null,
                     'next_reminder_at' => $this->resolveNextReminderAt($newDate, $newTime),
+                    'reminder_sent_count' => 0,
                 ]);
 
                 $from->update([
                     'status' => 'cancelled',
                     'reminder_status' => 'not_needed',
+                    'last_reminder_at' => null,
                     'next_reminder_at' => null,
                 ]);
 
@@ -759,13 +718,13 @@ class AppointmentController extends Controller
                     Appointment::class,
                     $to->id,
                     array_merge($old, [
-                        'new_status'          => 'scheduled',
-                        'new_doctor_id'       => $newDoctorId,
-                        'new_date'            => $newDate,
-                        'new_time'            => $newTime,
-                        'patient_id'          => $to->patient_id,
+                        'new_status' => 'scheduled',
+                        'new_doctor_id' => $newDoctorId,
+                        'new_date' => $newDate,
+                        'new_time' => $newTime,
+                        'patient_id' => $to->patient_id,
                         'from_appointment_id' => $from->id,
-                        'to_appointment_id'   => $to->id,
+                        'to_appointment_id' => $to->id,
                     ])
                 );
 
@@ -779,18 +738,18 @@ class AppointmentController extends Controller
                 ], 200);
             }
 
-            // CASE B: target slot غير موجود → نعدل نفس الصف
             try {
                 $from->update([
-                    'doctor_id'        => $newDoctorId,
-                    'doctor_name'      => $newDoctorName,
+                    'doctor_id' => $newDoctorId,
+                    'doctor_name' => $newDoctorName,
                     'appointment_date' => $newDate,
                     'appointment_time' => $newTime,
-                    'status'           => 'scheduled',
+                    'status' => 'scheduled',
 
                     'reminder_status' => 'pending',
                     'last_reminder_at' => null,
                     'next_reminder_at' => $this->resolveNextReminderAt($newDate, $newTime),
+                    'reminder_sent_count' => 0,
                 ]);
             } catch (QueryException $e) {
                 if ((string) $e->getCode() === '23000') {
@@ -812,13 +771,13 @@ class AppointmentController extends Controller
                 Appointment::class,
                 $from->id,
                 array_merge($old, [
-                    'new_status'          => 'scheduled',
-                    'new_doctor_id'       => $newDoctorId,
-                    'new_date'            => $newDate,
-                    'new_time'            => $newTime,
-                    'patient_id'          => $from->patient_id,
+                    'new_status' => 'scheduled',
+                    'new_doctor_id' => $newDoctorId,
+                    'new_date' => $newDate,
+                    'new_time' => $newTime,
+                    'patient_id' => $from->patient_id,
                     'from_appointment_id' => $from->id,
-                    'to_appointment_id'   => $from->id,
+                    'to_appointment_id' => $from->id,
                 ])
             );
 
