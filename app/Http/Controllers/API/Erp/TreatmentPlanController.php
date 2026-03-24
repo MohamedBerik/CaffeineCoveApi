@@ -698,8 +698,6 @@ class TreatmentPlanController extends Controller
                 ], 422);
             }
 
-            $this->validateAppointmentDateTime($doctor, $date, $time);
-
             $appointment = Appointment::create([
                 'company_id' => $companyId,
                 'patient_id' => $plan->customer_id,
@@ -822,6 +820,18 @@ class TreatmentPlanController extends Controller
             ], 422);
         }
 
+        $appointmentDateTime = Carbon::parse($appointment->appointment_date . ' ' . $appointment->appointment_time)->startOfMinute();
+
+        if ($appointmentDateTime->lte(now()->startOfMinute())) {
+            return response()->json([
+                'msg' => 'Cannot link to a past or ongoing appointment',
+                'status' => 422,
+                'errors' => [
+                    'appointment_id' => ['You can only link to a future scheduled appointment.'],
+                ],
+            ], 422);
+        }
+
         $existingInvoice = \App\Models\Invoice::query()
             ->where('company_id', $companyId)
             ->where('appointment_id', $appointment->id)
@@ -833,6 +843,22 @@ class TreatmentPlanController extends Controller
                 'status' => 422,
                 'errors' => [
                     'appointment_id' => ['Cannot link to an appointment that has already been invoiced.'],
+                ],
+            ], 422);
+        }
+
+        $appointmentAlreadyLinked = TreatmentPlanItem::query()
+            ->where('company_id', $companyId)
+            ->where('appointment_id', $appointment->id)
+            ->where('id', '!=', $item->id)
+            ->exists();
+
+        if ($appointmentAlreadyLinked) {
+            return response()->json([
+                'msg' => 'This appointment is already linked to another treatment item',
+                'status' => 422,
+                'errors' => [
+                    'appointment_id' => ['This appointment is already linked to another treatment item.'],
                 ],
             ], 422);
         }
