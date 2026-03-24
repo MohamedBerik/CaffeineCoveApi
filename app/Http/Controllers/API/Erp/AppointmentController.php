@@ -146,6 +146,7 @@ class AppointmentController extends Controller
         }
 
         $data = $v->validated();
+
         $date = Carbon::parse($data['appointment_date'])->toDateString();
         $time = $data['appointment_time'];
 
@@ -156,8 +157,56 @@ class AppointmentController extends Controller
 
         $doctorName = trim((string)($data['doctor_name'] ?? '')) ?: ($doctor->name ?? 'Doctor');
 
-        $blockedStatuses = ['scheduled', 'completed', 'no_show'];
         $requestedStatus = $data['status'] ?? 'scheduled';
+        $blockedStatuses = ['scheduled', 'completed', 'no_show'];
+
+        // 🔥 VALIDATION (قبل DB)
+        $start = Carbon::parse("$date " . ($doctor->work_start ?? '09:00'))->startOfMinute();
+        $end   = Carbon::parse("$date " . ($doctor->work_end ?? '17:00'))->startOfMinute();
+        $requested = Carbon::parse("$date $time")->startOfMinute();
+        $now = now()->startOfMinute();
+
+        // ❌ منع الماضي
+        if ($requested->lte($now)) {
+            return response()->json([
+                'msg' => 'Appointment must be in the future',
+                'status' => 422,
+                'errors' => [
+                    'appointment_time' => ['Appointment must be in the future'],
+                ],
+            ], 422);
+        }
+
+        // ❌ خارج مواعيد العمل
+        if ($requested->lt($start) || $requested->gte($end)) {
+            return response()->json([
+                'msg' => 'Time is outside working hours.',
+                'status' => 422,
+                'errors' => [
+                    'appointment_time' => ['Time is outside working hours.'],
+                ],
+            ], 422);
+        }
+
+        // ❌ slot validation
+        $slotMinutes = (int) ($doctor->slot_minutes ?? 30);
+
+        if ($slotMinutes <= 0) {
+            return response()->json([
+                'msg' => 'Invalid doctor slot configuration',
+                'status' => 422,
+            ], 422);
+        }
+
+        if ($start->diffInMinutes($requested) % $slotMinutes !== 0) {
+            return response()->json([
+                'msg' => 'Invalid slot interval',
+                'status' => 422,
+                'errors' => [
+                    'appointment_time' => ['Invalid slot interval'],
+                ],
+            ], 422);
+        }
 
         return DB::transaction(function () use (
             $request,
@@ -168,8 +217,10 @@ class AppointmentController extends Controller
             $doctor,
             $doctorName,
             $blockedStatuses,
-            $requestedStatus
+            $requestedStatus,
+            $requested
         ) {
+
             $existing = Appointment::query()
                 ->where('company_id', $companyId)
                 ->where('doctor_id', $doctor->id)
@@ -190,6 +241,9 @@ class AppointmentController extends Controller
                 }
 
                 if ($existing->status === 'cancelled') {
+
+                    $nextReminder = $this->resolveNextReminderAt($date, $time);
+
                     $existing->update([
                         'patient_id' => $data['patient_id'],
                         'doctor_name' => $doctorName,
@@ -202,25 +256,10 @@ class AppointmentController extends Controller
                         'appointment_type' => 'consultation',
                         'reminder_status' => 'pending',
                         'last_reminder_at' => null,
-                        'next_reminder_at' => Carbon::parse($date . ' ' . $time)->subDay(),
+                        'next_reminder_at' => $nextReminder,
                         'reminder_sent_count' => 0,
                     ]);
 
-                    $start = Carbon::parse("$date " . ($doctor->work_start ?? '09:00'));
-                    $end   = Carbon::parse("$date " . ($doctor->work_end ?? '17:00'));
-                    $requested = Carbon::parse("$date $time");
-
-                    if ($requested->lt($start) || $requested->gte($end)) {
-                        return response()->json([
-                            'msg' => 'Time is outside working hours.',
-                            'status' => 422,
-                            'errors' => [
-                                'appointment_time' => ['Time is outside working hours.'],
-                            ],
-                        ], 422);
-                    }
-
-                    // ✅ log rebook (FIX: use $existing not $appointment)
                     ActivityLogger::log(
                         $companyId,
                         $request->user(),
@@ -230,19 +269,16 @@ class AppointmentController extends Controller
                         [
                             'doctor_id'  => $existing->doctor_id,
                             'patient_id' => $existing->patient_id,
-                            'date'       => Carbon::parse($existing->appointment_date)->toDateString(),
-                            'time'       => substr((string) $existing->appointment_time, 0, 5),
+                            'date'       => $date,
+                            'time'       => substr((string) $time, 0, 5),
                         ]
                     );
 
                     return response()->json([
                         'msg' => 'Appointment rebooked',
                         'status' => 200,
-                        'data' => $existing->fresh()->load([
-                            'patient:id,name,email,company_id',
-                            'doctor:id,name,company_id,work_start,work_end,slot_minutes',
-                        ]),
-                    ], 200);
+                        'data' => $existing->fresh(),
+                    ]);
                 }
             }
 
@@ -260,6 +296,7 @@ class AppointmentController extends Controller
 
                     'appointment_type' => 'consultation',
                     'reminder_status' => 'pending',
+                    'last_reminder_at' => null,
                     'next_reminder_at' => $this->resolveNextReminderAt($date, $time),
                     'reminder_sent_count' => 0,
                 ]);
@@ -268,15 +305,11 @@ class AppointmentController extends Controller
                     return response()->json([
                         'msg' => 'Time slot already booked',
                         'status' => 422,
-                        'errors' => [
-                            'appointment_time' => ['This time slot is already booked for this doctor.'],
-                        ],
                     ], 422);
                 }
                 throw $e;
             }
 
-            // ✅ log created (ERP)
             ActivityLogger::log(
                 $companyId,
                 $request->user(),
@@ -286,8 +319,8 @@ class AppointmentController extends Controller
                 [
                     'doctor_id'  => $appointment->doctor_id,
                     'patient_id' => $appointment->patient_id,
-                    'date'       => Carbon::parse($appointment->appointment_date)->toDateString(),
-                    'time'       => substr((string) $appointment->appointment_time, 0, 5),
+                    'date'       => $date,
+                    'time'       => substr((string) $time, 0, 5),
                     'status'     => $appointment->status,
                 ]
             );
@@ -295,10 +328,7 @@ class AppointmentController extends Controller
             return response()->json([
                 'msg' => 'Appointment created',
                 'status' => 201,
-                'data' => $appointment->load([
-                    'patient:id,name,email,company_id',
-                    'doctor:id,name,company_id,work_start,work_end,slot_minutes',
-                ]),
+                'data' => $appointment,
             ], 201);
         });
     }
@@ -872,7 +902,6 @@ class AppointmentController extends Controller
         $date = Carbon::parse($data['appointment_date'])->toDateString();
         $time = $data['appointment_time'];
 
-        // resolve doctor
         if (!empty($data['doctor_id'])) {
             $doctor = Doctor::query()
                 ->where('company_id', $companyId)
@@ -896,10 +925,16 @@ class AppointmentController extends Controller
         $doctorId = (int) $doctor->id;
         $doctorName = trim((string) ($data['doctor_name'] ?? '')) ?: $doctor->name;
 
-        // working hours validation
-        $start = Carbon::parse("$date " . ($doctor->work_start ?? '09:00'));
-        $end = Carbon::parse("$date " . ($doctor->work_end ?? '17:00'));
-        $requested = Carbon::parse("$date $time");
+        $start = Carbon::parse("$date " . ($doctor->work_start ?? '09:00'))->startOfMinute();
+        $end = Carbon::parse("$date " . ($doctor->work_end ?? '17:00'))->startOfMinute();
+        $requested = Carbon::parse("$date $time")->startOfMinute();
+        $now = now()->startOfMinute();
+
+        if ($requested->lte($now)) {
+            throw ValidationException::withMessages([
+                'appointment_time' => ['Appointment must be in the future.'],
+            ]);
+        }
 
         if ($requested->lt($start) || $requested->gte($end)) {
             throw ValidationException::withMessages([
@@ -908,6 +943,13 @@ class AppointmentController extends Controller
         }
 
         $slotMinutes = (int) ($doctor->slot_minutes ?? 30);
+
+        if ($slotMinutes <= 0) {
+            throw ValidationException::withMessages([
+                'appointment_time' => ['Invalid doctor slot interval'],
+            ]);
+        }
+
         if ($start->diffInMinutes($requested) % $slotMinutes !== 0) {
             throw ValidationException::withMessages([
                 'appointment_time' => ['Invalid slot interval'],
@@ -922,9 +964,8 @@ class AppointmentController extends Controller
             $time,
             $doctorId,
             $doctorName,
-            $appointmentType,
+            $appointmentType
         ) {
-
             $existing = Appointment::query()
                 ->where('company_id', $companyId)
                 ->where('doctor_id', $doctorId)
@@ -989,6 +1030,7 @@ class AppointmentController extends Controller
                 'created_by' => $request->user()->id,
 
                 'reminder_status' => 'pending',
+                'last_reminder_at' => null,
                 'next_reminder_at' => $this->resolveNextReminderAt($date, $time),
                 'reminder_sent_count' => 0,
             ]);
@@ -1523,18 +1565,30 @@ class AppointmentController extends Controller
         }
 
         $appointmentDateTime = Carbon::parse($appointment->appointment_date)
-            ->setTimeFromTimeString($appointment->appointment_time);
+            ->setTimeFromTimeString((string) $appointment->appointment_time)
+            ->startOfMinute();
 
-        if ($appointmentDateTime->lt(now())) {
+        $now = now()->startOfMinute();
+
+        // لا نرسل reminder لموعد فات أو بدأ بالفعل
+        if ($appointmentDateTime->lte($now)) {
             return response()->json([
-                'msg' => 'Cannot send reminder for past appointments',
+                'msg' => 'Cannot send reminder for past or ongoing appointments',
+                'status' => 422,
+            ], 422);
+        }
+
+        // لا نرسل reminder إذا الموعد في نفس اليوم
+        if (Carbon::parse($appointment->appointment_date)->isToday()) {
+            return response()->json([
+                'msg' => 'Same-day reminders are not allowed for this appointment',
                 'status' => 422,
             ], 422);
         }
 
         if (
             !empty($appointment->next_reminder_at) &&
-            Carbon::parse($appointment->next_reminder_at)->gt(now())
+            Carbon::parse($appointment->next_reminder_at)->gt($now)
         ) {
             return response()->json([
                 'msg' => 'Reminder is not due yet',
@@ -1543,10 +1597,11 @@ class AppointmentController extends Controller
         }
 
         $newCount = (int) ($appointment->reminder_sent_count ?? 0) + 1;
+        $sentAt = now();
 
         $appointment->update([
             'reminder_status' => 'sent',
-            'last_reminder_at' => now(),
+            'last_reminder_at' => $sentAt,
             'next_reminder_at' => null,
             'reminder_sent_count' => $newCount,
         ]);
@@ -1562,9 +1617,10 @@ class AppointmentController extends Controller
             [
                 'patient_id' => $appointment->patient_id,
                 'doctor_id' => $appointment->doctor_id,
-                'appointment_date' => $appointment->appointment_date,
+                'appointment_date' => Carbon::parse($appointment->appointment_date)->toDateString(),
                 'appointment_time' => substr((string) $appointment->appointment_time, 0, 5),
                 'reminder_sent_count' => $newCount,
+                'sent_at' => $sentAt->toDateTimeString(),
             ]
         );
 
