@@ -3,6 +3,8 @@
 namespace App\Http\Controllers\API\Erp;
 
 use App\Http\Controllers\Controller;
+use App\Models\Appointment;
+use App\Models\Doctor;
 use App\Models\Invoice;
 use App\Models\Procedure;
 use App\Models\TreatmentPlan;
@@ -13,6 +15,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use App\Traits\ValidatesAppointments;
 use App\Traits\HandlesAppointmentReminders;
+use Carbon\Carbon;
 use Illuminate\Support\Facades\Log;
 
 class TreatmentPlanController extends Controller
@@ -616,163 +619,158 @@ class TreatmentPlanController extends Controller
     }
 
     //reuse with trait
-    // public function startItem(Request $request, $itemId)
-    // {
-    //     $companyId = $request->user()->company_id;
+    public function startItem(Request $request, $itemId)
+    {
+        $companyId = $request->user()->company_id;
 
-    //     $data = $request->validate([
-    //         'doctor_id' => ['nullable', 'integer'],
-    //         'appointment_date' => ['required', 'date'],
-    //         'appointment_time' => ['required', 'date_format:H:i'],
-    //         'notes' => ['nullable', 'string'],
-    //     ]);
+        $data = $request->validate([
+            'doctor_id' => ['nullable', 'integer'],
+            'appointment_date' => ['required', 'date'],
+            'appointment_time' => ['required', 'date_format:H:i'],
+            'notes' => ['nullable', 'string'],
+        ]);
 
-    //     return DB::transaction(function () use ($request, $companyId, $itemId, $data) {
-    //         $item = TreatmentPlanItem::query()
-    //             ->where('company_id', $companyId)
-    //             ->lockForUpdate()
-    //             ->findOrFail($itemId);
+        return DB::transaction(function () use ($request, $companyId, $itemId, $data) {
+            $item = TreatmentPlanItem::query()
+                ->where('company_id', $companyId)
+                ->lockForUpdate()
+                ->findOrFail($itemId);
 
-    //         if ($item->status === 'completed') {
-    //             return response()->json([
-    //                 'msg' => 'This procedure is already completed',
-    //                 'status' => 409,
-    //             ], 409);
-    //         }
+            if ($item->status === 'completed') {
+                return response()->json([
+                    'msg' => 'This procedure is already completed',
+                    'status' => 409,
+                ], 409);
+            }
 
-    //         if ($item->status === 'in_progress' && $item->appointment_id) {
-    //             return response()->json([
-    //                 'msg' => 'This procedure is already in progress',
-    //                 'status' => 409,
-    //                 'appointment_id' => $item->appointment_id,
-    //             ], 409);
-    //         }
+            if ($item->status === 'in_progress' && $item->appointment_id) {
+                return response()->json([
+                    'msg' => 'This procedure is already in progress',
+                    'status' => 409,
+                    'appointment_id' => $item->appointment_id,
+                ], 409);
+            }
 
-    //         $plan = TreatmentPlan::query()
-    //             ->where('company_id', $companyId)
-    //             ->findOrFail($item->treatment_plan_id);
+            $plan = TreatmentPlan::query()
+                ->where('company_id', $companyId)
+                ->findOrFail($item->treatment_plan_id);
 
-    //         if (!empty($data['doctor_id'])) {
-    //             $doctor = \App\Models\Doctor::query()
-    //                 ->where('company_id', $companyId)
-    //                 ->where('is_active', true)
-    //                 ->findOrFail((int) $data['doctor_id']);
-    //         } else {
-    //             $doctor = \App\Models\Doctor::query()
-    //                 ->where('company_id', $companyId)
-    //                 ->where('is_active', true)
-    //                 ->orderBy('id', 'asc')
-    //                 ->first();
+            if (!empty($data['doctor_id'])) {
+                $doctor = Doctor::query()
+                    ->where('company_id', $companyId)
+                    ->where('is_active', true)
+                    ->findOrFail((int) $data['doctor_id']);
+            } else {
+                $doctor = Doctor::query()
+                    ->where('company_id', $companyId)
+                    ->where('is_active', true)
+                    ->orderBy('id', 'asc')
+                    ->first();
 
-    //             if (!$doctor) {
-    //                 return response()->json([
-    //                     'msg' => 'No active doctor found. Create a doctor first.',
-    //                     'status' => 422,
-    //                 ], 422);
-    //             }
-    //         }
+                if (!$doctor) {
+                    return response()->json([
+                        'msg' => 'No active doctor found. Create a doctor first.',
+                        'status' => 422,
+                    ], 422);
+                }
+            }
 
-    //         $date = \Carbon\Carbon::parse($data['appointment_date'])->toDateString();
-    //         $time = $data['appointment_time'];
+            $date = Carbon::parse($data['appointment_date'])->toDateString();
+            $time = $data['appointment_time'];
 
-    //         $slotValidation = $this->validateAppointmentSlot($doctor, $date, $time);
+            $this->validateAppointmentDateTime($doctor, $date, $time);
 
-    //         if ($slotValidation) {
-    //             return response()->json($slotValidation['body'], $slotValidation['status']);
-    //         }
+            $existing = Appointment::query()
+                ->where('company_id', $companyId)
+                ->where('doctor_id', $doctor->id)
+                ->whereDate('appointment_date', $date)
+                ->whereTime('appointment_time', $time)
+                ->lockForUpdate()
+                ->first();
 
-    //         $existing = \App\Models\Appointment::query()
-    //             ->where('company_id', $companyId)
-    //             ->where('doctor_id', $doctor->id)
-    //             ->whereDate('appointment_date', $date)
-    //             ->whereTime('appointment_time', $time)
-    //             ->lockForUpdate()
-    //             ->first();
+            if ($existing && in_array($existing->status, ['scheduled', 'completed', 'no_show'], true)) {
+                return response()->json([
+                    'msg' => 'Time slot already booked',
+                    'status' => 422,
+                    'errors' => [
+                        'appointment_time' => ['This time slot is already booked for this doctor.'],
+                    ],
+                ], 422);
+            }
 
-    //         if ($existing && in_array($existing->status, ['scheduled', 'completed', 'no_show'], true)) {
-    //             return response()->json([
-    //                 'msg' => 'Time slot already booked',
-    //                 'status' => 422,
-    //                 'errors' => [
-    //                     'appointment_time' => ['This time slot is already booked for this doctor.'],
-    //                 ],
-    //             ], 422);
-    //         }
+            $this->validateAppointmentDateTime($doctor, $date, $time);
 
-    //         $appointment = \App\Models\Appointment::create([
-    //             'company_id' => $companyId,
-    //             'patient_id' => $plan->customer_id,
-    //             'doctor_id' => $doctor->id,
-    //             'doctor_name' => $doctor->name ?? 'Doctor',
-    //             'appointment_date' => $date,
-    //             'appointment_time' => $time,
-    //             'appointment_type' => 'treatment',
-    //             'status' => 'scheduled',
-    //             'notes' => $data['notes'] ?? $item->notes,
-    //             'created_by' => $request->user()->id,
+            $appointment = Appointment::create([
+                'company_id' => $companyId,
+                'patient_id' => $plan->customer_id,
+                'doctor_id' => $doctor->id,
+                'doctor_name' => $doctor->name ?? 'Doctor',
+                'appointment_date' => $date,
+                'appointment_time' => $time,
+                'appointment_type' => 'treatment',
+                'status' => 'scheduled',
+                'notes' => $data['notes'] ?? $item->notes,
+                'created_by' => $request->user()->id,
 
-    //             'reminder_status' => 'pending',
-    //             'last_reminder_at' => null,
-    //             'next_reminder_at' => $this->resolveNextReminderAt($date, $time),
-    //             'reminder_sent_count' => 0,
-    //         ]);
+                ...$this->buildPendingReminder($date, $time),
+            ]);
 
-    //         $item->update([
-    //             'status' => 'in_progress',
-    //             'appointment_id' => $appointment->id,
-    //             'started_at' => now(),
-    //         ]);
+            $item->update([
+                'status' => 'in_progress',
+                'appointment_id' => $appointment->id,
+                'started_at' => now(),
+            ]);
 
-    //         ActivityLogger::log(
-    //             $companyId,
-    //             $request->user(),
-    //             'appointment.booked',
-    //             \App\Models\Appointment::class,
-    //             $appointment->id,
-    //             [
-    //                 'doctor_id' => $doctor->id,
-    //                 'patient_id' => $plan->customer_id,
-    //                 'date' => $date,
-    //                 'time' => $time,
-    //                 'appointment_type' => 'treatment',
-    //                 'treatment_plan_id' => $item->treatment_plan_id,
-    //                 'treatment_plan_item_id' => $item->id,
-    //                 'procedure_id' => $item->procedure_id,
-    //                 'procedure' => $item->procedure,
-    //             ]
-    //         );
+            ActivityLogger::log(
+                $companyId,
+                $request->user(),
+                'appointment.booked',
+                Appointment::class,
+                $appointment->id,
+                [
+                    'doctor_id' => $doctor->id,
+                    'patient_id' => $plan->customer_id,
+                    'date' => $date,
+                    'time' => $time,
+                    'appointment_type' => 'treatment',
+                    'treatment_plan_id' => $item->treatment_plan_id,
+                    'treatment_plan_item_id' => $item->id,
+                    'procedure_id' => $item->procedure_id,
+                    'procedure' => $item->procedure,
+                ]
+            );
 
-    //         ActivityLogger::log(
-    //             $companyId,
-    //             $request->user(),
-    //             'treatment_plan_item.started',
-    //             TreatmentPlanItem::class,
-    //             $item->id,
-    //             [
-    //                 'treatment_plan_id' => $item->treatment_plan_id,
-    //                 'appointment_id' => $appointment->id,
-    //                 'patient_id' => $plan->customer_id,
-    //                 'doctor_id' => $doctor->id,
-    //                 'procedure_id' => $item->procedure_id,
-    //                 'procedure' => $item->procedure,
-    //                 'date' => $date,
-    //                 'time' => $time,
-    //             ]
-    //         );
+            ActivityLogger::log(
+                $companyId,
+                $request->user(),
+                'treatment_plan_item.started',
+                TreatmentPlanItem::class,
+                $item->id,
+                [
+                    'treatment_plan_id' => $item->treatment_plan_id,
+                    'appointment_id' => $appointment->id,
+                    'patient_id' => $plan->customer_id,
+                    'doctor_id' => $doctor->id,
+                    'procedure_id' => $item->procedure_id,
+                    'procedure' => $item->procedure,
+                    'date' => $date,
+                    'time' => $time,
+                ]
+            );
 
-    //         return response()->json([
-    //             'msg' => 'Procedure started successfully',
-    //             'status' => 201,
-    //             'data' => [
-    //                 'item' => $item->fresh(),
-    //                 'appointment' => $appointment->load([
-    //                     'patient:id,name,email,company_id',
-    //                     'doctor:id,name,company_id,work_start,work_end,slot_minutes',
-    //                 ]),
-    //             ],
-    //         ], 201);
-    //     });
-    // }
+            return response()->json([
+                'msg' => 'Procedure started successfully',
+                'status' => 201,
+                'data' => [
+                    'item' => $item->fresh(),
+                    'appointment' => $appointment->load([
+                        'patient:id,name,email,company_id',
+                        'doctor:id,name,company_id,work_start,work_end,slot_minutes',
+                    ]),
+                ],
+            ], 201);
+        });
+    }
 
     public function attachAppointment(Request $request, $itemId)
     {
@@ -864,310 +862,5 @@ class TreatmentPlanController extends Controller
                 'procedureRef:id,name,default_price',
             ]),
         ]);
-    }
-
-    public function startItem(Request $request, $itemId)
-    {
-        try {
-            Log::info('Starting treatment plan item', [
-                'item_id' => $itemId,
-                'user_id' => $request->user()?->id,
-                'company_id' => $request->user()?->company_id,
-            ]);
-
-            $companyId = $request->user()->company_id;
-
-            // التحقق من وجود company_id
-            if (!$companyId) {
-                return response()->json([
-                    'msg' => 'User has no associated company',
-                    'status' => 422,
-                ], 422);
-            }
-
-            // التحقق من صحة الـ ID
-            if (!is_numeric($itemId) || $itemId <= 0) {
-                return response()->json([
-                    'msg' => 'Invalid item ID',
-                    'status' => 422,
-                ], 422);
-            }
-
-            $data = $request->validate([
-                'doctor_id' => ['nullable', 'integer'],
-                'appointment_date' => ['required', 'date'],
-                'appointment_time' => ['required', 'date_format:H:i'],
-                'notes' => ['nullable', 'string'],
-            ]);
-
-            Log::info('Validation passed for startItem', [
-                'item_id' => $itemId,
-                'data' => $data
-            ]);
-
-            return DB::transaction(function () use ($request, $companyId, $itemId, $data) {
-                try {
-                    $item = TreatmentPlanItem::query()
-                        ->where('company_id', $companyId)
-                        ->lockForUpdate()
-                        ->findOrFail($itemId);
-
-                    Log::info('Found treatment plan item', [
-                        'item_id' => $itemId,
-                        'item_status' => $item->status,
-                        'item_data' => $item->toArray()
-                    ]);
-
-                    if ($item->status === 'completed') {
-                        return response()->json([
-                            'msg' => 'This procedure is already completed',
-                            'status' => 409,
-                        ], 409);
-                    }
-
-                    if ($item->status === 'in_progress' && $item->appointment_id) {
-                        return response()->json([
-                            'msg' => 'This procedure is already in progress',
-                            'status' => 409,
-                            'appointment_id' => $item->appointment_id,
-                        ], 409);
-                    }
-
-                    $plan = TreatmentPlan::query()
-                        ->where('company_id', $companyId)
-                        ->findOrFail($item->treatment_plan_id);
-
-                    Log::info('Found treatment plan', [
-                        'plan_id' => $plan->id,
-                        'customer_id' => $plan->customer_id
-                    ]);
-
-                    if (!empty($data['doctor_id'])) {
-                        $doctor = \App\Models\Doctor::query()
-                            ->where('company_id', $companyId)
-                            ->where('is_active', true)
-                            ->findOrFail((int) $data['doctor_id']);
-                    } else {
-                        $doctor = \App\Models\Doctor::query()
-                            ->where('company_id', $companyId)
-                            ->where('is_active', true)
-                            ->orderBy('id', 'asc')
-                            ->first();
-
-                        if (!$doctor) {
-                            return response()->json([
-                                'msg' => 'No active doctor found. Create a doctor first.',
-                                'status' => 422,
-                            ], 422);
-                        }
-                    }
-
-                    Log::info('Doctor selected', [
-                        'doctor_id' => $doctor->id,
-                        'doctor_name' => $doctor->name
-                    ]);
-
-                    // معالجة التاريخ والوقت مع try-catch منفصل
-                    try {
-                        $date = \Carbon\Carbon::parse($data['appointment_date'])->toDateString();
-                        $time = $data['appointment_time'];
-
-                        Log::info('Parsed date and time', [
-                            'original_date' => $data['appointment_date'],
-                            'parsed_date' => $date,
-                            'time' => $time
-                        ]);
-                    } catch (\Exception $e) {
-                        Log::error('Date parsing error', [
-                            'error' => $e->getMessage(),
-                            'date' => $data['appointment_date']
-                        ]);
-                        return response()->json([
-                            'msg' => 'Invalid date format: ' . $e->getMessage(),
-                            'status' => 422,
-                        ], 422);
-                    }
-
-                    $slotValidation = $this->validateAppointmentSlot($doctor, $date, $time);
-
-                    if ($slotValidation) {
-                        return response()->json($slotValidation['body'], $slotValidation['status']);
-                    }
-
-                    $existing = \App\Models\Appointment::query()
-                        ->where('company_id', $companyId)
-                        ->where('doctor_id', $doctor->id)
-                        ->whereDate('appointment_date', $date)
-                        ->whereTime('appointment_time', $time)
-                        ->lockForUpdate()
-                        ->first();
-
-                    if ($existing && in_array($existing->status, ['scheduled', 'completed', 'no_show'], true)) {
-                        return response()->json([
-                            'msg' => 'Time slot already booked',
-                            'status' => 422,
-                            'errors' => [
-                                'appointment_time' => ['This time slot is already booked for this doctor.'],
-                            ],
-                        ], 422);
-                    }
-
-                    Log::info('Creating appointment', [
-                        'doctor_id' => $doctor->id,
-                        'patient_id' => $plan->customer_id,
-                        'date' => $date,
-                        'time' => $time
-                    ]);
-
-                    // التحقق من وجود resolveNextReminderAt
-                    $nextReminderAt = null;
-                    try {
-                        $nextReminderAt = $this->resolveNextReminderAt($date, $time);
-                    } catch (\Exception $e) {
-                        Log::warning('Error in resolveNextReminderAt', [
-                            'error' => $e->getMessage(),
-                            'date' => $date,
-                            'time' => $time
-                        ]);
-                        // استمر بدون تذكير
-                    }
-
-                    $appointment = \App\Models\Appointment::create([
-                        'company_id' => $companyId,
-                        'patient_id' => $plan->customer_id,
-                        'doctor_id' => $doctor->id,
-                        'doctor_name' => $doctor->name ?? 'Doctor',
-                        'appointment_date' => $date,
-                        'appointment_time' => $time,
-                        'appointment_type' => 'treatment',
-                        'status' => 'scheduled',
-                        'notes' => $data['notes'] ?? $item->notes,
-                        'created_by' => $request->user()->id,
-
-                        'reminder_status' => 'pending',
-                        'last_reminder_at' => null,
-                        'next_reminder_at' => $nextReminderAt,
-                        'reminder_sent_count' => 0,
-                    ]);
-
-                    Log::info('Appointment created', [
-                        'appointment_id' => $appointment->id
-                    ]);
-
-                    $item->update([
-                        'status' => 'in_progress',
-                        'appointment_id' => $appointment->id,
-                        'started_at' => now(),
-                    ]);
-
-                    Log::info('Treatment plan item updated', [
-                        'item_id' => $item->id,
-                        'new_status' => 'in_progress'
-                    ]);
-
-                    // التحقق من وجود ActivityLogger قبل استخدامه
-                    if (class_exists('App\\Services\\ActivityLogger') && method_exists('App\\Services\\ActivityLogger', 'log')) {
-                        ActivityLogger::log(
-                            $companyId,
-                            $request->user(),
-                            'appointment.booked',
-                            \App\Models\Appointment::class,
-                            $appointment->id,
-                            [
-                                'doctor_id' => $doctor->id,
-                                'patient_id' => $plan->customer_id,
-                                'date' => $date,
-                                'time' => $time,
-                                'appointment_type' => 'treatment',
-                                'treatment_plan_id' => $item->treatment_plan_id,
-                                'treatment_plan_item_id' => $item->id,
-                                'procedure_id' => $item->procedure_id,
-                                'procedure' => $item->procedure,
-                            ]
-                        );
-
-                        ActivityLogger::log(
-                            $companyId,
-                            $request->user(),
-                            'treatment_plan_item.started',
-                            TreatmentPlanItem::class,
-                            $item->id,
-                            [
-                                'treatment_plan_id' => $item->treatment_plan_id,
-                                'appointment_id' => $appointment->id,
-                                'patient_id' => $plan->customer_id,
-                                'doctor_id' => $doctor->id,
-                                'procedure_id' => $item->procedure_id,
-                                'procedure' => $item->procedure,
-                                'date' => $date,
-                                'time' => $time,
-                            ]
-                        );
-                    } else {
-                        Log::info('ActivityLogger not available, skipping logs', [
-                            'appointment_id' => $appointment->id,
-                            'item_id' => $item->id
-                        ]);
-                    }
-
-                    return response()->json([
-                        'msg' => 'Procedure started successfully',
-                        'status' => 201,
-                        'data' => [
-                            'item' => $item->fresh(),
-                            'appointment' => $appointment->load([
-                                'patient:id,name,email,company_id',
-                                'doctor:id,name,company_id,work_start,work_end,slot_minutes',
-                            ]),
-                        ],
-                    ], 201);
-                } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
-                    Log::error('Model not found in transaction', [
-                        'item_id' => $itemId,
-                        'error' => $e->getMessage()
-                    ]);
-                    return response()->json([
-                        'msg' => 'Record not found',
-                        'status' => 404,
-                    ], 404);
-                } catch (\Exception $e) {
-                    Log::error('Error in transaction', [
-                        'item_id' => $itemId,
-                        'error_message' => $e->getMessage(),
-                        'error_file' => $e->getFile(),
-                        'error_line' => $e->getLine(),
-                        'trace' => $e->getTraceAsString()
-                    ]);
-                    throw $e; // إعادة رمي الاستثناء ليتم التعامل معه في الـ outer catch
-                }
-            });
-        } catch (\Exception $e) {
-            // تسجيل الخطأ بشكل مفصل
-            Log::error('Fatal error in startItem function:', [
-                'item_id' => $itemId ?? 'unknown',
-                'user_id' => $request->user()?->id ?? 'unknown',
-                'company_id' => $request->user()?->company_id ?? 'unknown',
-                'error_message' => $e->getMessage(),
-                'error_file' => $e->getFile(),
-                'error_line' => $e->getLine(),
-                'error_trace' => $e->getTraceAsString(),
-                'request_data' => $request->all(),
-            ]);
-
-            // إرجاع رسالة مناسبة حسب البيئة
-            $errorMessage = config('app.debug')
-                ? 'Error starting procedure: ' . $e->getMessage()
-                : 'An internal server error occurred while starting the procedure';
-
-            return response()->json([
-                'msg' => $errorMessage,
-                'status' => 500,
-                'debug' => config('app.debug') ? [
-                    'message' => $e->getMessage(),
-                    'file' => $e->getFile(),
-                    'line' => $e->getLine(),
-                ] : null
-            ], 500);
-        }
     }
 }
