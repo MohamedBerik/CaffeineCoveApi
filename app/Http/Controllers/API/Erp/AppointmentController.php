@@ -1514,6 +1514,14 @@ class AppointmentController extends Controller
                 'status' => 422,
             ], 422);
         }
+
+        if ($appointment->reminder_status === 'not_needed') {
+            return response()->json([
+                'msg' => 'Reminder is not needed for this appointment',
+                'status' => 422,
+            ], 422);
+        }
+
         $appointmentDateTime = Carbon::parse(
             $appointment->appointment_date . ' ' . $appointment->appointment_time
         );
@@ -1526,41 +1534,40 @@ class AppointmentController extends Controller
         }
 
         if (
-            $appointment->next_reminder_at &&
+            !empty($appointment->next_reminder_at) &&
             Carbon::parse($appointment->next_reminder_at)->gt(now())
         ) {
-
             return response()->json([
                 'msg' => 'Reminder is not due yet',
                 'status' => 422,
             ], 422);
         }
-        // هنا لاحقًا تربط WhatsApp / SMS / Email
-        // حالياً manual internal reminder فقط
+
+        $newCount = (int) ($appointment->reminder_sent_count ?? 0) + 1;
 
         $appointment->update([
             'reminder_status' => 'sent',
             'last_reminder_at' => now(),
             'next_reminder_at' => null,
-            'reminder_sent_count' => (int) ($appointment->reminder_sent_count ?? 0) + 1,
+            'reminder_sent_count' => $newCount,
         ]);
 
         $appointment->refresh();
 
-        // ActivityLogger::log(
-        //     $companyId,
-        //     $request->user(),
-        //     'appointment.reminder_sent',
-        //     Appointment::class,
-        //     $appointment->id,
-        //     [
-        //         'patient_id' => $appointment->patient_id,
-        //         'doctor_id' => $appointment->doctor_id,
-        //         'appointment_date' => $appointment->appointment_date,
-        //         'appointment_time' => substr((string) $appointment->appointment_time, 0, 5),
-        //         'reminder_sent_count' => (int) ($appointment->reminder_sent_count ?? 0),
-        //     ]
-        // );
+        ActivityLogger::log(
+            $companyId,
+            $request->user(),
+            'appointment.reminder_sent',
+            Appointment::class,
+            $appointment->id,
+            [
+                'patient_id' => $appointment->patient_id,
+                'doctor_id' => $appointment->doctor_id,
+                'appointment_date' => $appointment->appointment_date,
+                'appointment_time' => substr((string) $appointment->appointment_time, 0, 5),
+                'reminder_sent_count' => $newCount,
+            ]
+        );
 
         return response()->json([
             'msg' => 'Reminder sent successfully',
@@ -1569,9 +1576,10 @@ class AppointmentController extends Controller
                 'id' => $appointment->id,
                 'reminder_status' => $appointment->reminder_status,
                 'last_reminder_at' => $appointment->last_reminder_at,
+                'next_reminder_at' => $appointment->next_reminder_at,
                 'reminder_sent_count' => (int) $appointment->reminder_sent_count,
             ],
-        ]);
+        ], 200);
     }
 
     private function autoApplyCustomerCredit(Invoice $invoice, $user): void
