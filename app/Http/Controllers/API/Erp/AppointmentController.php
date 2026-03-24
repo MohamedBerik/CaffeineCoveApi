@@ -1729,9 +1729,8 @@ class AppointmentController extends Controller
                 ], 422);
             }
 
-            $appointmentDateTime = Carbon::parse(
-                $appointment->appointment_date . ' ' . $appointment->appointment_time
-            );
+            $appointmentDateTime = Carbon::parse($appointment->appointment_date)
+                ->setTimeFromTimeString($appointment->appointment_time);
 
             if ($appointmentDateTime->lt(now())) {
                 return response()->json([
@@ -1789,7 +1788,7 @@ class AppointmentController extends Controller
             ], 200);
         } catch (\Exception $e) {
             // تسجيل الخطأ في الـ log
-            \Log::error('Error in sendReminder function:', [
+            Log::error('Error in sendReminder function:', [
                 'appointment_id' => $id ?? 'unknown',
                 'user_id' => $request->user()?->id ?? 'unknown',
                 'company_id' => $request->user()?->company_id ?? 'unknown',
