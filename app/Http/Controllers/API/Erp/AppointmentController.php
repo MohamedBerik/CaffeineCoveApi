@@ -486,8 +486,7 @@ class AppointmentController extends Controller
 
         $appointment->update([
             'status' => 'cancelled',
-            'reminder_status' => 'not_needed',
-            'next_reminder_at' => null,
+            ...$this->markReminderNotNeeded(),
         ]);
 
         ActivityLogger::log(
@@ -541,8 +540,7 @@ class AppointmentController extends Controller
 
         $appointment->update([
             'status' => 'no_show',
-            'reminder_status' => 'not_needed',
-            'next_reminder_at' => null,
+            ...$this->markReminderNotNeeded(),
         ]);
 
         ActivityLogger::log(
@@ -608,11 +606,7 @@ class AppointmentController extends Controller
             ->where('is_active', true)
             ->findOrFail($newDoctorId);
 
-        $slotValidation = $this->validateAppointmentSlot($doctor, $newDate, $newTime);
-
-        if ($slotValidation) {
-            return response()->json($slotValidation['body'], $slotValidation['status']);
-        }
+        $this->validateAppointmentDateTime($doctor, $newDate, $newTime);
 
         $blockedStatuses = ['scheduled', 'completed', 'no_show'];
 
@@ -698,17 +692,12 @@ class AppointmentController extends Controller
                     'notes' => $from->notes,
                     'created_by' => $request->user()->id,
 
-                    'reminder_status' => 'pending',
-                    'last_reminder_at' => null,
-                    'next_reminder_at' => $this->resolveNextReminderAt($newDate, $newTime),
-                    'reminder_sent_count' => 0,
+                    ...$this->buildPendingReminder($newDate, $newTime),
                 ]);
 
                 $from->update([
                     'status' => 'cancelled',
-                    'reminder_status' => 'not_needed',
-                    'last_reminder_at' => null,
-                    'next_reminder_at' => null,
+                    ...$this->markReminderNotNeeded(),
                 ]);
 
                 ActivityLogger::log(
@@ -746,10 +735,7 @@ class AppointmentController extends Controller
                     'appointment_time' => $newTime,
                     'status' => 'scheduled',
 
-                    'reminder_status' => 'pending',
-                    'last_reminder_at' => null,
-                    'next_reminder_at' => $this->resolveNextReminderAt($newDate, $newTime),
-                    'reminder_sent_count' => 0,
+                    ...$this->buildPendingReminder($newDate, $newTime),
                 ]);
             } catch (QueryException $e) {
                 if ((string) $e->getCode() === '23000') {
@@ -940,17 +926,17 @@ class AppointmentController extends Controller
         });
     }
 
-    private function resolveNextReminderAt(string $date, string $time)
-    {
-        $appointmentAt = Carbon::parse($date . ' ' . $time);
-        $nextReminderAt = $appointmentAt->copy()->subDay();
+    // private function resolveNextReminderAt(string $date, string $time)
+    // {
+    //     $appointmentAt = Carbon::parse($date . ' ' . $time);
+    //     $nextReminderAt = $appointmentAt->copy()->subDay();
 
-        if ($nextReminderAt->lt(now())) {
-            $nextReminderAt = now();
-        }
+    //     if ($nextReminderAt->lt(now())) {
+    //         $nextReminderAt = now();
+    //     }
 
-        return $nextReminderAt;
-    }
+    //     return $nextReminderAt;
+    // }
 
     private function createConsultationInvoiceIfMissing($appointment, $request)
     {
@@ -1103,8 +1089,7 @@ class AppointmentController extends Controller
 
                 $appointment->update([
                     'status' => 'completed',
-                    'reminder_status' => 'not_needed',
-                    'next_reminder_at' => null,
+                    ...$this->markReminderNotNeeded(),
                 ]);
 
                 ActivityLogger::log(
@@ -1302,8 +1287,7 @@ class AppointmentController extends Controller
 
                 $appointment->update([
                     'status' => 'completed',
-                    'reminder_status' => 'not_needed',
-                    'next_reminder_at' => null,
+                    ...$this->markReminderNotNeeded(),
                 ]);
 
                 $currentCompleted = (int) ($linkedPlanItem->completed_sessions ?? 0);
