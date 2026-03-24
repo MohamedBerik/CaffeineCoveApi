@@ -1,5 +1,8 @@
 <?php
 
+namespace App\Traits;
+
+
 trait ValidatesAppointments
 {
 
