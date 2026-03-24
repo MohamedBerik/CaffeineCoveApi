@@ -13,6 +13,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use App\Traits\ValidatesAppointments;
 use App\Traits\HandlesAppointmentReminders;
+use Illuminate\Support\Facades\Log;
 
 class TreatmentPlanController extends Controller
 {
@@ -868,7 +869,7 @@ class TreatmentPlanController extends Controller
     public function startItem(Request $request, $itemId)
     {
         try {
-            \Log::info('Starting treatment plan item', [
+            Log::info('Starting treatment plan item', [
                 'item_id' => $itemId,
                 'user_id' => $request->user()?->id,
                 'company_id' => $request->user()?->company_id,
@@ -899,7 +900,7 @@ class TreatmentPlanController extends Controller
                 'notes' => ['nullable', 'string'],
             ]);
 
-            \Log::info('Validation passed for startItem', [
+            Log::info('Validation passed for startItem', [
                 'item_id' => $itemId,
                 'data' => $data
             ]);
@@ -911,7 +912,7 @@ class TreatmentPlanController extends Controller
                         ->lockForUpdate()
                         ->findOrFail($itemId);
 
-                    \Log::info('Found treatment plan item', [
+                    Log::info('Found treatment plan item', [
                         'item_id' => $itemId,
                         'item_status' => $item->status,
                         'item_data' => $item->toArray()
@@ -936,7 +937,7 @@ class TreatmentPlanController extends Controller
                         ->where('company_id', $companyId)
                         ->findOrFail($item->treatment_plan_id);
 
-                    \Log::info('Found treatment plan', [
+                    Log::info('Found treatment plan', [
                         'plan_id' => $plan->id,
                         'customer_id' => $plan->customer_id
                     ]);
@@ -961,7 +962,7 @@ class TreatmentPlanController extends Controller
                         }
                     }
 
-                    \Log::info('Doctor selected', [
+                    Log::info('Doctor selected', [
                         'doctor_id' => $doctor->id,
                         'doctor_name' => $doctor->name
                     ]);
