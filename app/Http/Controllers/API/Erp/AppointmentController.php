@@ -219,6 +219,7 @@ class AppointmentController extends Controller
                             ],
                         ], 422);
                     }
+
                     // ✅ log rebook (FIX: use $existing not $appointment)
                     ActivityLogger::log(
                         $companyId,
