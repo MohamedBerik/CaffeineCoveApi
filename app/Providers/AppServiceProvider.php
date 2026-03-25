@@ -24,11 +24,21 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        if (class_exists(\Doctrine\DBAL\Types\Type::class)) {
-            Schema::getConnection()
-                ->getDoctrineSchemaManager()
-                ->getDatabasePlatform()
-                ->registerDoctrineTypeMapping('enum', 'string');
+        // تجنب الاتصال بقاعدة البيانات أثناء البناء (deployment)
+        if ($this->app->runningInConsole() && !$this->app->environment('production')) {
+            return;
+        }
+        
+        try {
+            if (class_exists(\Doctrine\DBAL\Types\Type::class)) {
+                Schema::getConnection()
+                    ->getDoctrineSchemaManager()
+                    ->getDatabasePlatform()
+                    ->registerDoctrineTypeMapping('enum', 'string');
+            }
+        } catch (\Exception $e) {
+            // تجاهل الخطأ أثناء البناء أو إذا كانت قاعدة البيانات مش شغالة
+            \Log::info('Database not available for Doctrine mapping: ' . $e->getMessage());
         }
     }
 }
