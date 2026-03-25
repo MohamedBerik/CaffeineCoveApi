@@ -35,6 +35,7 @@ class SendAppointmentReminderJob implements ShouldQueue
     {
         DB::transaction(function () {
             $appointment = Appointment::query()
+                ->with('patient:id,phone')
                 ->lockForUpdate()
                 ->find($this->appointmentId);
 
@@ -43,22 +44,27 @@ class SendAppointmentReminderJob implements ShouldQueue
             }
 
             $validationError = $this->validateReminderCanBeSent($appointment);
-
             if ($validationError) {
-                Log::info('SendAppointmentReminderJob skipped', [
-                    'appointment_id' => $this->appointmentId,
-                    'reason' => $validationError['body']['msg'] ?? 'validation_failed',
-                ]);
+                return;
+            }
+
+            $userPhone = $appointment->patient?->phone;
+            if (empty($userPhone)) {
                 return;
             }
 
             $sentAt = now()->startOfMinute();
             $newCount = (int) ($appointment->reminder_sent_count ?? 0) + 1;
 
-            /**
-             * هنا لاحقًا حط الإرسال الفعلي:
-             * SMS / WhatsApp / Email
-             */
+            $message = sprintf(
+                "Reminder: you have an appointment on %s at %s with doctor %s.",
+                Carbon::parse($appointment->appointment_date)->format('Y-m-d'),
+                substr((string) $appointment->appointment_time, 0, 5),
+                $appointment->doctor_name ?? 'Doctor'
+            );
+
+            $result = app(\App\Services\Whatsapp\TwilioWhatsappService::class)
+                ->send($userPhone, $message);
 
             $appointment->update(
                 $this->buildSentReminderState($sentAt, $newCount)
@@ -80,6 +86,8 @@ class SendAppointmentReminderJob implements ShouldQueue
                     'reminder_sent_count' => $newCount,
                     'sent_at' => $sentAt->toDateTimeString(),
                     'source' => 'scheduler',
+                    'provider' => 'twilio',
+                    'provider_message_sid' => $result['sid'] ?? null,
                 ]
             );
         });
