@@ -11231,3 +11231,4 @@ Did you mean one of these?
 #16 C:\\Laravel\\Api\\CaffeineCove\\artisan(35): Illuminate\\Foundation\\Console\\Kernel->handle(Object(Symfony\\Component\\Console\\Input\\ArgvInput), Object(Symfony\\Component\\Console\\Output\\ConsoleOutput))
 #17 {main}
 "} 
+[2026-03-25 16:10:10] production.INFO: Database not available for Doctrine mapping: SQLSTATE[HY000] [2002] php_network_getaddresses: getaddrinfo for switchyard.proxy.rlwy.net failed: This is usually a temporary error during hostname resolution and means that the local server did not receive a response from an authoritative server.   

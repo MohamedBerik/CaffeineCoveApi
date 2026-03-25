@@ -45,6 +45,10 @@ class SendAppointmentReminderJob implements ShouldQueue
             $validationError = $this->validateReminderCanBeSent($appointment);
 
             if ($validationError) {
+                Log::info('SendAppointmentReminderJob skipped', [
+                    'appointment_id' => $this->appointmentId,
+                    'reason' => $validationError['body']['msg'] ?? 'validation_failed',
+                ]);
                 return;
             }
 

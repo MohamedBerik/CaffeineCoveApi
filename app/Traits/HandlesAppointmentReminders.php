@@ -88,6 +88,16 @@ trait HandlesAppointmentReminders
             ];
         }
 
+        if ($appointment->reminder_status === 'sent') {
+            return [
+                'status' => 422,
+                'body' => [
+                    'msg' => 'Reminder already sent for this appointment',
+                    'status' => 422,
+                ],
+            ];
+        }
+
         $appointmentDateTime = Carbon::parse($appointment->appointment_date)
             ->setTimeFromTimeString((string) $appointment->appointment_time)
             ->startOfMinute();
@@ -104,7 +114,10 @@ trait HandlesAppointmentReminders
             ];
         }
 
-        if (Carbon::parse($appointment->appointment_date)->isToday()) {
+        $appointmentDate = Carbon::parse($appointment->appointment_date)->startOfDay();
+        $today = now()->startOfDay();
+
+        if ($appointmentDate->eq($today)) {
             return [
                 'status' => 422,
                 'body' => [
