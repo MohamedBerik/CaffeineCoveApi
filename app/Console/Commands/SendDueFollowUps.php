@@ -13,14 +13,14 @@ class SendDueFollowUps extends Command
      *
      * @var string
      */
-    protected $signature = 'command:name';
+    protected $signature = 'appointments:send-followups';
 
     /**
      * The console command description.
      *
      * @var string
      */
-    protected $description = 'Command description';
+    protected $description = 'Send follow-up messages to patients after completed appointments';
 
     /**
      * Create a new command instance.

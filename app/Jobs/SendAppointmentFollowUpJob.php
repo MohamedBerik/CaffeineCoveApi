@@ -1,13 +1,18 @@
 <?php
 
+namespace App\Jobs;
+
 use App\Models\Appointment;
 use App\Traits\HandlesAppointmentFollowUps;
+use Illuminate\Bus\Queueable;
+use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Contracts\Queue\ShouldQueue;
+use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Log;
 
 class SendAppointmentFollowUpJob implements ShouldQueue
 {
-    use HandlesAppointmentFollowUps;
+    use HandlesAppointmentFollowUps, Dispatchable, Queueable, SerializesModels;
 
     public function __construct(public int $appointmentId) {}
 
