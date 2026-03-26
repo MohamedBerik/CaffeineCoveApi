@@ -29,6 +29,9 @@ class Appointment extends Model
         'last_reminder_at',
         'next_reminder_at',
         'reminder_sent_count',
+        'follow_up_status',
+        'follow_up_at',
+        'follow_up_sent_at',
     ];
 
     protected $casts = [
@@ -38,6 +41,8 @@ class Appointment extends Model
         'last_reminder_at' => 'datetime',
         'next_reminder_at' => 'datetime',
         'reminder_sent_count' => 'integer',
+        'follow_up_at' => 'datetime',
+        'follow_up_sent_at' => 'datetime',
     ];
 
     public function patient()

@@ -11232,3 +11232,77 @@ Did you mean one of these?
 #17 {main}
 "} 
 [2026-03-25 16:10:10] production.INFO: Database not available for Doctrine mapping: SQLSTATE[HY000] [2002] php_network_getaddresses: getaddrinfo for switchyard.proxy.rlwy.net failed: This is usually a temporary error during hostname resolution and means that the local server did not receive a response from an authoritative server.   
+[2026-03-26 15:38:47] production.INFO: Database not available for Doctrine mapping: SQLSTATE[HY000] [2002] No connection could be made because the target machine actively refused it  
+[2026-03-26 15:38:48] production.ERROR: Command "make:trait" is not defined.
+
+Did you mean one of these?
+    make:cast
+    make:channel
+    make:command
+    make:component
+    make:controller
+    make:event
+    make:exception
+    make:factory
+    make:job
+    make:listener
+    make:mail
+    make:middleware
+    make:migration
+    make:model
+    make:notification
+    make:observer
+    make:policy
+    make:provider
+    make:request
+    make:resource
+    make:rule
+    make:seeder
+    make:test {"exception":"[object] (Symfony\\Component\\Console\\Exception\\CommandNotFoundException(code: 0): Command \"make:trait\" is not defined.
+
+Did you mean one of these?
+    make:cast
+    make:channel
+    make:command
+    make:component
+    make:controller
+    make:event
+    make:exception
+    make:factory
+    make:job
+    make:listener
+    make:mail
+    make:middleware
+    make:migration
+    make:model
+    make:notification
+    make:observer
+    make:policy
+    make:provider
+    make:request
+    make:resource
+    make:rule
+    make:seeder
+    make:test at C:\\Laravel\\Api\\CaffeineCove\\vendor\\symfony\\console\\Application.php:720)
+[stacktrace]
+#0 C:\\Laravel\\Api\\CaffeineCove\\vendor\\symfony\\console\\Application.php(259): Symfony\\Component\\Console\\Application->find('make:trait')
+#1 C:\\Laravel\\Api\\CaffeineCove\\vendor\\symfony\\console\\Application.php(171): Symfony\\Component\\Console\\Application->doRun(Object(Symfony\\Component\\Console\\Input\\ArgvInput), Object(Symfony\\Component\\Console\\Output\\ConsoleOutput))
+#2 C:\\Laravel\\Api\\CaffeineCove\\vendor\\laravel\\framework\\src\\Illuminate\\Console\\Application.php(94): Symfony\\Component\\Console\\Application->run(Object(Symfony\\Component\\Console\\Input\\ArgvInput), Object(Symfony\\Component\\Console\\Output\\ConsoleOutput))
+#3 C:\\Laravel\\Api\\CaffeineCove\\vendor\\laravel\\framework\\src\\Illuminate\\Foundation\\Console\\Kernel.php(129): Illuminate\\Console\\Application->run(Object(Symfony\\Component\\Console\\Input\\ArgvInput), Object(Symfony\\Component\\Console\\Output\\ConsoleOutput))
+#4 C:\\Laravel\\Api\\CaffeineCove\\artisan(35): Illuminate\\Foundation\\Console\\Kernel->handle(Object(Symfony\\Component\\Console\\Input\\ArgvInput), Object(Symfony\\Component\\Console\\Output\\ConsoleOutput))
+#5 {main}
+"} 
+[2026-03-26 15:41:30] production.INFO: Database not available for Doctrine mapping: SQLSTATE[HY000] [2002] No connection could be made because the target machine actively refused it  
+[2026-03-26 15:45:35] production.INFO: Database not available for Doctrine mapping: SQLSTATE[HY000] [2002] No connection could be made because the target machine actively refused it  
+[2026-03-26 15:52:36] production.INFO: Database not available for Doctrine mapping: SQLSTATE[HY000] [2002] No connection could be made because the target machine actively refused it  
+[2026-03-26 15:52:36] production.ERROR: syntax error, unexpected token "public", expecting end of file {"exception":"[object] (ParseError(code: 0): syntax error, unexpected token \"public\", expecting end of file at C:\\Laravel\\Api\\CaffeineCove\\app\\Console\\Commands\\SendDueFollowUps.php:7)
+[stacktrace]
+#0 C:\\Laravel\\Api\\CaffeineCove\\vendor\\composer\\ClassLoader.php(427): Composer\\Autoload\\{closure}('C:\\\\Laravel\\\\Api\\\\...')
+#1 [internal function]: Composer\\Autoload\\ClassLoader->loadClass('App\\\\Console\\\\Com...')
+#2 C:\\Laravel\\Api\\CaffeineCove\\vendor\\laravel\\framework\\src\\Illuminate\\Foundation\\Console\\Kernel.php(229): is_subclass_of('App\\\\Console\\\\Com...', 'Illuminate\\\\Cons...')
+#3 C:\\Laravel\\Api\\CaffeineCove\\app\\Console\\Kernel.php(34): Illuminate\\Foundation\\Console\\Kernel->load(Array)
+#4 C:\\Laravel\\Api\\CaffeineCove\\vendor\\laravel\\framework\\src\\Illuminate\\Foundation\\Console\\Kernel.php(316): App\\Console\\Kernel->commands()
+#5 C:\\Laravel\\Api\\CaffeineCove\\vendor\\laravel\\framework\\src\\Illuminate\\Foundation\\Console\\Kernel.php(127): Illuminate\\Foundation\\Console\\Kernel->bootstrap()
+#6 C:\\Laravel\\Api\\CaffeineCove\\artisan(35): Illuminate\\Foundation\\Console\\Kernel->handle(Object(Symfony\\Component\\Console\\Input\\ArgvInput), Object(Symfony\\Component\\Console\\Output\\ConsoleOutput))
+#7 {main}
+"} 
