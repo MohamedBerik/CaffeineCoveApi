@@ -12,12 +12,15 @@ class TwilioWhatsappService
         $token = config('services.twilio.auth_token');
         $from = config('services.twilio.whatsapp_from');
 
+        // إزالة "whatsapp:" من from إذا كانت موجودة
+        $from = preg_replace('/^whatsapp:/', '', $from);
+
         $client = new Client($sid, $token);
 
         $response = $client->messages->create(
             'whatsapp:' . $this->normalizePhone($to),
             [
-                'from' => $from,
+                'from' => 'whatsapp:' . $from,
                 'body' => $message,
             ]
         );
