@@ -35,8 +35,14 @@ class TwilioWhatsappService
     {
         $phone = trim($phone);
 
+        // remove whatsapp:
         if (str_starts_with($phone, 'whatsapp:')) {
             $phone = substr($phone, 9);
+        }
+
+        // لو مصري وبدأ بـ 0 → حوله لـ +20
+        if (str_starts_with($phone, '0')) {
+            $phone = '+2' . substr($phone, 1);
         }
 
         return $phone;
