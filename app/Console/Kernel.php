@@ -19,6 +19,10 @@ class Kernel extends ConsoleKernel
             ->everyMinute()
             ->withoutOverlapping()
             ->runInBackground();
+
+        $schedule->command('appointments:send-followups')
+            ->everyMinute()
+            ->withoutOverlapping();
     }
     protected $commands = [
         \App\Console\Commands\ResetAccountingForCompany::class,
