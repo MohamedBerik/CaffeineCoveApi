@@ -16,13 +16,13 @@ class Kernel extends ConsoleKernel
     protected function schedule(Schedule $schedule): void
     {
         $schedule->command('appointments:send-due-reminders')
-            ->everyMinute()
+            ->everyFiveMinutes()
             ->withoutOverlapping()
             ->sendOutputTo(storage_path('logs/schedule.log'))
             ->runInBackground();
 
         $schedule->command('appointments:send-followups')
-            ->everyMinute()
+            ->everyFiveMinutes()
             ->withoutOverlapping()
             ->sendOutputTo(storage_path('logs/schedule.log'))
             ->runInBackground();
