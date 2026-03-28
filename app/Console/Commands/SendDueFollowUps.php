@@ -20,32 +20,37 @@ class SendDueFollowUps extends Command
      *
      * @var string
      */
-    protected $description = 'Send follow-up messages to patients after completed appointments';
+    protected $description = 'Send follow-up messages to patients after completed appointments (with retry support)';
 
-    /**
-     * Create a new command instance.
-     *
-     * @return void
-     */
-    public function __construct()
-    {
-        parent::__construct();
-    }
-
-    /**
-     * Execute the console command.
-     *
-     * @return int
-     */
     public function handle(): int
     {
         $limit = 50;
 
         $appointments = Appointment::query()
             ->where('status', 'completed')
-            ->where('follow_up_status', 'pending')
-            ->whereNotNull('follow_up_at')
-            ->where('follow_up_at', '<=', now())
+            ->where(function ($q) {
+
+                // 🟢 الحالة الطبيعية (pending)
+                $q->where(function ($q) {
+                    $q->where('follow_up_status', 'pending')
+                        ->whereNotNull('follow_up_at')
+                        ->where('follow_up_at', '<=', now());
+                })
+
+                    // 🔁 retry للحالات الفاشلة
+                    ->orWhere(function ($q) {
+                        $q->where('follow_up_status', 'failed')
+                            ->where('follow_up_retry_count', '<', 3)
+                            ->whereNotNull('follow_up_next_retry_at')
+                            ->where('follow_up_next_retry_at', '<=', now());
+                    });
+            })
+            ->orderByRaw("
+                CASE
+                    WHEN follow_up_status = 'pending' THEN 1
+                    WHEN follow_up_status = 'failed' THEN 2
+                END
+            ")
             ->orderBy('follow_up_at', 'asc')
             ->limit($limit)
             ->get(['id']);

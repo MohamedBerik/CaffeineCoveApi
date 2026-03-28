@@ -83,9 +83,21 @@ class SendAppointmentFollowUpJob implements ShouldQueue
                 'error' => $e->getMessage()
             ]);
 
-            $appointment->update([
-                'follow_up_status' => 'failed'
-            ]);
+            $retryCount = $appointment->follow_up_retry_count + 1;
+
+            if ($retryCount >= 3) {
+                $appointment->update([
+                    'follow_up_status' => 'failed',
+                    'follow_up_retry_count' => $retryCount,
+                    'follow_up_next_retry_at' => null,
+                ]);
+            } else {
+                $appointment->update([
+                    'follow_up_status' => 'failed',
+                    'follow_up_retry_count' => $retryCount,
+                    'follow_up_next_retry_at' => now()->addMinutes(5),
+                ]);
+            }
         }
     }
 }
