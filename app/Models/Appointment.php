@@ -32,6 +32,8 @@ class Appointment extends Model
         'follow_up_status',
         'follow_up_at',
         'follow_up_sent_at',
+        'follow_up_retry_count',
+        'follow_up_next_retry_at',
     ];
 
     protected $casts = [
@@ -43,6 +45,8 @@ class Appointment extends Model
         'reminder_sent_count' => 'integer',
         'follow_up_at' => 'datetime',
         'follow_up_sent_at' => 'datetime',
+        'follow_up_retry_count' => 'integer',
+        'follow_up_next_retry_at' => 'datetime',
     ];
 
     public function patient()
