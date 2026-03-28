@@ -19,7 +19,7 @@ trait ValidatesAppointments
         }
 
         $start = Carbon::parse("$date " . ($doctor->work_start ?? '09:00'))->startOfMinute();
-        $end = Carbon::parse("$date " . ($doctor->work_end ?? '17:00'))->startOfMinute();
+        $end = Carbon::parse("$date " . ($doctor->work_end ?? '21:00'))->startOfMinute();
 
         if ($end->lte($start)) {
             throw ValidationException::withMessages([

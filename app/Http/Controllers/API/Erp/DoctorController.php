@@ -53,7 +53,7 @@ class DoctorController extends Controller
             'phone' => $data['phone'] ?? null,
             'email' => $data['email'] ?? null,
             'work_start' => $data['work_start'] ?? '09:00',
-            'work_end' => $data['work_end'] ?? '17:00',
+            'work_end' => $data['work_end'] ?? '21:00',
             'slot_minutes' => $data['slot_minutes'] ?? 30,
             'is_active' => $data['is_active'] ?? true,
             'created_by' => $request->user()->id ?? null,
