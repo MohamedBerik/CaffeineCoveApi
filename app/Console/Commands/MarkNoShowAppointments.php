@@ -4,9 +4,12 @@ namespace App\Console\Commands;
 
 use Illuminate\Console\Command;
 use App\Models\Appointment;
+use App\Traits\HandlesAppointmentReminders;
 
 class MarkNoShowAppointments extends Command
 {
+    use HandlesAppointmentReminders; // ✅ الحل هنا
+
     protected $signature = 'appointments:mark-no-show';
     protected $description = 'Mark overdue scheduled appointments as no_show';
 
@@ -30,20 +33,24 @@ class MarkNoShowAppointments extends Command
             return self::SUCCESS;
         }
 
+        $count = 0;
+
         foreach ($appointments as $appointment) {
 
-            // 🛑 حماية من التكرار
+            // 🛑 حماية إضافية
             if ($appointment->status !== 'scheduled') {
                 continue;
             }
 
             $appointment->update([
                 'status' => 'no_show',
-                ...app(\App\Traits\HandlesAppointmentReminders::class)->markReminderNotNeeded(),
+                ...$this->markReminderNotNeeded(), // ✅ بدل app()
             ]);
+
+            $count++;
         }
 
-        $this->info("Marked {$appointments->count()} appointments as no_show");
+        $this->info("Marked {$count} appointments as no_show");
 
         return self::SUCCESS;
     }
