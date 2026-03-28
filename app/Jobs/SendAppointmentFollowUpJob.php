@@ -18,18 +18,48 @@ class SendAppointmentFollowUpJob implements ShouldQueue
 
     public function handle(): void
     {
+        // 🔒 نجيب appointment بشرط إنها لسه pending (anti-duplicate)
         $appointment = Appointment::with('patient:id,phone')
-            ->find($this->appointmentId);
+            ->where('id', $this->appointmentId)
+            ->where('follow_up_status', 'pending')
+            ->first();
 
-        if (!$appointment) return;
+        if (!$appointment) {
+            return;
+        }
 
+        // 🔄 نحولها processing قبل الإرسال
+        $appointment->update([
+            'follow_up_status' => 'processing'
+        ]);
+
+        // ✅ تحقق إنها فعلاً ينفع يتبعت لها follow-up
         if (!$this->validateFollowUpCanBeSent($appointment)) {
-            Log::info('Follow-up skipped', ['id' => $appointment->id]);
+            Log::info('Follow-up skipped', [
+                'appointment_id' => $appointment->id,
+                'reason' => 'Validation failed'
+            ]);
+
+            $appointment->update([
+                'follow_up_status' => 'skipped'
+            ]);
+
             return;
         }
 
         $phone = $appointment->patient?->phone;
-        if (!$phone) return;
+
+        if (!$phone) {
+            Log::warning('Follow-up skipped: missing phone', [
+                'appointment_id' => $appointment->id
+            ]);
+
+            $appointment->update([
+                'follow_up_status' => 'failed'
+            ]);
+
+            return;
+        }
 
         $message = "How are you feeling after your appointment?";
 
@@ -37,10 +67,19 @@ class SendAppointmentFollowUpJob implements ShouldQueue
             app(\App\Services\Whatsapp\TwilioWhatsappService::class)
                 ->send($phone, $message);
 
-            $appointment->update($this->markFollowUpSent());
+            // ✅ نجاح الإرسال
+            $appointment->update([
+                'follow_up_status' => 'sent',
+                'follow_up_sent_at' => now(),
+            ]);
+
+            Log::info('Follow-up sent successfully', [
+                'appointment_id' => $appointment->id,
+                'phone' => $phone
+            ]);
         } catch (\Exception $e) {
             Log::error('Follow-up failed', [
-                'id' => $appointment->id,
+                'appointment_id' => $appointment->id,
                 'error' => $e->getMessage()
             ]);
 

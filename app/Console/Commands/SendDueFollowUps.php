@@ -39,17 +39,27 @@ class SendDueFollowUps extends Command
      */
     public function handle(): int
     {
+        $limit = 50;
+
         $appointments = Appointment::query()
             ->where('status', 'completed')
             ->where('follow_up_status', 'pending')
             ->whereNotNull('follow_up_at')
             ->where('follow_up_at', '<=', now())
-            ->limit(50)
-            ->pluck('id');
+            ->orderBy('follow_up_at', 'asc')
+            ->limit($limit)
+            ->get(['id']);
 
-        foreach ($appointments as $id) {
-            SendAppointmentFollowUpJob::dispatch($id);
+        if ($appointments->isEmpty()) {
+            $this->info('No follow-ups due.');
+            return self::SUCCESS;
         }
+
+        foreach ($appointments as $appointment) {
+            SendAppointmentFollowUpJob::dispatch($appointment->id);
+        }
+
+        $this->info("Dispatched {$appointments->count()} follow-up job(s).");
 
         return self::SUCCESS;
     }
