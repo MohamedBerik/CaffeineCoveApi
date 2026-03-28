@@ -6,28 +6,38 @@ use Twilio\Rest\Client;
 
 class TwilioWhatsappService
 {
-    public function send(string $to, string $message): array
+    // public function send(string $to, string $message): array
+    // {
+    //     $sid = config('services.twilio.account_sid');
+    //     $token = config('services.twilio.auth_token');
+    //     $from = config('services.twilio.whatsapp_from');
+
+    //     // إزالة "whatsapp:" من from إذا كانت موجودة
+    //     $from = preg_replace('/^whatsapp:/', '', $from);
+
+    //     $client = new Client($sid, $token);
+
+    //     $response = $client->messages->create(
+    //         'whatsapp:' . $this->normalizePhone($to),
+    //         [
+    //             'from' => 'whatsapp:' . $from,
+    //             'body' => $message,
+    //         ]
+    //     );
+
+    //     return [
+    //         'sid' => $response->sid ?? null,
+    //         'status' => $response->status ?? null,
+    //     ];
+    // }
+
+    public function send($to, $message)
     {
-        $sid = config('services.twilio.account_sid');
-        $token = config('services.twilio.auth_token');
-        $from = config('services.twilio.whatsapp_from');
-
-        // إزالة "whatsapp:" من from إذا كانت موجودة
-        $from = preg_replace('/^whatsapp:/', '', $from);
-
-        $client = new Client($sid, $token);
-
-        $response = $client->messages->create(
-            'whatsapp:' . $this->normalizePhone($to),
-            [
-                'from' => 'whatsapp:' . $from,
-                'body' => $message,
-            ]
-        );
+        \Log::info('Mock WhatsApp', compact('to', 'message'));
 
         return [
-            'sid' => $response->sid ?? null,
-            'status' => $response->status ?? null,
+            'sid' => 'mock',
+            'status' => 'sent'
         ];
     }
 
