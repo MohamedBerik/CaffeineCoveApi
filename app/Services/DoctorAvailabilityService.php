@@ -28,7 +28,7 @@ class DoctorAvailabilityService
             ->findOrFail($doctorId);
 
         $workStart   = $doctor->work_start ?: '09:00';
-        $workEnd     = $doctor->work_end ?: '17:00';
+        $workEnd     = $doctor->work_end ?: '21:00';
         $slotMinutes = (int)($doctor->slot_minutes ?: 30);
 
         if ($slotMinutes <= 0) {
