@@ -16,12 +16,12 @@ class MarkNoShowAppointments extends Command
 
         $appointments = Appointment::query()
             ->where('status', 'scheduled')
-            ->where(function ($q) use ($now) {
-                $q->whereRaw(
-                    "TIMESTAMP(appointment_date, appointment_time) < ?",
-                    [$now->copy()->subMinutes(30)]
-                );
-            })
+            ->whereRaw(
+                "TIMESTAMP(appointment_date, appointment_time) < ?",
+                [$now->copy()->subMinutes(30)]
+            )
+            ->orderBy('appointment_date')
+            ->orderBy('appointment_time')
             ->limit(100)
             ->get();
 
@@ -31,9 +31,15 @@ class MarkNoShowAppointments extends Command
         }
 
         foreach ($appointments as $appointment) {
+
+            // 🛑 حماية من التكرار
+            if ($appointment->status !== 'scheduled') {
+                continue;
+            }
+
             $appointment->update([
                 'status' => 'no_show',
-                'reminder_status' => 'not_needed',
+                ...app(\App\Traits\HandlesAppointmentReminders::class)->markReminderNotNeeded(),
             ]);
         }
 
