@@ -2,6 +2,7 @@
 
 namespace App\Services\Whatsapp;
 
+use Illuminate\Support\Facades\Log;
 use Twilio\Rest\Client;
 
 class TwilioWhatsappService
@@ -33,7 +34,7 @@ class TwilioWhatsappService
 
     public function send($to, $message)
     {
-        \Log::info('Mock WhatsApp', compact('to', 'message'));
+        Log::info('Mock WhatsApp', compact('to', 'message'));
 
         return [
             'sid' => 'mock',
