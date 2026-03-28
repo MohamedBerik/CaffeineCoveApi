@@ -26,6 +26,12 @@ class Kernel extends ConsoleKernel
             ->withoutOverlapping()
             ->sendOutputTo(storage_path('logs/schedule.log'))
             ->runInBackground();
+
+        $schedule->command('appointments:mark-no-show')
+            ->everyFiveMinutes()
+            ->withoutOverlapping()
+            ->sendOutputTo(storage_path('logs/schedule.log'))
+            ->runInBackground();
     }
     protected $commands = [
         \App\Console\Commands\ResetAccountingForCompany::class,
