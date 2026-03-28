@@ -926,18 +926,6 @@ class AppointmentController extends Controller
         });
     }
 
-    // private function resolveNextReminderAt(string $date, string $time)
-    // {
-    //     $appointmentAt = Carbon::parse($date . ' ' . $time);
-    //     $nextReminderAt = $appointmentAt->copy()->subDay();
-
-    //     if ($nextReminderAt->lt(now())) {
-    //         $nextReminderAt = now();
-    //     }
-
-    //     return $nextReminderAt;
-    // }
-
     private function createConsultationInvoiceIfMissing($appointment, $request)
     {
         $companyId = $appointment->company_id;
