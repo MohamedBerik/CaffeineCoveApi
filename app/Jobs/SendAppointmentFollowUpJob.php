@@ -18,22 +18,22 @@ class SendAppointmentFollowUpJob implements ShouldQueue
 
     public function handle(): void
     {
-        // 🔒 نجيب appointment بشرط إنها لسه pending (anti-duplicate)
+        // 🔒 نجيب appointment (pending + failed retry)
         $appointment = Appointment::with('patient:id,phone')
             ->where('id', $this->appointmentId)
-            ->where('follow_up_status', 'pending')
+            ->whereIn('follow_up_status', ['pending', 'failed'])
             ->first();
 
         if (!$appointment) {
             return;
         }
 
-        // 🔄 نحولها processing قبل الإرسال
+        // 🔄 نحولها processing (anti-duplicate)
         $appointment->update([
             'follow_up_status' => 'processing'
         ]);
 
-        // ✅ تحقق إنها فعلاً ينفع يتبعت لها follow-up
+        // ✅ تحقق
         if (!$this->validateFollowUpCanBeSent($appointment)) {
             Log::info('Follow-up skipped', [
                 'appointment_id' => $appointment->id,
@@ -67,10 +67,11 @@ class SendAppointmentFollowUpJob implements ShouldQueue
             app(\App\Services\Whatsapp\TwilioWhatsappService::class)
                 ->send($phone, $message);
 
-            // ✅ نجاح الإرسال
+            // ✅ نجاح
             $appointment->update([
-                'follow_up_status' => 'sent',
-                'follow_up_sent_at' => now(),
+                ...$this->markFollowUpSent(),
+                'follow_up_retry_count' => 0,
+                'follow_up_next_retry_at' => null,
             ]);
 
             Log::info('Follow-up sent successfully', [
@@ -96,6 +97,11 @@ class SendAppointmentFollowUpJob implements ShouldQueue
                     'follow_up_status' => 'failed',
                     'follow_up_retry_count' => $retryCount,
                     'follow_up_next_retry_at' => now()->addMinutes(5),
+                ]);
+
+                Log::warning('Follow-up retry scheduled', [
+                    'appointment_id' => $appointment->id,
+                    'retry_count' => $retryCount
                 ]);
             }
         }
