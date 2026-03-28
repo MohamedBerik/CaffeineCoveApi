@@ -18,11 +18,14 @@ class Kernel extends ConsoleKernel
         $schedule->command('appointments:send-due-reminders')
             ->everyMinute()
             ->withoutOverlapping()
+            ->sendOutputTo(storage_path('logs/schedule.log'))
             ->runInBackground();
 
         $schedule->command('appointments:send-followups')
             ->everyMinute()
-            ->withoutOverlapping();
+            ->withoutOverlapping()
+            ->sendOutputTo(storage_path('logs/schedule.log'))
+            ->runInBackground();
     }
     protected $commands = [
         \App\Console\Commands\ResetAccountingForCompany::class,
