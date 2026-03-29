@@ -21,36 +21,35 @@ class SendDueFollowUps extends Command
             ->whereIn('follow_up_state', ['pending', 'retrying'])
             ->where(function ($q) {
 
+                // 🟢 pending (first attempt)
                 $q->where(function ($q) {
-                    $q->where('follow_up_status', 'pending')
-                        ->where('follow_up_state', 'pending')
+                    $q->where('follow_up_state', 'pending')
                         ->whereNotNull('follow_up_at')
                         ->where('follow_up_at', '<=', now());
                 })
 
+                    // 🔁 retry
                     ->orWhere(function ($q) {
-                        $q->where('follow_up_status', 'failed')
-                            ->where('follow_up_state', 'retrying')
+                        $q->where('follow_up_state', 'retrying')
                             ->where('follow_up_retry_count', '<', 3)
                             ->whereNotNull('follow_up_next_retry_at')
                             ->where('follow_up_next_retry_at', '<=', now());
                     });
             })
 
-            // 🧠 ترتيب الأولويات:
-            // pending الأول، بعده retry
+            // 🧠 priority: pending first, then retrying
             ->orderByRaw("
                 CASE
-                    WHEN follow_up_status = 'pending' THEN 1
-                    WHEN follow_up_status = 'failed' THEN 2
+                    WHEN follow_up_state = 'pending' THEN 1
+                    WHEN follow_up_state = 'retrying' THEN 2
                     ELSE 3
                 END
             ")
 
-            // 🟢 pending حسب follow_up_at
+            // 🟢 pending ordering
             ->orderBy('follow_up_at', 'asc')
 
-            // 🔁 retry حسب next_retry_at
+            // 🔁 retry ordering
             ->orderBy('follow_up_next_retry_at', 'asc')
 
             ->limit($limit)

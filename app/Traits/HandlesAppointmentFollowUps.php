@@ -15,37 +15,66 @@ trait HandlesAppointmentFollowUps
     protected function buildPendingFollowUp(string $date, string $time): array
     {
         return [
-            'follow_up_status' => 'pending',
+            'follow_up_state' => 'pending',
             'follow_up_at' => $this->resolveFollowUpAt($date, $time),
             'follow_up_sent_at' => null,
+            'follow_up_retry_count' => 0,
+            'follow_up_next_retry_at' => null,
         ];
     }
 
     protected function validateFollowUpCanBeSent(Appointment $appointment): bool
     {
+        // لازم يكون appointment مكتمل
         if ($appointment->status !== 'completed') {
             return false;
         }
 
-        if ($appointment->follow_up_status === 'sent') {
+        // ممنوع الإرسال لو انتهى أو توقف
+        if (in_array($appointment->follow_up_state, ['sent', 'stopped'])) {
             return false;
         }
 
-        if (
-            empty($appointment->follow_up_at) ||
-            Carbon::parse($appointment->follow_up_at)->gt(now())
-        ) {
-            return false;
+        // pending → يعتمد على follow_up_at
+        if ($appointment->follow_up_state === 'pending') {
+            return !empty($appointment->follow_up_at)
+                && Carbon::parse($appointment->follow_up_at)->lte(now());
         }
 
-        return true;
+        // retrying → يعتمد على next_retry_at
+        if ($appointment->follow_up_state === 'retrying') {
+            return !empty($appointment->follow_up_next_retry_at)
+                && Carbon::parse($appointment->follow_up_next_retry_at)->lte(now());
+        }
+
+        // أي state تانية غير مسموح
+        return false;
     }
 
     protected function markFollowUpSent(): array
     {
         return [
-            'follow_up_status' => 'sent',
+            'follow_up_state' => 'sent',
             'follow_up_sent_at' => now(),
+            'follow_up_next_retry_at' => null,
+        ];
+    }
+
+    protected function markFollowUpRetrying(int $retryCount): array
+    {
+        return [
+            'follow_up_state' => 'retrying',
+            'follow_up_retry_count' => $retryCount,
+            'follow_up_next_retry_at' => now()->addMinutes(5),
+        ];
+    }
+
+    protected function markFollowUpStopped(int $retryCount): array
+    {
+        return [
+            'follow_up_state' => 'stopped',
+            'follow_up_retry_count' => $retryCount,
+            'follow_up_next_retry_at' => null,
         ];
     }
 }

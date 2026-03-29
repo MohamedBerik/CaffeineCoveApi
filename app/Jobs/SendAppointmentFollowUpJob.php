@@ -27,7 +27,7 @@ class SendAppointmentFollowUpJob implements ShouldQueue
             return;
         }
 
-        // 🔄 processing
+        // 🔒 prevent duplicate processing
         $appointment->update([
             'follow_up_state' => 'processing',
         ]);
@@ -41,7 +41,7 @@ class SendAppointmentFollowUpJob implements ShouldQueue
             ]);
 
             $appointment->update([
-                'follow_up_state' => 'skipped'
+                'follow_up_state' => 'skipped',
             ]);
 
             return;
@@ -55,10 +55,13 @@ class SendAppointmentFollowUpJob implements ShouldQueue
                 'appointment_id' => $appointment->id
             ]);
 
-            $appointment->update([
-                'follow_up_status' => 'failed',
-                'follow_up_state' => 'retrying',
-            ]);
+            $retryCount = $appointment->follow_up_retry_count + 1;
+
+            $appointment->update(
+                $retryCount >= 3
+                    ? $this->markFollowUpStopped($retryCount)
+                    : $this->markFollowUpRetrying($retryCount)
+            );
 
             return;
         }
@@ -89,28 +92,16 @@ class SendAppointmentFollowUpJob implements ShouldQueue
 
             $retryCount = $appointment->follow_up_retry_count + 1;
 
-            if ($retryCount >= 3) {
+            $appointment->update(
+                $retryCount >= 3
+                    ? $this->markFollowUpStopped($retryCount)
+                    : $this->markFollowUpRetrying($retryCount)
+            );
 
-                $appointment->update([
-                    'follow_up_status' => 'failed',
-                    'follow_up_state' => 'stopped',
-                    'follow_up_retry_count' => $retryCount,
-                    'follow_up_next_retry_at' => null,
-                ]);
-            } else {
-
-                $appointment->update([
-                    'follow_up_status' => 'failed',
-                    'follow_up_state' => 'retrying',
-                    'follow_up_retry_count' => $retryCount,
-                    'follow_up_next_retry_at' => now()->addMinutes(5),
-                ]);
-
-                Log::warning('Follow-up retry scheduled', [
-                    'appointment_id' => $appointment->id,
-                    'retry_count' => $retryCount
-                ]);
-            }
+            Log::warning('Follow-up retry scheduled', [
+                'appointment_id' => $appointment->id,
+                'retry_count' => $retryCount
+            ]);
         }
     }
 }
