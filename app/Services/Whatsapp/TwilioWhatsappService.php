@@ -32,14 +32,19 @@ class TwilioWhatsappService
     //     ];
     // }
 
-    public function send($to, $message)
-    {
-        Log::info('Mock WhatsApp', compact('to', 'message'));
+    // public function send($to, $message)
+    // {
+    //     Log::info('Mock WhatsApp', compact('to', 'message'));
 
-        return [
-            'sid' => 'mock',
-            'status' => 'sent'
-        ];
+    //     return [
+    //         'sid' => 'mock',
+    //         'status' => 'sent'
+    //     ];
+    // }
+
+    public function send($phone, $message)
+    {
+        throw new \Exception('Forced failure for testing');
     }
 
     private function normalizePhone(string $phone): string
