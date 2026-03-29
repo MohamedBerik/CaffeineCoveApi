@@ -18,30 +18,30 @@ class SendAppointmentFollowUpJob implements ShouldQueue
 
     public function handle(): void
     {
-        // 🔒 نجيب appointment (pending + failed retry)
         $appointment = Appointment::with('patient:id,phone')
             ->where('id', $this->appointmentId)
-            ->whereIn('follow_up_status', ['pending', 'failed'])
+            ->whereIn('follow_up_state', ['pending', 'retrying'])
             ->first();
 
         if (!$appointment) {
             return;
         }
 
-        // 🔄 نحولها processing (anti-duplicate)
+        // 🔄 processing
         $appointment->update([
-            'follow_up_status' => 'processing'
+            'follow_up_state' => 'processing',
         ]);
 
-        // ✅ تحقق
+        // ✅ validation
         if (!$this->validateFollowUpCanBeSent($appointment)) {
+
             Log::info('Follow-up skipped', [
                 'appointment_id' => $appointment->id,
                 'reason' => 'Validation failed'
             ]);
 
             $appointment->update([
-                'follow_up_status' => 'skipped'
+                'follow_up_state' => 'skipped'
             ]);
 
             return;
@@ -50,12 +50,14 @@ class SendAppointmentFollowUpJob implements ShouldQueue
         $phone = $appointment->patient?->phone;
 
         if (!$phone) {
+
             Log::warning('Follow-up skipped: missing phone', [
                 'appointment_id' => $appointment->id
             ]);
 
             $appointment->update([
-                'follow_up_status' => 'failed'
+                'follow_up_status' => 'failed',
+                'follow_up_state' => 'retrying',
             ]);
 
             return;
@@ -67,7 +69,7 @@ class SendAppointmentFollowUpJob implements ShouldQueue
             app(\App\Services\Whatsapp\TwilioWhatsappService::class)
                 ->send($phone, $message);
 
-            // ✅ نجاح
+            // ✅ success
             $appointment->update([
                 ...$this->markFollowUpSent(),
                 'follow_up_retry_count' => 0,
@@ -79,6 +81,7 @@ class SendAppointmentFollowUpJob implements ShouldQueue
                 'phone' => $phone
             ]);
         } catch (\Exception $e) {
+
             Log::error('Follow-up failed', [
                 'appointment_id' => $appointment->id,
                 'error' => $e->getMessage()
@@ -87,14 +90,18 @@ class SendAppointmentFollowUpJob implements ShouldQueue
             $retryCount = $appointment->follow_up_retry_count + 1;
 
             if ($retryCount >= 3) {
+
                 $appointment->update([
                     'follow_up_status' => 'failed',
+                    'follow_up_state' => 'stopped',
                     'follow_up_retry_count' => $retryCount,
                     'follow_up_next_retry_at' => null,
                 ]);
             } else {
+
                 $appointment->update([
                     'follow_up_status' => 'failed',
+                    'follow_up_state' => 'retrying',
                     'follow_up_retry_count' => $retryCount,
                     'follow_up_next_retry_at' => now()->addMinutes(5),
                 ]);

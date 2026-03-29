@@ -1078,6 +1078,7 @@ class AppointmentController extends Controller
                 $appointment->update([
                     'status' => 'completed',
                     ...$this->markReminderNotNeeded(),
+                    ...$this->initFollowUp(),
                 ]);
 
                 ActivityLogger::log(
@@ -1276,6 +1277,7 @@ class AppointmentController extends Controller
                 $appointment->update([
                     'status' => 'completed',
                     ...$this->markReminderNotNeeded(),
+                    ...$this->initFollowUp(),
                 ]);
 
                 $currentCompleted = (int) ($linkedPlanItem->completed_sessions ?? 0);
@@ -1568,5 +1570,16 @@ class AppointmentController extends Controller
         $invoice->update([
             'status' => $status,
         ]);
+    }
+
+    private function initFollowUp(): array
+    {
+        return [
+            'follow_up_status' => 'pending',
+            'follow_up_state' => 'pending',
+            'follow_up_retry_count' => 0,
+            'follow_up_next_retry_at' => null,
+            'follow_up_at' => now()->addHour(),
+        ];
     }
 }

@@ -18,18 +18,19 @@ class SendDueFollowUps extends Command
 
         $appointments = Appointment::query()
             ->where('status', 'completed')
+            ->whereIn('follow_up_state', ['pending', 'retrying'])
             ->where(function ($q) {
 
-                // 🟢 pending (first attempt)
                 $q->where(function ($q) {
                     $q->where('follow_up_status', 'pending')
+                        ->where('follow_up_state', 'pending')
                         ->whereNotNull('follow_up_at')
                         ->where('follow_up_at', '<=', now());
                 })
 
-                    // 🔁 retry (failed with conditions)
                     ->orWhere(function ($q) {
                         $q->where('follow_up_status', 'failed')
+                            ->where('follow_up_state', 'retrying')
                             ->where('follow_up_retry_count', '<', 3)
                             ->whereNotNull('follow_up_next_retry_at')
                             ->where('follow_up_next_retry_at', '<=', now());
