@@ -30,6 +30,7 @@ class Appointment extends Model
         'next_reminder_at',
         'reminder_sent_count',
         'follow_up_status',
+        'follow_up_state',
         'follow_up_at',
         'follow_up_sent_at',
         'follow_up_retry_count',
