@@ -8,18 +8,8 @@ use App\Jobs\SendAppointmentFollowUpJob;
 
 class SendDueFollowUps extends Command
 {
-    /**
-     * The name and signature of the console command.
-     *
-     * @var string
-     */
     protected $signature = 'appointments:send-followups';
 
-    /**
-     * The console command description.
-     *
-     * @var string
-     */
     protected $description = 'Send follow-up messages to patients after completed appointments (with retry support)';
 
     public function handle(): int
@@ -30,14 +20,14 @@ class SendDueFollowUps extends Command
             ->where('status', 'completed')
             ->where(function ($q) {
 
-                // 🟢 الحالة الطبيعية (pending)
+                // 🟢 pending (first attempt)
                 $q->where(function ($q) {
                     $q->where('follow_up_status', 'pending')
                         ->whereNotNull('follow_up_at')
                         ->where('follow_up_at', '<=', now());
                 })
 
-                    // 🔁 retry للحالات الفاشلة
+                    // 🔁 retry (failed with conditions)
                     ->orWhere(function ($q) {
                         $q->where('follow_up_status', 'failed')
                             ->where('follow_up_retry_count', '<', 3)
@@ -45,13 +35,23 @@ class SendDueFollowUps extends Command
                             ->where('follow_up_next_retry_at', '<=', now());
                     });
             })
+
+            // 🧠 ترتيب الأولويات:
+            // pending الأول، بعده retry
             ->orderByRaw("
                 CASE
                     WHEN follow_up_status = 'pending' THEN 1
                     WHEN follow_up_status = 'failed' THEN 2
+                    ELSE 3
                 END
             ")
+
+            // 🟢 pending حسب follow_up_at
             ->orderBy('follow_up_at', 'asc')
+
+            // 🔁 retry حسب next_retry_at
+            ->orderBy('follow_up_next_retry_at', 'asc')
+
             ->limit($limit)
             ->get(['id']);
 
