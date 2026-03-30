@@ -115,6 +115,7 @@ trait HandlesAppointmentReminders
 
         $now = now()->startOfMinute();
 
+        // ❌ لو المعاد فات أو بدأ
         if ($appointmentDateTime->lte($now)) {
             return [
                 'status' => 422,
@@ -125,19 +126,21 @@ trait HandlesAppointmentReminders
             ];
         }
 
-        $appointmentDate = Carbon::parse($appointment->appointment_date)->startOfDay();
-        $today = now()->startOfDay();
+        // ✅ الفرق بالدقايق قبل المعاد
+        $minutesBefore = $now->diffInMinutes($appointmentDateTime, false);
 
-        if ($appointmentDate->eq($today)) {
+        // ❌ لو فاضل أقل من 15 دقيقة
+        if ($minutesBefore < 15) {
             return [
                 'status' => 422,
                 'body' => [
-                    'msg' => 'Same-day reminders are not allowed for this appointment',
+                    'msg' => 'Too late to send reminder',
                     'status' => 422,
                 ],
             ];
         }
 
+        // ❌ لو فيه reminder متجدول ولسه مجاش وقته
         if (
             !empty($appointment->next_reminder_at) &&
             Carbon::parse($appointment->next_reminder_at)->gt($now)
