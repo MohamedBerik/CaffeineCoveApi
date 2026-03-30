@@ -26,12 +26,23 @@ trait HandlesAppointmentReminders
     /**
      * بناء reminder fields للحالة pending
      */
-    protected function buildPendingReminder(string $date, string $time): array
+    private function buildPendingReminder($date, $time): array
     {
+        $appointmentDateTime = Carbon::parse($date . ' ' . $time);
+        $now = now();
+
+        // لو المعاد قريب (أقل من 30 دقيقة)
+        if ($appointmentDateTime->diffInMinutes($now, false) <= 30) {
+            return [
+                'reminder_status' => 'pending',
+                'next_reminder_at' => $now->addMinute(), // send ASAP
+                'reminder_sent_count' => 0,
+            ];
+        }
+
         return [
             'reminder_status' => 'pending',
-            'last_reminder_at' => null,
-            'next_reminder_at' => $this->resolveNextReminderAt($date, $time),
+            'next_reminder_at' => $appointmentDateTime->copy()->subMinutes(30),
             'reminder_sent_count' => 0,
         ];
     }
