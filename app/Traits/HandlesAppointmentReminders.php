@@ -7,10 +7,6 @@ use Carbon\Carbon;
 
 trait HandlesAppointmentReminders
 {
-    /**
-     * احسب next reminder (قبل المعاد بيوم)
-     * لو وقت التذكير فات بالفعل → null
-     */
     protected function resolveNextReminderAt(string $date, string $time): ?Carbon
     {
         $appointmentDateTime = Carbon::parse("$date $time")->startOfMinute();
@@ -23,9 +19,6 @@ trait HandlesAppointmentReminders
         return $nextReminder;
     }
 
-    /**
-     * بناء reminder fields للحالة pending
-     */
     private function buildPendingReminder($date, $time): array
     {
         $appointmentDateTime = Carbon::parse($date . ' ' . $time);
@@ -47,9 +40,6 @@ trait HandlesAppointmentReminders
         ];
     }
 
-    /**
-     * تحديث بعد إرسال reminder
-     */
     protected function markReminderSent(Appointment $appointment, ?Carbon $sentAt = null): array
     {
         $sentAt ??= now();
@@ -62,9 +52,6 @@ trait HandlesAppointmentReminders
         ];
     }
 
-    /**
-     * لما appointment يخلص أو يتلغى
-     */
     protected function markReminderNotNeeded(): array
     {
         return [
@@ -74,9 +61,6 @@ trait HandlesAppointmentReminders
         ];
     }
 
-    /**
-     * Validation قبل إرسال reminder
-     */
     protected function validateReminderCanBeSent(Appointment $appointment): ?array
     {
         if ($appointment->status !== 'scheduled') {
