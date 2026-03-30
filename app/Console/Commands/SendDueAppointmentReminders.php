@@ -5,6 +5,7 @@ namespace App\Console\Commands;
 use App\Jobs\SendAppointmentReminderJob;
 use App\Models\Appointment;
 use Illuminate\Console\Command;
+use Illuminate\Support\Facades\DB;
 
 class SendDueAppointmentReminders extends Command
 {
@@ -15,14 +16,25 @@ class SendDueAppointmentReminders extends Command
     {
         $limit = max((int) $this->option('limit'), 1);
 
-        $appointments = Appointment::query()
-            ->where('status', 'scheduled')
-            ->where('reminder_status', 'pending')
-            ->whereNotNull('next_reminder_at')
-            ->where('next_reminder_at', '<=', now())
-            ->orderBy('next_reminder_at', 'asc')
-            ->limit($limit)
-            ->get(['id']);
+        $appointments = DB::transaction(function () use ($limit) {
+
+            $appointments = Appointment::query()
+                ->where('status', 'scheduled')
+                ->where('reminder_status', 'pending')
+                ->whereNotNull('next_reminder_at')
+                ->where('next_reminder_at', '<=', now())
+                ->lockForUpdate()
+                ->limit($limit)
+                ->get();
+
+            foreach ($appointments as $appointment) {
+                $appointment->update([
+                    'reminder_status' => 'processing'
+                ]);
+            }
+
+            return $appointments;
+        });
 
         if ($appointments->isEmpty()) {
             $this->info('No due appointment reminders found.');

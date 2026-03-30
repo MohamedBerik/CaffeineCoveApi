@@ -15,42 +15,23 @@ class MarkNoShowAppointments extends Command
 
     public function handle(): int
     {
-        $now = now();
-
         $appointments = Appointment::query()
             ->where('status', 'scheduled')
             ->whereRaw(
                 "TIMESTAMP(appointment_date, appointment_time) < ?",
-                [$now->copy()->subMinutes(30)]
+                [now()->subMinutes(30)]
             )
-            ->orderBy('appointment_date')
-            ->orderBy('appointment_time')
             ->limit(100)
             ->get();
 
-        if ($appointments->isEmpty()) {
-            $this->info('No appointments to mark as no_show');
-            return self::SUCCESS;
-        }
-
-        $count = 0;
-
         foreach ($appointments as $appointment) {
-
-            // 🛑 حماية إضافية
-            if ($appointment->status !== 'scheduled') {
-                continue;
-            }
-
             $appointment->update([
                 'status' => 'no_show',
-                ...$this->markReminderNotNeeded(), // ✅ بدل app()
+                ...$this->markReminderNotNeeded(),
             ]);
-
-            $count++;
         }
 
-        $this->info("Marked {$count} appointments as no_show");
+        $this->info("Marked {$appointments->count()} appointments as no_show");
 
         return self::SUCCESS;
     }

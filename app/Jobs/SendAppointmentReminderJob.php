@@ -34,6 +34,7 @@ class SendAppointmentReminderJob implements ShouldQueue
     public function handle(): void
     {
         DB::transaction(function () {
+
             $appointment = Appointment::query()
                 ->with('patient:id,phone')
                 ->lockForUpdate()
@@ -43,54 +44,72 @@ class SendAppointmentReminderJob implements ShouldQueue
                 return;
             }
 
+            // ✅ لازم يكون processing
+            if ($appointment->reminder_status !== 'processing') {
+                return;
+            }
+
             $validationError = $this->validateReminderCanBeSent($appointment);
+
             if ($validationError) {
+                $appointment->update([
+                    'reminder_status' => 'skipped'
+                ]);
                 return;
             }
 
-            $userPhone = $appointment->patient?->phone;
-            if (empty($userPhone)) {
+            $phone = $appointment->patient?->phone;
+
+            if (!$phone) {
+                $this->handleFailure($appointment);
                 return;
             }
-
-            $sentAt = now()->startOfMinute();
-            $newCount = (int) ($appointment->reminder_sent_count ?? 0) + 1;
 
             $message = sprintf(
                 "Reminder: you have an appointment on %s at %s with doctor %s.",
-                Carbon::parse($appointment->appointment_date)->format('Y-m-d'),
-                substr((string) $appointment->appointment_time, 0, 5),
+                $appointment->appointment_date,
+                substr($appointment->appointment_time, 0, 5),
                 $appointment->doctor_name ?? 'Doctor'
             );
 
-            $result = app(\App\Services\Whatsapp\TwilioWhatsappService::class)
-                ->send($userPhone, $message);
+            try {
 
-            $appointment->update(
-                $this->buildSentReminderState($sentAt, $newCount)
-            );
+                $result = app(\App\Services\Whatsapp\TwilioWhatsappService::class)
+                    ->send($phone, $message);
 
-            $appointment->refresh();
+                $appointment->update([
+                    ...$this->buildSentReminderState(now(), $appointment->reminder_sent_count + 1),
+                    'reminder_retry_count' => 0,
+                ]);
+            } catch (\Exception $e) {
 
-            ActivityLogger::log(
-                $appointment->company_id,
-                $this->resolveSystemUser($appointment->company_id),
-                'appointment.reminder_sent',
-                Appointment::class,
-                $appointment->id,
-                [
-                    'patient_id' => $appointment->patient_id,
-                    'doctor_id' => $appointment->doctor_id,
-                    'appointment_date' => Carbon::parse($appointment->appointment_date)->toDateString(),
-                    'appointment_time' => substr((string) $appointment->appointment_time, 0, 5),
-                    'reminder_sent_count' => $newCount,
-                    'sent_at' => $sentAt->toDateTimeString(),
-                    'source' => 'scheduler',
-                    'provider' => 'twilio',
-                    'provider_message_sid' => $result['sid'] ?? null,
-                ]
-            );
+                $this->handleFailure($appointment);
+
+                Log::error('Reminder failed', [
+                    'appointment_id' => $appointment->id,
+                    'error' => $e->getMessage()
+                ]);
+            }
         });
+    }
+
+    private function handleFailure(Appointment $appointment): void
+    {
+        $retry = ($appointment->reminder_retry_count ?? 0) + 1;
+
+        if ($retry >= 3) {
+            $appointment->update([
+                'reminder_status' => 'failed',
+                'reminder_retry_count' => $retry
+            ]);
+            return;
+        }
+
+        $appointment->update([
+            'reminder_status' => 'pending',
+            'reminder_retry_count' => $retry,
+            'next_reminder_at' => now()->addMinutes(10),
+        ]);
     }
 
     protected function resolveSystemUser(int $companyId)

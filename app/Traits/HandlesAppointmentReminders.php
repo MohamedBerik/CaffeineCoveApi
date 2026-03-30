@@ -80,81 +80,41 @@ trait HandlesAppointmentReminders
     protected function validateReminderCanBeSent(Appointment $appointment): ?array
     {
         if ($appointment->status !== 'scheduled') {
-            return [
-                'status' => 422,
-                'body' => [
-                    'msg' => 'Only scheduled appointments can receive reminders',
-                    'status' => 422,
-                ],
-            ];
+            return $this->error('Only scheduled appointments can receive reminders');
         }
 
-        if ($appointment->reminder_status === 'not_needed') {
-            return [
-                'status' => 422,
-                'body' => [
-                    'msg' => 'Reminder is not needed for this appointment',
-                    'status' => 422,
-                ],
-            ];
+        if (in_array($appointment->reminder_status, ['sent', 'not_needed'])) {
+            return $this->error('Reminder not allowed in current state');
         }
 
-        if ($appointment->reminder_status === 'sent') {
-            return [
-                'status' => 422,
-                'body' => [
-                    'msg' => 'Reminder already sent for this appointment',
-                    'status' => 422,
-                ],
-            ];
-        }
-
-        $appointmentDateTime = Carbon::parse($appointment->appointment_date)
-            ->setTimeFromTimeString((string) $appointment->appointment_time)
-            ->startOfMinute();
+        $appointmentDateTime = Carbon::parse(
+            $appointment->appointment_date . ' ' . $appointment->appointment_time
+        )->startOfMinute();
 
         $now = now()->startOfMinute();
 
-        // ❌ لو المعاد فات أو بدأ
         if ($appointmentDateTime->lte($now)) {
-            return [
-                'status' => 422,
-                'body' => [
-                    'msg' => 'Cannot send reminder for past or ongoing appointments',
-                    'status' => 422,
-                ],
-            ];
+            return $this->error('Appointment already passed');
         }
 
-        // ✅ الفرق بالدقايق قبل المعاد
         $minutesBefore = $now->diffInMinutes($appointmentDateTime, false);
 
-        // ❌ لو فاضل أقل من 15 دقيقة
         if ($minutesBefore < 15) {
-            return [
-                'status' => 422,
-                'body' => [
-                    'msg' => 'Too late to send reminder',
-                    'status' => 422,
-                ],
-            ];
-        }
-
-        // ❌ لو فيه reminder متجدول ولسه مجاش وقته
-        if (
-            !empty($appointment->next_reminder_at) &&
-            Carbon::parse($appointment->next_reminder_at)->gt($now)
-        ) {
-            return [
-                'status' => 422,
-                'body' => [
-                    'msg' => 'Reminder is not due yet',
-                    'status' => 422,
-                ],
-            ];
+            return $this->error('Too late to send reminder');
         }
 
         return null;
+    }
+
+    private function error(string $msg): array
+    {
+        return [
+            'status' => 422,
+            'body' => [
+                'msg' => $msg,
+                'status' => 422,
+            ],
+        ];
     }
 
     protected function buildSentReminderState(?Carbon $sentAt = null, ?int $count = null): array
