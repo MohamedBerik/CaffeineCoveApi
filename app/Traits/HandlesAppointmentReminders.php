@@ -64,11 +64,11 @@ trait HandlesAppointmentReminders
     protected function validateReminderCanBeSent(Appointment $appointment): ?array
     {
         if ($appointment->status !== 'scheduled') {
-            return $this->error('Only scheduled appointments can receive reminders');
+            return $this->errorResponse('Only scheduled appointments can receive reminders');
         }
 
         if (in_array($appointment->reminder_status, ['sent', 'not_needed'])) {
-            return $this->error('Reminder not allowed in current state');
+            return $this->errorResponse('Reminder not allowed in current state');
         }
 
         $appointmentDateTime = Carbon::parse(
@@ -78,13 +78,13 @@ trait HandlesAppointmentReminders
         $now = now()->startOfMinute();
 
         if ($appointmentDateTime->lte($now)) {
-            return $this->error('Appointment already passed');
+            return $this->errorResponse('Appointment already passed');
         }
 
         $minutesBefore = $now->diffInMinutes($appointmentDateTime, false);
 
         if ($minutesBefore < 15) {
-            return $this->error('Too late to send reminder');
+            return $this->errorResponse('Too late to send reminder');
         }
 
         return null;
