@@ -90,7 +90,7 @@ trait HandlesAppointmentReminders
         return null;
     }
 
-    public function error(string $msg): array
+    private function errorResponse(string $msg): array
     {
         return [
             'status' => 422,
@@ -100,6 +100,7 @@ trait HandlesAppointmentReminders
             ],
         ];
     }
+
 
     protected function buildSentReminderState(?Carbon $sentAt = null, ?int $count = null): array
     {
