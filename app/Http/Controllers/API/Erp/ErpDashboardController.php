@@ -16,13 +16,13 @@ class ErpDashboardController extends Controller
     {
         $companyId = $request->user()->company_id;
 
-        $today = Carbon::today()->toDateString();
-        $monthStart = Carbon::today()->startOfMonth()->toDateString();
-        $monthEnd = Carbon::today()->endOfMonth()->toDateString();
+        $today = Carbon::today();
+        $monthStart = Carbon::today()->startOfMonth();
+        $monthEnd = Carbon::today()->endOfMonth();
 
-        // -------------------------------------------------
-        // Appointments
-        // -------------------------------------------------
+        // =================================================
+        // 1. Appointments KPIs
+        // =================================================
         $todayAppointmentsQuery = Appointment::query()
             ->where('company_id', $companyId)
             ->whereDate('appointment_date', $today);
@@ -35,42 +35,26 @@ class ErpDashboardController extends Controller
 
         $recentAppointments = Appointment::query()
             ->where('company_id', $companyId)
-            ->with([
-                'patient:id,name,email,company_id',
-                'doctor:id,name,company_id',
-            ])
+            ->with(['patient:id,name,email', 'doctor:id,name'])
             ->orderByDesc('appointment_date')
             ->orderByDesc('appointment_time')
             ->limit(5)
             ->get();
 
-        // -------------------------------------------------
-        // Reminders Monitoring
-        // -------------------------------------------------
-        $pendingRemindersCount = Appointment::query()
+        // =================================================
+        // 2. Reminders KPIs
+        // =================================================
+        $reminderStats = Appointment::query()
             ->where('company_id', $companyId)
-            ->where('reminder_status', 'pending')
-            ->count();
-
-        $processingRemindersCount = Appointment::query()
-            ->where('company_id', $companyId)
-            ->where('reminder_status', 'processing')
-            ->count();
-
-        $sentRemindersCount = Appointment::query()
-            ->where('company_id', $companyId)
-            ->where('reminder_status', 'sent')
-            ->count();
-
-        $failedRemindersCount = Appointment::query()
-            ->where('company_id', $companyId)
-            ->where('reminder_status', 'failed')
-            ->count();
-
-        $skippedRemindersCount = Appointment::query()
-            ->where('company_id', $companyId)
-            ->where('reminder_status', 'skipped')
-            ->count();
+            ->selectRaw("
+                COUNT(*) as total,
+                SUM(reminder_status = 'pending') as pending,
+                SUM(reminder_status = 'processing') as processing,
+                SUM(reminder_status = 'sent') as sent,
+                SUM(reminder_status = 'failed') as failed,
+                SUM(reminder_status = 'skipped') as skipped
+            ")
+            ->first();
 
         $stuckRemindersCount = Appointment::query()
             ->where('company_id', $companyId)
@@ -78,54 +62,39 @@ class ErpDashboardController extends Controller
             ->where('updated_at', '<', now()->subMinutes(10))
             ->count();
 
-        $totalReminders = Appointment::query()
-            ->where('company_id', $companyId)
-            ->whereNotNull('reminder_status')
-            ->count();
-
-        $successRate = $totalReminders > 0
-            ? round(($sentRemindersCount / $totalReminders) * 100, 2)
+        $successRate = $reminderStats->total > 0
+            ? round(($reminderStats->sent / $reminderStats->total) * 100, 2)
             : 0;
-        // -------------------------------------------------
-        // Invoices
-        // -------------------------------------------------
-        $unpaidInvoicesCount = Invoice::query()
-            ->where('company_id', $companyId)
-            ->where('status', 'unpaid')
-            ->count();
 
-        $partiallyPaidInvoicesCount = Invoice::query()
+        $failedReminders = Appointment::query()
             ->where('company_id', $companyId)
-            ->where('status', 'partially_paid')
-            ->count();
+            ->where('reminder_status', 'failed')
+            ->orderByDesc('reminder_last_attempt_at')
+            ->limit(5)
+            ->get(['id', 'patient_id', 'doctor_name', 'appointment_date', 'reminder_retry_count', 'reminder_last_attempt_at']);
 
-        $paidInvoicesCount = Invoice::query()
+        // =================================================
+        // 3. Invoices KPIs
+        // =================================================
+        $invoicesStats = Invoice::query()
             ->where('company_id', $companyId)
-            ->where('status', 'paid')
-            ->count();
+            ->selectRaw("
+                SUM(status = 'unpaid') as unpaid,
+                SUM(status = 'partially_paid') as partially_paid,
+                SUM(status = 'paid') as paid
+            ")
+            ->first();
 
         $recentInvoices = Invoice::query()
             ->where('company_id', $companyId)
             ->orderByDesc('issued_at')
             ->orderByDesc('id')
             ->limit(5)
-            ->get([
-                'id',
-                'number',
-                'customer_id',
-                'appointment_id',
-                'treatment_plan_id',
-                'total',
-                'status',
-                'issued_at',
-                'created_at',
-            ]);
+            ->get(['id', 'number', 'customer_id', 'appointment_id', 'treatment_plan_id', 'total', 'status', 'issued_at', 'created_at']);
 
-        // -------------------------------------------------
-        // Revenue
-        // today_revenue = sum(applied_amount today)
-        // month_revenue = sum(applied_amount during this month)
-        // -------------------------------------------------
+        // =================================================
+        // 4. Revenue KPIs
+        // =================================================
         $todayRevenue = (float) Payment::query()
             ->where('company_id', $companyId)
             ->whereDate('paid_at', $today)
@@ -133,8 +102,7 @@ class ErpDashboardController extends Controller
 
         $monthRevenue = (float) Payment::query()
             ->where('company_id', $companyId)
-            ->whereDate('paid_at', '>=', $monthStart)
-            ->whereDate('paid_at', '<=', $monthEnd)
+            ->whereBetween('paid_at', [$monthStart, $monthEnd])
             ->sum('applied_amount');
 
         $recentPayments = Payment::query()
@@ -142,20 +110,11 @@ class ErpDashboardController extends Controller
             ->orderByDesc('paid_at')
             ->orderByDesc('id')
             ->limit(5)
-            ->get([
-                'id',
-                'invoice_id',
-                'amount',
-                'applied_amount',
-                'credit_amount',
-                'method',
-                'paid_at',
-                'created_at',
-            ]);
+            ->get(['id', 'invoice_id', 'amount', 'applied_amount', 'credit_amount', 'method', 'paid_at', 'created_at']);
 
-        // -------------------------------------------------
-        // Customer credits
-        // -------------------------------------------------
+        // =================================================
+        // 5. Customer Credits
+        // =================================================
         $creditIssued = (float) DB::table('customer_credits')
             ->where('company_id', $companyId)
             ->where('type', 'credit')
@@ -168,38 +127,49 @@ class ErpDashboardController extends Controller
 
         $netCreditBalance = $creditIssued - $creditUsed;
 
+        // =================================================
+        // 6. Response
+        // =================================================
         return response()->json([
             'msg' => 'ERP dashboard',
             'status' => 200,
             'data' => [
                 'kpis' => [
+                    // Appointments
                     'today_appointments_count' => $todayAppointmentsCount,
                     'scheduled_today_count' => $scheduledTodayCount,
                     'completed_today_count' => $completedTodayCount,
                     'cancelled_today_count' => $cancelledTodayCount,
                     'no_show_today_count' => $noShowTodayCount,
 
-                    'unpaid_invoices_count' => $unpaidInvoicesCount,
-                    'partially_paid_invoices_count' => $partiallyPaidInvoicesCount,
-                    'paid_invoices_count' => $paidInvoicesCount,
+                    // Reminders
+                    'reminders_pending' => $reminderStats->pending,
+                    'reminders_processing' => $reminderStats->processing,
+                    'reminders_sent' => $reminderStats->sent,
+                    'reminders_failed' => $reminderStats->failed,
+                    'reminders_skipped' => $reminderStats->skipped,
+                    'reminders_stuck' => $stuckRemindersCount,
+                    'reminders_success_rate' => $successRate,
 
+                    // Invoices
+                    'unpaid_invoices_count' => $invoicesStats->unpaid,
+                    'partially_paid_invoices_count' => $invoicesStats->partially_paid,
+                    'paid_invoices_count' => $invoicesStats->paid,
+
+                    // Revenue
                     'today_revenue' => $todayRevenue,
                     'month_revenue' => $monthRevenue,
 
+                    // Credits
                     'credit_balance_total' => $netCreditBalance,
-
-                    'reminders_pending' => $pendingRemindersCount,
-                    'reminders_processing' => $processingRemindersCount,
-                    'reminders_sent' => $sentRemindersCount,
-                    'reminders_failed' => $failedRemindersCount,
-                    'reminders_skipped' => $skippedRemindersCount,
-
-                    'reminders_stuck' => $stuckRemindersCount,
-                    'reminders_success_rate' => $successRate,
                 ],
                 'recent_appointments' => $recentAppointments,
                 'recent_invoices' => $recentInvoices,
                 'recent_payments' => $recentPayments,
+                'reminders' => [
+                    'stats' => $reminderStats,
+                    'failed_recent' => $failedReminders,
+                ],
             ],
         ]);
     }
