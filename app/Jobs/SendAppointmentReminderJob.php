@@ -4,6 +4,7 @@ namespace App\Jobs;
 
 use App\Models\Appointment;
 use App\Services\ActivityLogger;
+use App\Services\Whatsapp\TwilioWhatsappService;
 use App\Traits\HandlesAppointmentReminders;
 use Carbon\Carbon;
 use Illuminate\Bus\Queueable;
@@ -49,6 +50,13 @@ class SendAppointmentReminderJob implements ShouldQueue
                 return;
             }
 
+            if (
+                $appointment->last_reminder_at &&
+                Carbon::parse($appointment->last_reminder_at)->diffInSeconds(now()) < 30
+            ) {
+                return;
+            }
+
             $validationError = $this->validateReminderCanBeSent($appointment);
 
             if ($validationError) {
@@ -74,12 +82,16 @@ class SendAppointmentReminderJob implements ShouldQueue
 
             try {
 
-                $result = app(\App\Services\Whatsapp\TwilioWhatsappService::class)
+                $result = app(TwilioWhatsappService::class)
                     ->send($phone, $message);
 
                 $appointment->update([
-                    ...$this->buildSentReminderState(now(), $appointment->reminder_sent_count + 1),
+                    'last_reminder_at' => now(),
+                    'reminder_last_attempt_at' => now(),
+                    'reminder_sent_count' => $appointment->reminder_sent_count + 1,
                     'reminder_retry_count' => 0,
+
+                    ...$this->advanceReminderStage($appointment),
                 ]);
             } catch (\Exception $e) {
 
@@ -106,9 +118,9 @@ class SendAppointmentReminderJob implements ShouldQueue
         }
 
         $appointment->update([
+            'next_reminder_at' => now()->addMinutes(5),
             'reminder_status' => 'pending',
             'reminder_retry_count' => $retry,
-            'next_reminder_at' => now()->addMinutes(10),
         ]);
     }
 

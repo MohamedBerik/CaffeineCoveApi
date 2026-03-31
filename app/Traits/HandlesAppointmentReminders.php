@@ -7,16 +7,24 @@ use Carbon\Carbon;
 
 trait HandlesAppointmentReminders
 {
-    protected function resolveNextReminderAt(string $date, string $time): ?Carbon
+    protected function resolveNextReminderAt(string $date, string $time, int $stage = 1): ?Carbon
     {
-        $appointmentDateTime = Carbon::parse("$date $time")->startOfMinute();
-        $nextReminder = $appointmentDateTime->copy()->subDay()->startOfMinute();
+        $appointment = Carbon::parse("$date $time");
 
-        if ($nextReminder->lte(now()->startOfMinute())) {
+        $now = now();
+
+        $next = match ($stage) {
+            1 => $appointment->copy()->subDay(),
+            2 => $appointment->copy()->subHour(),
+            3 => $appointment->copy()->subMinutes(15),
+            default => null,
+        };
+
+        if (!$next || $next->lte($now)) {
             return null;
         }
 
-        return $nextReminder;
+        return $next->startOfMinute();
     }
 
     private function buildPendingReminder($date, $time): array
@@ -28,14 +36,16 @@ trait HandlesAppointmentReminders
         if ($appointmentDateTime->diffInMinutes($now, false) <= 30) {
             return [
                 'reminder_status' => 'pending',
-                'next_reminder_at' => $now->addMinute(), // send ASAP
+                'reminder_stage' => 1, // ✅ مهم
+                'next_reminder_at' => $now->addMinute(),
                 'reminder_sent_count' => 0,
             ];
         }
 
         return [
             'reminder_status' => 'pending',
-            'next_reminder_at' => $appointmentDateTime->copy()->subMinutes(30),
+            'reminder_stage' => 1, // ✅ مهم
+            'next_reminder_at' => $this->resolveNextReminderAt($date, $time, 1), // ✅ بدل subMinutes(30)
             'reminder_sent_count' => 0,
         ];
     }
@@ -87,6 +97,13 @@ trait HandlesAppointmentReminders
             return $this->errorResponse('Too late to send reminder');
         }
 
+        if (
+            $appointment->next_reminder_at &&
+            Carbon::parse($appointment->next_reminder_at)->gt($now)
+        ) {
+            return $this->errorResponse('Reminder is not due yet');
+        }
+
         return null;
     }
 
@@ -101,7 +118,6 @@ trait HandlesAppointmentReminders
         ];
     }
 
-
     protected function buildSentReminderState(?Carbon $sentAt = null, ?int $count = null): array
     {
         $sentAt ??= now();
@@ -112,6 +128,32 @@ trait HandlesAppointmentReminders
             'last_reminder_at' => $sentAt,
             'next_reminder_at' => null,
             'reminder_sent_count' => $count,
+        ];
+    }
+
+    protected function advanceReminderStage(Appointment $appointment): array
+    {
+        $currentStage = $appointment->reminder_stage ?? 1;
+        $nextStage = $currentStage + 1;
+
+        if ($nextStage > 3) {
+            return [
+                'reminder_status' => 'completed',
+                'reminder_stage' => null,
+                'next_reminder_at' => null,
+            ];
+        }
+
+        $nextReminder = $this->resolveNextReminderAt(
+            $appointment->appointment_date,
+            $appointment->appointment_time,
+            $nextStage
+        );
+
+        return [
+            'reminder_status' => $nextReminder ? 'pending' : 'sent',
+            'reminder_stage' => $nextReminder ? $nextStage : null,
+            'next_reminder_at' => $nextReminder,
         ];
     }
 }

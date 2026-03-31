@@ -103,6 +103,7 @@ class AppointmentController extends Controller
                 'last_reminder_at' => $appointment->last_reminder_at,
                 'next_reminder_at' => $appointment->next_reminder_at,
                 'reminder_sent_count' => (int) ($appointment->reminder_sent_count ?? 0),
+                'reminder_stage' => $appointment->reminder_stage,
             ];
         })->values();
 
@@ -119,7 +120,6 @@ class AppointmentController extends Controller
         ]);
     }
 
-    //reuse with trait
     public function store(Request $request)
     {
         $companyId = $request->user()->company_id;
@@ -343,6 +343,7 @@ class AppointmentController extends Controller
                 'last_reminder_at' => $appointment->last_reminder_at,
                 'next_reminder_at' => $appointment->next_reminder_at,
                 'reminder_sent_count' => (int) ($appointment->reminder_sent_count ?? 0),
+                'reminder_stage' => $appointment->reminder_stage,
             ],
         ]);
     }
@@ -569,7 +570,6 @@ class AppointmentController extends Controller
         ]);
     }
 
-    //reuse with trait
     public function reschedule(Request $request, $id)
     {
         $companyId = $request->user()->company_id;
@@ -778,7 +778,6 @@ class AppointmentController extends Controller
         });
     }
 
-    //book method for dental clinic only with consultaion fee + use trait
     public function book(Request $request)
     {
         $companyId = $request->user()->company_id;
@@ -999,7 +998,6 @@ class AppointmentController extends Controller
         $this->autoApplyCustomerCredit($invoice, $request->user());
     }
 
-    //complete method for dental clinic only with start procedure
     public function complete(Request $request, $id)
     {
         $companyId = $request->user()->company_id;
