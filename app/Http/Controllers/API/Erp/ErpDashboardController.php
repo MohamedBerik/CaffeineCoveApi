@@ -45,6 +45,48 @@ class ErpDashboardController extends Controller
             ->get();
 
         // -------------------------------------------------
+        // Reminders Monitoring
+        // -------------------------------------------------
+        $pendingRemindersCount = Appointment::query()
+            ->where('company_id', $companyId)
+            ->where('reminder_status', 'pending')
+            ->count();
+
+        $processingRemindersCount = Appointment::query()
+            ->where('company_id', $companyId)
+            ->where('reminder_status', 'processing')
+            ->count();
+
+        $sentRemindersCount = Appointment::query()
+            ->where('company_id', $companyId)
+            ->where('reminder_status', 'sent')
+            ->count();
+
+        $failedRemindersCount = Appointment::query()
+            ->where('company_id', $companyId)
+            ->where('reminder_status', 'failed')
+            ->count();
+
+        $skippedRemindersCount = Appointment::query()
+            ->where('company_id', $companyId)
+            ->where('reminder_status', 'skipped')
+            ->count();
+
+        $stuckRemindersCount = Appointment::query()
+            ->where('company_id', $companyId)
+            ->where('reminder_status', 'processing')
+            ->where('updated_at', '<', now()->subMinutes(10))
+            ->count();
+
+        $totalReminders = Appointment::query()
+            ->where('company_id', $companyId)
+            ->whereNotNull('reminder_status')
+            ->count();
+
+        $successRate = $totalReminders > 0
+            ? round(($sentRemindersCount / $totalReminders) * 100, 2)
+            : 0;
+        // -------------------------------------------------
         // Invoices
         // -------------------------------------------------
         $unpaidInvoicesCount = Invoice::query()
@@ -145,6 +187,15 @@ class ErpDashboardController extends Controller
                     'month_revenue' => $monthRevenue,
 
                     'credit_balance_total' => $netCreditBalance,
+
+                    'reminders_pending' => $pendingRemindersCount,
+                    'reminders_processing' => $processingRemindersCount,
+                    'reminders_sent' => $sentRemindersCount,
+                    'reminders_failed' => $failedRemindersCount,
+                    'reminders_skipped' => $skippedRemindersCount,
+
+                    'reminders_stuck' => $stuckRemindersCount,
+                    'reminders_success_rate' => $successRate,
                 ],
                 'recent_appointments' => $recentAppointments,
                 'recent_invoices' => $recentInvoices,
