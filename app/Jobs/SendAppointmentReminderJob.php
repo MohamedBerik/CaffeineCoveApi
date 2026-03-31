@@ -8,6 +8,7 @@ use App\Services\Whatsapp\TwilioWhatsappService;
 use App\Traits\HandlesAppointmentReminders;
 use Carbon\Carbon;
 use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
@@ -16,7 +17,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Throwable;
 
-class SendAppointmentReminderJob implements ShouldQueue
+class SendAppointmentReminderJob implements ShouldQueue, ShouldBeUnique
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels, HandlesAppointmentReminders;
 
@@ -57,6 +58,12 @@ class SendAppointmentReminderJob implements ShouldQueue
                 return;
             }
 
+            $dedupKey = "appointment_{$appointment->id}_stage_{$appointment->reminder_stage}";
+
+            if ($appointment->reminder_dedup_key === $dedupKey) {
+                return;
+            }
+
             $validationError = $this->validateReminderCanBeSent($appointment);
 
             if ($validationError) {
@@ -86,6 +93,7 @@ class SendAppointmentReminderJob implements ShouldQueue
                     ->send($phone, $message);
 
                 $appointment->update([
+                    'reminder_dedup_key' => $dedupKey,
                     'last_reminder_at' => now(),
                     'reminder_last_attempt_at' => now(),
                     'reminder_sent_count' => $appointment->reminder_sent_count + 1,
