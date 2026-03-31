@@ -90,7 +90,7 @@ trait HandlesAppointmentReminders
         return null;
     }
 
-    private function error(string $msg): array
+    public function error(string $msg): array
     {
         return [
             'status' => 422,
