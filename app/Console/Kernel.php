@@ -36,6 +36,11 @@ class Kernel extends ConsoleKernel
             ->onOneServer()
             ->runInBackground()
             ->appendOutputTo(storage_path('logs/schedule.log'));
+
+        $schedule->command('reminders:recover-stuck')
+            ->everyFiveMinutes()
+            ->withoutOverlapping()
+            ->runInBackground();
     }
     protected $commands = [
         ResetAccountingForCompany::class,
