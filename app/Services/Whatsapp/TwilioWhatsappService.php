@@ -16,7 +16,12 @@ class TwilioWhatsappService
         // إزالة "whatsapp:" من from إذا كانت موجودة
         $from = preg_replace('/^whatsapp:/', '', $from);
 
+        if (!$sid || !$token || !$from) {
+            throw new \Exception('Twilio config missing');
+        }
+
         $client = new Client($sid, $token);
+        $client->setTimeout(10);
 
         $response = $client->messages->create(
             'whatsapp:' . $this->normalizePhone($to),
@@ -26,26 +31,17 @@ class TwilioWhatsappService
             ]
         );
 
+        Log::info('WhatsApp sent', [
+            'to' => $to,
+            'sid' => $response->sid ?? null,
+            'status' => $response->status ?? null,
+        ]);
+
         return [
             'sid' => $response->sid ?? null,
             'status' => $response->status ?? null,
         ];
     }
-
-    // public function send($to, $message)
-    // {
-    //     Log::info('Mock WhatsApp', compact('to', 'message'));
-
-    //     return [
-    //         'sid' => 'mock',
-    //         'status' => 'sent'
-    //     ];
-    // }
-
-    // public function send($phone, $message)
-    // {
-    //     throw new \Exception('Forced failure for testing');
-    // }
 
     private function normalizePhone(string $phone): string
     {
