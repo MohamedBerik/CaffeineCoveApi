@@ -46,11 +46,20 @@ class SendAppointmentReminderJob implements ShouldQueue, ShouldBeUnique
                 return;
             }
 
-            // ✅ لازم يكون processing
+            // لازم يكون processing
             if ($appointment->reminder_status !== 'processing') {
                 return;
             }
 
+            // 🧱 Idempotency key
+            $dedupKey = "appointment_{$appointment->id}_stage_{$appointment->reminder_stage}";
+
+            // 🛑 لو اتبعت قبل كده
+            if ($appointment->reminder_dedup_key === $dedupKey) {
+                return;
+            }
+
+            // 🛑 cooldown protection (double trigger protection)
             if (
                 $appointment->last_reminder_at &&
                 Carbon::parse($appointment->last_reminder_at)->diffInSeconds(now()) < 30
@@ -58,18 +67,20 @@ class SendAppointmentReminderJob implements ShouldQueue, ShouldBeUnique
                 return;
             }
 
-            $dedupKey = "appointment_{$appointment->id}_stage_{$appointment->reminder_stage}";
-
-            if ($appointment->reminder_dedup_key === $dedupKey) {
-                return;
-            }
-
+            // ✅ validation
             $validationError = $this->validateReminderCanBeSent($appointment);
 
             if ($validationError) {
                 $appointment->update([
                     'reminder_status' => 'skipped'
                 ]);
+
+                Log::warning('Reminder skipped', [
+                    'appointment_id' => $appointment->id,
+                    'stage' => $appointment->reminder_stage,
+                    'reason' => 'validation_failed',
+                ]);
+
                 return;
             }
 
@@ -77,6 +88,11 @@ class SendAppointmentReminderJob implements ShouldQueue, ShouldBeUnique
 
             if (!$phone) {
                 $this->handleFailure($appointment);
+
+                Log::error('Reminder failed - missing phone', [
+                    'appointment_id' => $appointment->id,
+                ]);
+
                 return;
             }
 
@@ -89,7 +105,7 @@ class SendAppointmentReminderJob implements ShouldQueue, ShouldBeUnique
 
             try {
 
-                $result = app(TwilioWhatsappService::class)
+                app(TwilioWhatsappService::class)
                     ->send($phone, $message);
 
                 $appointment->update([
@@ -101,13 +117,22 @@ class SendAppointmentReminderJob implements ShouldQueue, ShouldBeUnique
 
                     ...$this->advanceReminderStage($appointment),
                 ]);
-            } catch (\Exception $e) {
+
+                Log::info('Reminder sent', [
+                    'appointment_id' => $appointment->id,
+                    'stage' => $appointment->reminder_stage,
+                    'phone' => $phone,
+                    'sent_at' => now()->toDateTimeString(),
+                ]);
+            } catch (\Throwable $e) {
 
                 $this->handleFailure($appointment);
 
                 Log::error('Reminder failed', [
                     'appointment_id' => $appointment->id,
-                    'error' => $e->getMessage()
+                    'stage' => $appointment->reminder_stage,
+                    'retry_count' => $appointment->reminder_retry_count,
+                    'error' => $e->getMessage(),
                 ]);
             }
         });
