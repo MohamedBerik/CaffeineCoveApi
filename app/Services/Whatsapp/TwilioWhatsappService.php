@@ -7,6 +7,40 @@ use Twilio\Rest\Client;
 
 class TwilioWhatsappService
 {
+    // public function send(string $to, string $message): array
+    // {
+    //     $sid = config('services.twilio.account_sid');
+    //     $token = config('services.twilio.auth_token');
+    //     $from = config('services.twilio.whatsapp_from');
+
+    //     $from = preg_replace('/^whatsapp:/', '', $from);
+
+    //     if (!$sid || !$token || !$from) {
+    //         throw new \Exception('Twilio config missing');
+    //     }
+
+    //     $client = new Client($sid, $token);
+
+    //     $response = $client->messages->create(
+    //         'whatsapp:' . $this->normalizePhone($to),
+    //         [
+    //             'from' => 'whatsapp:' . $from,
+    //             'body' => $message,
+    //         ]
+    //     );
+
+    //     Log::info('WhatsApp sent', [
+    //         'to' => $to,
+    //         'sid' => $response->sid ?? null,
+    //         'status' => $response->status ?? null,
+    //     ]);
+
+    //     return [
+    //         'sid' => $response->sid ?? null,
+    //         'status' => $response->status ?? null,
+    //     ];
+    // }
+
     public function send(string $to, string $message): array
     {
         $sid = config('services.twilio.account_sid');
@@ -21,11 +55,16 @@ class TwilioWhatsappService
 
         $client = new Client($sid, $token);
 
+        // استخدام Template للحصول على الموافقة
         $response = $client->messages->create(
             'whatsapp:' . $this->normalizePhone($to),
             [
                 'from' => 'whatsapp:' . $from,
-                'body' => $message,
+                'content_sid' => 'HXb5b62575e6e4ff6129ad7c8efe1f983e', // Template ID من الصورة
+                'content_variables' => json_encode([
+                    '1' => 'April 2, 2026',
+                    '2' => '1:30 PM',
+                ]),
             ]
         );
 
