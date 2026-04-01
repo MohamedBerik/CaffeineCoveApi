@@ -44,8 +44,12 @@ class Kernel extends ConsoleKernel
             ->runInBackground();
 
         $schedule->call(function () {
-            app(ReminderAlertService::class)
-                ->checkAndTriggerAlerts(auth()->user()->company_id ?? 1);
+            $companyIds = \App\Models\Company::pluck('id');
+
+            foreach ($companyIds as $companyId) {
+                app(ReminderAlertService::class)
+                    ->checkAndTriggerAlerts($companyId);
+            }
         })->everyMinute();
     }
     protected $commands = [
