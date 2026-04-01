@@ -3,6 +3,7 @@
 namespace App\Console;
 
 use App\Console\Commands\ResetAccountingForCompany;
+use App\Services\ReminderAlertService;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Foundation\Console\Kernel as ConsoleKernel;
 
@@ -41,6 +42,11 @@ class Kernel extends ConsoleKernel
             ->everyFiveMinutes()
             ->withoutOverlapping()
             ->runInBackground();
+
+        $schedule->call(function () {
+            app(ReminderAlertService::class)
+                ->checkAndTriggerAlerts(auth()->user()->company_id ?? 1);
+        })->everyMinute();
     }
     protected $commands = [
         ResetAccountingForCompany::class,

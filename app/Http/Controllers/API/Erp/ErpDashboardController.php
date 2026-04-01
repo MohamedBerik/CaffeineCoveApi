@@ -127,6 +127,21 @@ class ErpDashboardController extends Controller
 
         $netCreditBalance = $creditIssued - $creditUsed;
 
+        $alerts = [];
+
+        if ($reminderStats->failed >= 10) {
+            $alerts[] = [
+                'type' => 'danger',
+                'message' => 'High failed reminders'
+            ];
+        }
+
+        if ($reminderStats->processing >= 5) {
+            $alerts[] = [
+                'type' => 'warning',
+                'message' => 'Reminders stuck in processing'
+            ];
+        }
         // =================================================
         // 6. Response
         // =================================================
@@ -169,6 +184,7 @@ class ErpDashboardController extends Controller
                 'reminders' => [
                     'stats' => $reminderStats,
                     'failed_recent' => $failedReminders,
+                    'alerts' => $alerts,
                 ],
             ],
         ]);
