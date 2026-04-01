@@ -52,7 +52,12 @@ class TwilioWhatsappService
 
         // لو مصري وبدأ بـ 0 → حوله لـ +20
         if (str_starts_with($phone, '0')) {
-            $phone = '+2' . substr($phone, 1);
+            $phone = '+20' . substr($phone, 1);  // +20 مش +2
+        }
+
+        // لو الرقم بيبدأ بـ +21 (غلط) صححه
+        if (str_starts_with($phone, '+21')) {
+            $phone = '+20' . substr($phone, 3);
         }
 
         return $phone;
