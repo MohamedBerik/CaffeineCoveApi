@@ -34,6 +34,7 @@ return [
         'account_sid' => env('TWILIO_ACCOUNT_SID'),
         'auth_token' => env('TWILIO_AUTH_TOKEN'),
         'whatsapp_from' => env('TWILIO_WHATSAPP_FROM'),
+        'whatsapp_template_sid' => env('TWILIO_WHATSAPP_TEMPLATE_SID', 'HXb5b62575e6e4ff6129ad7c8efe1f983e'),
     ],
 
 ];
