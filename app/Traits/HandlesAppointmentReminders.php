@@ -9,7 +9,7 @@ trait HandlesAppointmentReminders
 {
     protected function resolveNextReminderAt(string $date, string $time, int $stage = 1): ?Carbon
     {
-        $appointment = Carbon::parse("$date $time");
+        $appointment = Carbon::parse($this->cleanDateTime($date, $time));
 
         $now = now();
 
@@ -29,7 +29,7 @@ trait HandlesAppointmentReminders
 
     private function buildPendingReminder($date, $time): array
     {
-        $appointmentDateTime = Carbon::parse($date . ' ' . $time);
+        $appointmentDateTime = Carbon::parse($this->cleanDateTime($date, $time));
         $now = now();
 
         // لو المعاد قريب (أقل من 30 دقيقة)
@@ -82,7 +82,7 @@ trait HandlesAppointmentReminders
         }
 
         $appointmentDateTime = Carbon::parse(
-            $appointment->appointment_date . ' ' . $appointment->appointment_time
+            $this->cleanDateTime($appointment->appointment_date, $appointment->appointment_time)
         )->startOfMinute();
 
         $now = now()->startOfMinute();
@@ -155,5 +155,12 @@ trait HandlesAppointmentReminders
             'reminder_stage' => $nextReminder ? $nextStage : null,
             'next_reminder_at' => $nextReminder,
         ];
+    }
+
+    private function cleanDateTime(string $date, string $time): string
+    {
+        // لو التاريخ فيه وقت (00:00:00) اشيله
+        $cleanDate = explode(' ', $date)[0];
+        return $cleanDate . ' ' . $time;
     }
 }
