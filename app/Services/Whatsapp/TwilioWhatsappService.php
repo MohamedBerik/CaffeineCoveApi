@@ -77,32 +77,42 @@ class TwilioWhatsappService
 
         $client = new Client($sid, $token);
 
-        // استخدم template ID من Twilio
-        $contentSid = config('services.twilio.whatsapp_template_sid', 'HXb5b62575e6e4ff6129ad7c8efe1f983e');
+        // Template ID من الصورة
+        $templateId = 'HXb5b62575e6e4ff6129ad7c8efe1f983e';
 
-        // استخرج التاريخ والوقت من الرسالة أو افتراضياً
-        $response = $client->messages->create(
-            'whatsapp:' . $this->normalizePhone($to),
-            [
-                'from' => 'whatsapp:' . $from,
-                'content_sid' => $contentSid,
-                'content_variables' => json_encode([
-                    '1' => now()->addDay()->format('M j, Y'),
-                    '2' => '1:30 PM',
-                ]),
-            ]
-        );
-
-        Log::info('WhatsApp sent', [
-            'to' => $to,
-            'sid' => $response->sid ?? null,
-            'status' => $response->status ?? null,
+        // Variables للـ template
+        $variables = json_encode([
+            '1' => 'April 2, 2026',
+            '2' => '1:30 PM',
         ]);
 
-        return [
-            'sid' => $response->sid ?? null,
-            'status' => $response->status ?? null,
-        ];
+        try {
+            $response = $client->messages->create(
+                'whatsapp:' . $this->normalizePhone($to),
+                [
+                    'from' => 'whatsapp:' . $from,
+                    'content_sid' => $templateId,
+                    'content_variables' => $variables,
+                ]
+            );
+
+            Log::info('WhatsApp sent', [
+                'to' => $to,
+                'sid' => $response->sid ?? null,
+                'status' => $response->status ?? null,
+            ]);
+
+            return [
+                'sid' => $response->sid ?? null,
+                'status' => $response->status ?? null,
+            ];
+        } catch (\Exception $e) {
+            Log::error('WhatsApp failed', [
+                'to' => $to,
+                'error' => $e->getMessage(),
+            ]);
+            throw $e;
+        }
     }
 
     private function normalizePhone(string $phone): string
