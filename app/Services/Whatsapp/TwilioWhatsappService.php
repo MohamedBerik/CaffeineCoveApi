@@ -41,6 +41,28 @@ class TwilioWhatsappService
     //     ];
     // }
 
+    // private function normalizePhone(string $phone): string
+    // {
+    //     $phone = trim($phone);
+
+    //     // remove whatsapp:
+    //     if (str_starts_with($phone, 'whatsapp:')) {
+    //         $phone = substr($phone, 9);
+    //     }
+
+    //     // لو مصري وبدأ بـ 0 → حوله لـ +20
+    //     if (str_starts_with($phone, '0')) {
+    //         $phone = '+20' . substr($phone, 1);  // +20 مش +2
+    //     }
+
+    //     // لو الرقم بيبدأ بـ +21 (غلط) صححه
+    //     if (str_starts_with($phone, '+21')) {
+    //         $phone = '+20' . substr($phone, 3);
+    //     }
+
+    //     return $phone;
+    // }
+
     public function send(string $to, string $message): array
     {
         $sid = config('services.twilio.account_sid');
@@ -55,14 +77,17 @@ class TwilioWhatsappService
 
         $client = new Client($sid, $token);
 
-        // استخدام Template للحصول على الموافقة
+        // استخدم template ID من Twilio
+        $contentSid = config('services.twilio.whatsapp_template_sid', 'HXb5b62575e6e4ff6129ad7c8efe1f983e');
+
+        // استخرج التاريخ والوقت من الرسالة أو افتراضياً
         $response = $client->messages->create(
             'whatsapp:' . $this->normalizePhone($to),
             [
                 'from' => 'whatsapp:' . $from,
-                'content_sid' => 'HXb5b62575e6e4ff6129ad7c8efe1f983e', // Template ID من الصورة
+                'content_sid' => $contentSid,
                 'content_variables' => json_encode([
-                    '1' => 'April 2, 2026',
+                    '1' => now()->addDay()->format('M j, Y'),
                     '2' => '1:30 PM',
                 ]),
             ]
@@ -84,17 +109,14 @@ class TwilioWhatsappService
     {
         $phone = trim($phone);
 
-        // remove whatsapp:
         if (str_starts_with($phone, 'whatsapp:')) {
             $phone = substr($phone, 9);
         }
 
-        // لو مصري وبدأ بـ 0 → حوله لـ +20
         if (str_starts_with($phone, '0')) {
-            $phone = '+20' . substr($phone, 1);  // +20 مش +2
+            $phone = '+20' . substr($phone, 1);
         }
 
-        // لو الرقم بيبدأ بـ +21 (غلط) صححه
         if (str_starts_with($phone, '+21')) {
             $phone = '+20' . substr($phone, 3);
         }
