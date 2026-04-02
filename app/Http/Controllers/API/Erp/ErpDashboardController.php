@@ -148,7 +148,7 @@ class ErpDashboardController extends Controller
         // =================================================
         $totalPatients = DB::table('customers')
             ->where('company_id', $companyId)
-            ->where('is_active', 1) // أو حسب حالة المريض
+            ->where('status', 1) // أو حسب حالة المريض
             ->count();
 
         // =================================================
