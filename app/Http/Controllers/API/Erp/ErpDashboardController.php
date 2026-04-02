@@ -21,14 +21,14 @@ class ErpDashboardController extends Controller
         $monthEnd = Carbon::today()->endOfMonth();
 
         // =================================================
-        // 6. Patients KPIs
+        // 1. Patients KPIs
         // =================================================
         $totalPatients = \App\Models\Customer::query()
             ->where('company_id', $companyId)
             ->count();
 
         // =================================================
-        // 1. Appointments KPIs
+        // 2. Appointments KPIs
         // =================================================
         $todayAppointmentsQuery = Appointment::query()
             ->where('company_id', $companyId)
@@ -49,7 +49,7 @@ class ErpDashboardController extends Controller
             ->get();
 
         // =================================================
-        // 2. Reminders KPIs
+        // 3. Reminders KPIs
         // =================================================
         $reminderStats = Appointment::query()
             ->where('company_id', $companyId)
@@ -81,7 +81,7 @@ class ErpDashboardController extends Controller
             ->get(['id', 'patient_id', 'doctor_name', 'appointment_date', 'reminder_retry_count', 'reminder_last_attempt_at']);
 
         // =================================================
-        // 3. Invoices KPIs
+        // 4. Invoices KPIs
         // =================================================
         $invoicesStats = Invoice::query()
             ->where('company_id', $companyId)
@@ -100,7 +100,7 @@ class ErpDashboardController extends Controller
             ->get(['id', 'number', 'customer_id', 'appointment_id', 'treatment_plan_id', 'total', 'status', 'issued_at', 'created_at']);
 
         // =================================================
-        // 4. Revenue KPIs
+        // 5. Revenue KPIs
         // =================================================
         $todayRevenue = (float) Payment::query()
             ->where('company_id', $companyId)
@@ -120,7 +120,7 @@ class ErpDashboardController extends Controller
             ->get(['id', 'invoice_id', 'amount', 'applied_amount', 'credit_amount', 'method', 'paid_at', 'created_at']);
 
         // =================================================
-        // 5. Customer Credits
+        // 6. Customer Credits
         // =================================================
         $creditIssued = (float) DB::table('customer_credits')
             ->where('company_id', $companyId)
