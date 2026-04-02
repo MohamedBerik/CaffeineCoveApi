@@ -142,8 +142,17 @@ class ErpDashboardController extends Controller
                 'message' => 'Reminders stuck in processing'
             ];
         }
+
         // =================================================
-        // 6. Response
+        // 6. Patients KPIs
+        // =================================================
+        $totalPatients = DB::table('customers')
+            ->where('company_id', $companyId)
+            ->where('is_active', 1) // أو حسب حالة المريض
+            ->count();
+
+        // =================================================
+        // 7. Response
         // =================================================
         return response()->json([
             'msg' => 'ERP dashboard',
@@ -177,6 +186,9 @@ class ErpDashboardController extends Controller
 
                     // Credits
                     'credit_balance_total' => $netCreditBalance,
+
+                    'total_patients' => $totalPatients,
+
                 ],
                 'recent_appointments' => $recentAppointments,
                 'recent_invoices' => $recentInvoices,
