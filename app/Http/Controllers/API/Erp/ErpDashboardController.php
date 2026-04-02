@@ -21,6 +21,13 @@ class ErpDashboardController extends Controller
         $monthEnd = Carbon::today()->endOfMonth();
 
         // =================================================
+        // 6. Patients KPIs
+        // =================================================
+        $totalPatients = \App\Models\Customer::query()
+            ->where('company_id', $companyId)
+            ->count();
+
+        // =================================================
         // 1. Appointments KPIs
         // =================================================
         $todayAppointmentsQuery = Appointment::query()
@@ -142,14 +149,6 @@ class ErpDashboardController extends Controller
                 'message' => 'Reminders stuck in processing'
             ];
         }
-
-        // =================================================
-        // 6. Patients KPIs
-        // =================================================
-        $totalPatients = DB::table('customers')
-            ->where('company_id', $companyId)
-            ->where('status', 1) // أو حسب حالة المريض
-            ->count();
 
         // =================================================
         // 7. Response
