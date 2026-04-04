@@ -144,6 +144,9 @@ class ErpDashboardController extends Controller
         // =================================================
         // 7. Alerts
         // =================================================
+        app(ReminderAlertService::class)
+            ->checkAndTriggerAlerts($companyId);
+
         $alerts = SystemAlert::query()
             ->where('company_id', $companyId)
             ->whereNull('resolved_at')
