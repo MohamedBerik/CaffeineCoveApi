@@ -87,6 +87,7 @@ class ReminderAlertService
             'type' => $type,
             'message' => $message,
             'meta' => $meta,
+            'triggered_at' => now()->toDateTimeString(),
         ]);
 
         // -----------------------------

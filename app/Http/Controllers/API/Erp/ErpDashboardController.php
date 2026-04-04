@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Appointment;
 use App\Models\Invoice;
 use App\Models\Payment;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Carbon;
@@ -134,21 +135,7 @@ class ErpDashboardController extends Controller
 
         $netCreditBalance = $creditIssued - $creditUsed;
 
-        $alerts = [];
-
-        if ($reminderStats->failed >= 10) {
-            $alerts[] = [
-                'type' => 'danger',
-                'message' => 'High failed reminders'
-            ];
-        }
-
-        if ($reminderStats->processing >= 5) {
-            $alerts[] = [
-                'type' => 'warning',
-                'message' => 'Reminders stuck in processing'
-            ];
-        }
+        $alerts = Cache::get("dashboard_alerts_company_{$companyId}", []);
 
         // =================================================
         // 7. Response
