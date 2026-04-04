@@ -4,18 +4,25 @@ namespace App\Http\Controllers\API\Erp;
 
 use App\Http\Controllers\Controller;
 use App\Models\SystemAlert;
+use Illuminate\Http\Request;
 
 class AlertController extends Controller
 {
-
-    public function acknowledge($id)
+    public function acknowledge($id, Request $request)
     {
-        $alert = SystemAlert::findOrFail($id);
+        $companyId = $request->user()->company_id;
+
+        $alert = SystemAlert::query()
+            ->where('company_id', $companyId)
+            ->where('id', $id)
+            ->firstOrFail();
 
         $alert->update([
-            'acknowledged_at' => now()
+            'acknowledged_at' => now(),
         ]);
 
-        return response()->json(['status' => 'ok']);
+        return response()->json([
+            'message' => 'Alert acknowledged'
+        ]);
     }
 }

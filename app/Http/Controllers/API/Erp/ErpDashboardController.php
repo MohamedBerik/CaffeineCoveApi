@@ -216,7 +216,7 @@ class ErpDashboardController extends Controller
             'data' => [
                 ...$data,
                 'reminders' => [
-                    ...$data['reminders'],
+                    ...($data['reminders'] ?? []),
                     'alerts' => $alerts,
                 ]
             ],

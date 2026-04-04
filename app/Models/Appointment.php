@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use App\Models\Concerns\BelongsToCompanyTrait;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Support\Facades\Cache;
 
 class Appointment extends Model
 {
@@ -83,5 +84,16 @@ class Appointment extends Model
     public function treatmentPlanItem()
     {
         return $this->hasOne(\App\Models\TreatmentPlanItem::class);
+    }
+
+    protected static function booted()
+    {
+        static::saved(function ($appointment) {
+            Cache::forget("dashboard_{$appointment->company_id}");
+        });
+
+        static::deleted(function ($appointment) {
+            Cache::forget("dashboard_{$appointment->company_id}");
+        });
     }
 }

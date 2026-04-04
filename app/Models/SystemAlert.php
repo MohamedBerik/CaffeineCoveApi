@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use App\Models\Concerns\BelongsToCompanyTrait;
+use Illuminate\Support\Facades\Cache;
 
 class SystemAlert extends Model
 {
@@ -29,4 +30,11 @@ class SystemAlert extends Model
         'resolved_at' => 'datetime',
         'acknowledged_at' => 'datetime',
     ];
+
+    protected static function booted()
+    {
+        static::saved(function ($alert) {
+            Cache::forget("dashboard_{$alert->company_id}");
+        });
+    }
 }

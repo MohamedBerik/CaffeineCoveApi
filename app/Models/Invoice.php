@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use App\Models\Concerns\BelongsToCompanyTrait;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 
 class Invoice extends Model
@@ -96,6 +97,13 @@ class Invoice extends Model
     public function company()
     {
         return $this->belongsTo(Company::class);
+    }
+
+    protected static function booted()
+    {
+        static::saved(function ($invoice) {
+            Cache::forget("dashboard_{$invoice->company_id}");
+        });
     }
 
     /* =========================
