@@ -440,7 +440,7 @@ Route::prefix('erp')
         Route::get('/clinic-settings', [ClinicSettingController::class, 'show']);
         Route::put('/clinic-settings', [ClinicSettingController::class, 'update']);
 
-        Route::post('/alerts/{id}/ack', [AlertController::class, 'ack']);
+        Route::post('/alerts/{id}/ack', [AlertController::class, 'acknowledge']);
     });
 
 Route::middleware('auth:sanctum')->prefix('saas')->group(function () {

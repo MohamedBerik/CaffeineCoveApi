@@ -26,6 +26,8 @@ return new class extends Migration
             $table->timestamps();
 
             $table->index(['company_id', 'code']);
+            $table->index(['company_id', 'code', 'resolved_at']);
+            $table->index(['company_id', 'acknowledged_at']);
         });
     }
 

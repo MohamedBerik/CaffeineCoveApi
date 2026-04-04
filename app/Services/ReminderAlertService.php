@@ -31,7 +31,6 @@ class ReminderAlertService
             ->where('reminder_status', 'processing')
             ->where('updated_at', '<', now()->subMinutes(5))
             ->count();
-
         // -----------------------------
         // Alerts (with dedup)
         // -----------------------------
@@ -62,32 +61,10 @@ class ReminderAlertService
                 meta: ['count' => $stuckProcessing]
             );
         }
-
-        if ($failedCount < 10) {
-            SystemAlert::query()
-                ->where('company_id', $companyId)
-                ->where('code', 'failed')
-                ->whereNull('resolved_at')
-                ->update([
-                    'resolved_at' => now()
-                ]);
-        }
-
-        if ($highRetryCount < 5) {
-            SystemAlert::query()
-                ->where('company_id', $companyId)
-                ->where('code', 'retry')
-                ->whereNull('resolved_at')
-                ->update(['resolved_at' => now()]);
-        }
-
-        if ($stuckProcessing < 5) {
-            SystemAlert::query()
-                ->where('company_id', $companyId)
-                ->where('code', 'stuck')
-                ->whereNull('resolved_at')
-                ->update(['resolved_at' => now()]);
-        }
+        // بعد الحسابات مباشرة
+        $this->resolveIfRecovered($companyId, 'failed', $failedCount < 10);
+        $this->resolveIfRecovered($companyId, 'retry', $highRetryCount < 5);
+        $this->resolveIfRecovered($companyId, 'stuck', $stuckProcessing < 5);
     }
 
     protected function sendAlert(
@@ -96,18 +73,13 @@ class ReminderAlertService
         string $message,
         array $meta = []
     ): void {
-        // -----------------------------
-        // Deduplication key
-        // -----------------------------
+
         $cacheKey = "reminder_alert_{$type}_company_{$companyId}";
 
         if (Cache::has($cacheKey)) {
             return;
         }
 
-        // -----------------------------
-        // Log alert
-        // -----------------------------
         $existing = SystemAlert::query()
             ->where('company_id', $companyId)
             ->where('code', $type)
@@ -115,6 +87,10 @@ class ReminderAlertService
             ->first();
 
         if ($existing) {
+            $existing->update([
+                'meta' => $meta,
+                'updated_at' => now(),
+            ]);
             return;
         }
 
@@ -135,78 +111,24 @@ class ReminderAlertService
             'type' => $type,
             'message' => $message,
             'meta' => $meta,
-            'triggered_at' => now()->toDateTimeString(),
         ]);
 
         Cache::put($cacheKey, true, now()->addMinutes(10));
     }
 
-    public function getDashboardAlerts(int $companyId): array
+    protected function resolveIfRecovered(int $companyId, string $type, bool $recovered): void
     {
-        $alerts = [];
-
-        // نفس الحسابات
-        $recentFailed = Appointment::query()
-            ->where('company_id', $companyId)
-            ->where('reminder_status', 'failed')
-            ->where('updated_at', '>=', now()->subMinutes(10))
-            ->count();
-
-        $stuckProcessing = Appointment::query()
-            ->where('company_id', $companyId)
-            ->where('reminder_status', 'processing')
-            ->where('updated_at', '<', now()->subMinutes(10))
-            ->count();
-
-        $recentRetry = Appointment::query()
-            ->where('company_id', $companyId)
-            ->where('reminder_retry_count', '>=', 3)
-            ->where('updated_at', '>=', now()->subMinutes(10))
-            ->count();
-
-        if ($recentFailed >= 10) {
-            $alerts[] = $this->buildAlert('failed', $recentFailed);
+        if (!$recovered) {
+            return;
         }
 
-        if ($stuckProcessing >= 5) {
-            $alerts[] = $this->buildAlert('stuck', $stuckProcessing);
-        }
-
-        if ($recentRetry >= 5) {
-            $alerts[] = $this->buildAlert('retry', $recentRetry);
-        }
-
-        return $alerts;
-    }
-
-    private function buildAlert(string $type, int $count): array
-    {
-        return match ($type) {
-            'failed' => [
-                'type' => 'danger',
-                'priority' => 'high',
-                'code' => 'REMINDER_FAILED_SPIKE',
-                'message' => 'High failed reminders',
-                'meta' => ['count' => $count],
-                'time' => now()->toIso8601String(),
-            ],
-            'stuck' => [
-                'type' => 'warning',
-                'priority' => 'medium',
-                'code' => 'REMINDER_STUCK',
-                'message' => 'Reminders stuck in processing',
-                'meta' => ['count' => $count],
-                'time' => now()->toIso8601String(),
-            ],
-            'retry' => [
-                'type' => 'warning',
-                'priority' => 'medium',
-                'code' => 'REMINDER_RETRY_HIGH',
-                'message' => 'High retry reminders',
-                'meta' => ['count' => $count],
-                'time' => now()->toIso8601String(),
-            ],
-        };
+        SystemAlert::query()
+            ->where('company_id', $companyId)
+            ->where('code', $type)
+            ->whereNull('resolved_at')
+            ->update([
+                'resolved_at' => now()
+            ]);
     }
 
     private function getAlertConfig(string $type): array

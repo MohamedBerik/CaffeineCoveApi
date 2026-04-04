@@ -3,19 +3,19 @@
 namespace App\Http\Controllers\API\Erp;
 
 use App\Http\Controllers\Controller;
-use Illuminate\Http\Request;
-use App\Models\ActivityLog;
 use App\Models\SystemAlert;
 
 class AlertController extends Controller
 {
 
-    public function ack($id)
+    public function acknowledge($id)
     {
-        SystemAlert::where('id', $id)->update([
+        $alert = SystemAlert::findOrFail($id);
+
+        $alert->update([
             'acknowledged_at' => now()
         ]);
 
-        return response()->json(['status' => true]);
+        return response()->json(['status' => 'ok']);
     }
 }

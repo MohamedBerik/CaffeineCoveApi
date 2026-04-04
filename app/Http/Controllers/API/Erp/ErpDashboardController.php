@@ -4,6 +4,7 @@ namespace App\Http\Controllers\API\Erp;
 
 use App\Http\Controllers\Controller;
 use App\Models\Appointment;
+use App\Models\Customer;
 use App\Models\Invoice;
 use App\Models\Payment;
 use App\Models\SystemAlert;
@@ -25,7 +26,7 @@ class ErpDashboardController extends Controller
         // =================================================
         // 1. Patients KPIs
         // =================================================
-        $totalPatients = \App\Models\Customer::query()
+        $totalPatients = Customer::query()
             ->where('company_id', $companyId)
             ->count();
 
@@ -143,14 +144,12 @@ class ErpDashboardController extends Controller
         // =================================================
         // 7. Alerts
         // =================================================
-        $alerts = app(ReminderAlertService::class)
-            ->getDashboardAlerts($companyId);
-
-        $alerts = \App\Models\SystemAlert::query()
+        $alerts = SystemAlert::query()
             ->where('company_id', $companyId)
             ->whereNull('resolved_at')
             ->whereNull('acknowledged_at')
             ->latest()
+            ->limit(10)
             ->get()
             ->map(fn($alert) => [
                 'id' => $alert->id,
