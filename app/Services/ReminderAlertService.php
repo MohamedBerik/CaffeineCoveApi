@@ -101,4 +101,69 @@ class ReminderAlertService
         // SlackNotification::send(...)
         // Mail::to(...)->send(...)
     }
+
+    public function getDashboardAlerts(int $companyId): array
+    {
+        $alerts = [];
+
+        // نفس الحسابات
+        $recentFailed = Appointment::query()
+            ->where('company_id', $companyId)
+            ->where('reminder_status', 'failed')
+            ->where('updated_at', '>=', now()->subMinutes(10))
+            ->count();
+
+        $stuckProcessing = Appointment::query()
+            ->where('company_id', $companyId)
+            ->where('reminder_status', 'processing')
+            ->where('updated_at', '<', now()->subMinutes(10))
+            ->count();
+
+        $recentRetry = Appointment::query()
+            ->where('company_id', $companyId)
+            ->where('reminder_retry_count', '>=', 3)
+            ->where('updated_at', '>=', now()->subMinutes(10))
+            ->count();
+
+        if ($recentFailed >= 10) {
+            $alerts[] = $this->buildAlert('failed', $recentFailed);
+        }
+
+        if ($stuckProcessing >= 5) {
+            $alerts[] = $this->buildAlert('stuck', $stuckProcessing);
+        }
+
+        if ($recentRetry >= 5) {
+            $alerts[] = $this->buildAlert('retry', $recentRetry);
+        }
+
+        return $alerts;
+    }
+
+    private function buildAlert(string $type, int $count): array
+    {
+        return match ($type) {
+            'failed' => [
+                'type' => 'danger',
+                'priority' => 'high',
+                'code' => 'REMINDER_FAILED_SPIKE',
+                'message' => 'High failed reminders',
+                'count' => $count,
+            ],
+            'stuck' => [
+                'type' => 'warning',
+                'priority' => 'medium',
+                'code' => 'REMINDER_STUCK',
+                'message' => 'Reminders stuck in processing',
+                'count' => $count,
+            ],
+            'retry' => [
+                'type' => 'warning',
+                'priority' => 'medium',
+                'code' => 'REMINDER_RETRY_HIGH',
+                'message' => 'High retry reminders',
+                'count' => $count,
+            ],
+        };
+    }
 }

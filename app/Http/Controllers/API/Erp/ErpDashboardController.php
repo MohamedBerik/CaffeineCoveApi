@@ -6,7 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Appointment;
 use App\Models\Invoice;
 use App\Models\Payment;
-use Illuminate\Support\Facades\Cache;
+use App\Services\ReminderAlertService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Carbon;
@@ -63,6 +63,10 @@ class ErpDashboardController extends Controller
                 SUM(reminder_status = 'skipped') as skipped
             ")
             ->first();
+
+        if (!$reminderStats) {
+            $reminderStats = (object)['total' => 0, 'pending' => 0, 'processing' => 0, 'sent' => 0, 'failed' => 0, 'skipped' => 0];
+        }
 
         $stuckRemindersCount = Appointment::query()
             ->where('company_id', $companyId)
@@ -135,10 +139,14 @@ class ErpDashboardController extends Controller
 
         $netCreditBalance = $creditIssued - $creditUsed;
 
-        $alerts = Cache::get("dashboard_alerts_company_{$companyId}", []);
+        // =================================================
+        // 7. Alerts
+        // =================================================
+        $alerts = app(ReminderAlertService::class)
+            ->getDashboardAlerts($companyId);
 
         // =================================================
-        // 7. Response
+        // 8. Response
         // =================================================
         return response()->json([
             'msg' => 'ERP dashboard',
