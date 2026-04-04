@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Appointment;
 use App\Models\Invoice;
 use App\Models\Payment;
+use App\Models\SystemAlert;
 use App\Services\ReminderAlertService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -145,6 +146,20 @@ class ErpDashboardController extends Controller
         $alerts = app(ReminderAlertService::class)
             ->getDashboardAlerts($companyId);
 
+        $alerts = \App\Models\SystemAlert::query()
+            ->where('company_id', $companyId)
+            ->whereNull('resolved_at')
+            ->whereNull('acknowledged_at')
+            ->latest()
+            ->get()
+            ->map(fn($alert) => [
+                'id' => $alert->id,
+                'type' => $alert->type,
+                'priority' => $alert->priority,
+                'message' => $alert->message,
+                'meta' => $alert->meta,
+                'time' => $alert->triggered_at,
+            ]);
         // =================================================
         // 8. Response
         // =================================================

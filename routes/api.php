@@ -20,6 +20,7 @@ use App\Http\Controllers\API\Erp\InvoiceController;
 use App\Http\Controllers\API\Erp\PurchaseOrderController;
 use App\Http\Controllers\API\Erp\FinanceDashboardController;
 use App\Http\Controllers\API\Erp\ActivityLogController;
+use App\Http\Controllers\API\Erp\AlertController;
 use App\Http\Controllers\API\Erp\AppointmentActivityController;
 use App\Http\Controllers\API\Erp\CustomerStatementController;
 use App\Http\Controllers\API\Erp\PaymentRefundController;
@@ -438,6 +439,8 @@ Route::prefix('erp')
         */
         Route::get('/clinic-settings', [ClinicSettingController::class, 'show']);
         Route::put('/clinic-settings', [ClinicSettingController::class, 'update']);
+
+        Route::post('/alerts/{id}/ack', [AlertController::class, 'ack']);
     });
 
 Route::middleware('auth:sanctum')->prefix('saas')->group(function () {
