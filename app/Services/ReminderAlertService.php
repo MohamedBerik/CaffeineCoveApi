@@ -148,21 +148,24 @@ class ReminderAlertService
                 'priority' => 'high',
                 'code' => 'REMINDER_FAILED_SPIKE',
                 'message' => 'High failed reminders',
-                'count' => $count,
+                'meta' => ['count' => $count],
+                'time' => now()->toIso8601String(),
             ],
             'stuck' => [
                 'type' => 'warning',
                 'priority' => 'medium',
                 'code' => 'REMINDER_STUCK',
                 'message' => 'Reminders stuck in processing',
-                'count' => $count,
+                'meta' => ['count' => $count],
+                'time' => now()->toIso8601String(),
             ],
             'retry' => [
                 'type' => 'warning',
                 'priority' => 'medium',
                 'code' => 'REMINDER_RETRY_HIGH',
                 'message' => 'High retry reminders',
-                'count' => $count,
+                'meta' => ['count' => $count],
+                'time' => now()->toIso8601String(),
             ],
         };
     }
