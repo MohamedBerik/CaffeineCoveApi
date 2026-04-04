@@ -22,8 +22,8 @@ class ErpDashboardController extends Controller
         $companyId = $request->user()->company_id;
 
         $today = Carbon::today();
-        $monthStart = Carbon::today()->startOfMonth();
-        $monthEnd = Carbon::today()->endOfMonth();
+        $monthStart = $today->copy()->startOfMonth();
+        $monthEnd = $today->copy()->endOfMonth();
 
         $data = Cache::remember(
             "dashboard_{$companyId}",

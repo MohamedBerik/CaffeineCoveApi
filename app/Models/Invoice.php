@@ -101,8 +101,41 @@ class Invoice extends Model
 
     protected static function booted()
     {
-        static::saved(function ($invoice) {
-            Cache::forget("dashboard_{$invoice->company_id}");
+        static::created(function ($appointment) {
+            ActivityLog::create([
+                'company_id' => $appointment->company_id,
+                'user_id' => auth()->id(),
+                'action' => 'created',
+                'subject_type' => 'Appointment',
+                'subject_id' => $appointment->id,
+                'properties' => [
+                    'new' => $appointment->toArray()
+                ]
+            ]);
+        });
+
+        static::updated(function ($appointment) {
+            ActivityLog::create([
+                'company_id' => $appointment->company_id,
+                'user_id' => auth()->id(),
+                'action' => 'updated',
+                'subject_type' => 'Appointment',
+                'subject_id' => $appointment->id,
+                'properties' => [
+                    'old' => $appointment->getOriginal(),
+                    'changes' => $appointment->getChanges()
+                ]
+            ]);
+        });
+
+        static::deleted(function ($appointment) {
+            ActivityLog::create([
+                'company_id' => $appointment->company_id,
+                'user_id' => auth()->id(),
+                'action' => 'deleted',
+                'subject_type' => 'Appointment',
+                'subject_id' => $appointment->id,
+            ]);
         });
     }
 

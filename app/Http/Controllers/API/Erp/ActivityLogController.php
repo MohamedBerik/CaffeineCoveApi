@@ -15,10 +15,23 @@ class ActivityLogController extends Controller
         $limit = (int) $request->get('limit', 6);
 
         $logs = ActivityLog::where('company_id', $companyId)
+            ->when(
+                $request->subject_type,
+                fn($q) =>
+                $q->where('subject_type', $request->subject_type)
+            )
             ->latest()
-            ->limit($limit)
-            ->get();
+            ->paginate(10);
 
-        return response()->json($logs);
+        return response()->json(
+            $logs->map(fn($log) => [
+                'id' => $log->id,
+                'action' => $log->action,
+                'subject_type' => $log->subject_type,
+                'subject_id' => $log->subject_id,
+                'properties' => $log->properties,
+                'created_at' => $log->created_at,
+            ])
+        );
     }
 }

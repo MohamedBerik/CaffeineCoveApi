@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use App\Models\Concerns\BelongsToCompanyTrait;
+use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Support\Facades\Cache;
 
@@ -72,13 +73,13 @@ class Appointment extends Model
     }
     public function doctor()
     {
-        return $this->belongsTo(\App\Models\Doctor::class, 'doctor_id');
+        return $this->belongsTo(Doctor::class, 'doctor_id');
     }
 
     public function getAppointmentTimeAttribute($value)
     {
         if (!$value) return null;
-        return \Carbon\Carbon::parse($value)->format('H:i');
+        return Carbon::parse($value)->format('H:i');
     }
 
     public function treatmentPlanItem()
@@ -88,12 +89,41 @@ class Appointment extends Model
 
     protected static function booted()
     {
-        static::saved(function ($appointment) {
-            Cache::forget("dashboard_{$appointment->company_id}");
+        static::created(function ($appointment) {
+            ActivityLog::create([
+                'company_id' => $appointment->company_id,
+                'user_id' => auth()->id(),
+                'action' => 'created',
+                'subject_type' => 'Appointment',
+                'subject_id' => $appointment->id,
+                'properties' => [
+                    'new' => $appointment->toArray()
+                ]
+            ]);
+        });
+
+        static::updated(function ($appointment) {
+            ActivityLog::create([
+                'company_id' => $appointment->company_id,
+                'user_id' => auth()->id(),
+                'action' => 'updated',
+                'subject_type' => 'Appointment',
+                'subject_id' => $appointment->id,
+                'properties' => [
+                    'old' => $appointment->getOriginal(),
+                    'changes' => $appointment->getChanges()
+                ]
+            ]);
         });
 
         static::deleted(function ($appointment) {
-            Cache::forget("dashboard_{$appointment->company_id}");
+            ActivityLog::create([
+                'company_id' => $appointment->company_id,
+                'user_id' => auth()->id(),
+                'action' => 'deleted',
+                'subject_type' => 'Appointment',
+                'subject_id' => $appointment->id,
+            ]);
         });
     }
 }
