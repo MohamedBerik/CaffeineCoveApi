@@ -10,7 +10,7 @@ class DashboardObserver
     {
         if (!$model->company_id) return;
 
-        Cache::tags(['dashboard', "company_{$model->company_id}"])->flush();
+        Cache::forget("dashboard_{$model->company_id}");
     }
 
     public function created($model)
