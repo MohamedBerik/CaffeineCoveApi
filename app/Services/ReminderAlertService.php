@@ -107,8 +107,7 @@ class ReminderAlertService
             'triggered_at' => now(),
         ]);
 
-        event(new AlertCreated($alert));
-
+        event(new AlertCreated($alert->toArray()));
         Log::critical('[REMINDER ALERT]', [
             'company_id' => $companyId,
             'type' => $type,
