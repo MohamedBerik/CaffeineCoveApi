@@ -255,7 +255,7 @@ Route::prefix('erp')
 
         /*
         |--------------------------------------------------------------------------
-        | Dashboard & logs
+        | Dashboard & logs & Alerts
         |--------------------------------------------------------------------------
         */
         Route::middleware('permission:finance.view')
@@ -266,6 +266,7 @@ Route::prefix('erp')
 
         Route::middleware('permission:finance.view')
             ->get('/dashboard', [ErpDashboardController::class, 'index']);
+
         Route::post('/alerts/{id}/ack', [AlertController::class, 'acknowledge']);
 
 
