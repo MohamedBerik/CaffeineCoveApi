@@ -6,6 +6,7 @@ use App\Models\Appointment;
 use App\Models\SystemAlert;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Cache;
+use App\Events\AlertCreated;
 
 class ReminderAlertService
 {
@@ -96,7 +97,7 @@ class ReminderAlertService
 
         $config = $this->getAlertConfig($type);
 
-        SystemAlert::create([
+        $alert = SystemAlert::create([
             'company_id' => $companyId,
             'code' => $type,
             'type' => $config['type'],
@@ -105,6 +106,8 @@ class ReminderAlertService
             'meta' => $meta,
             'triggered_at' => now(),
         ]);
+
+        event(new AlertCreated($alert));
 
         Log::critical('[REMINDER ALERT]', [
             'company_id' => $companyId,
