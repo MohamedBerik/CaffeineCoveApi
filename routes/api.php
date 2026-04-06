@@ -266,6 +266,7 @@ Route::prefix('erp')
 
         Route::middleware('permission:finance.view')
             ->get('/dashboard', [ErpDashboardController::class, 'index']);
+        Route::post('/alerts/{id}/ack', [AlertController::class, 'acknowledge']);
 
 
         /*
@@ -439,8 +440,6 @@ Route::prefix('erp')
         */
         Route::get('/clinic-settings', [ClinicSettingController::class, 'show']);
         Route::put('/clinic-settings', [ClinicSettingController::class, 'update']);
-
-        Route::post('/alerts/{id}/ack', [AlertController::class, 'acknowledge']);
     });
 
 Route::middleware('auth:sanctum')->prefix('saas')->group(function () {
