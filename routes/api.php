@@ -261,8 +261,7 @@ Route::prefix('erp')
         Route::middleware('permission:finance.view')
             ->get('/dashboard/finance', [FinanceDashboardController::class, 'index']);
 
-        Route::middleware('permission:finance.view')
-            ->get('/activity-logs', [ActivityLogController::class, 'index']);
+        Route::get('/activity-logs', [ActivityLogController::class, 'index']);
 
         Route::middleware('permission:finance.view')
             ->get('/dashboard', [ErpDashboardController::class, 'index']);
