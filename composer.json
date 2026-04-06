@@ -17,6 +17,7 @@
         "laravel/tinker": "^2.5",
         "laravel/ui": "^3.4",
         "mcamara/laravel-localization": "^2.0",
+        "pusher/pusher-php-server": "*",
         "spatie/laravel-permission": "^6.24",
         "twilio/sdk": "^8.11"
     },
