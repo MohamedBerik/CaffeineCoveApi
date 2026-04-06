@@ -108,6 +108,7 @@ class ReminderAlertService
         ]);
 
         event(new AlertCreated($alert->toArray()));
+
         Log::critical('[REMINDER ALERT]', [
             'company_id' => $companyId,
             'type' => $type,
