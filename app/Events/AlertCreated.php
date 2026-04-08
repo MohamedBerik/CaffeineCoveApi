@@ -36,6 +36,7 @@ class AlertCreated implements ShouldBroadcast
         return [
             'alert' => [
                 'id' => $this->alert->id,
+                'code' => $this->alert->code,
                 'message' => $this->alert->message,
                 'priority' => $this->alert->priority,
                 'type' => $this->alert->type,
