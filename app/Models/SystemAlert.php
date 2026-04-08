@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Events\AlertCreated;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use App\Models\Concerns\BelongsToCompanyTrait;
@@ -33,40 +34,45 @@ class SystemAlert extends Model
 
     protected static function booted()
     {
-        static::created(function ($appointment) {
+        // دالة موحدة للـ created
+        static::created(function ($alert) {
+            // 1. تسجيل في ActivityLog
             ActivityLog::create([
-                'company_id' => $appointment->company_id,
+                'company_id' => $alert->company_id,
                 'user_id' => auth()->id(),
                 'action' => 'created',
-                'subject_type' => 'Appointment',
-                'subject_id' => $appointment->id,
+                'subject_type' => 'SystemAlert',
+                'subject_id' => $alert->id,
                 'properties' => [
-                    'new' => $appointment->toArray()
+                    'new' => $alert->toArray()
                 ]
             ]);
+
+            // 2. Broadcasting للإشعارات
+            broadcast(new AlertCreated($alert))->toOthers();
         });
 
-        static::updated(function ($appointment) {
+        static::updated(function ($alert) {
             ActivityLog::create([
-                'company_id' => $appointment->company_id,
+                'company_id' => $alert->company_id,
                 'user_id' => auth()->id(),
                 'action' => 'updated',
-                'subject_type' => 'Appointment',
-                'subject_id' => $appointment->id,
+                'subject_type' => 'SystemAlert',
+                'subject_id' => $alert->id,
                 'properties' => [
-                    'old' => $appointment->getOriginal(),
-                    'changes' => $appointment->getChanges()
+                    'old' => $alert->getOriginal(),
+                    'changes' => $alert->getChanges()
                 ]
             ]);
         });
 
-        static::deleted(function ($appointment) {
+        static::deleted(function ($alert) {
             ActivityLog::create([
-                'company_id' => $appointment->company_id,
+                'company_id' => $alert->company_id,
                 'user_id' => auth()->id(),
                 'action' => 'deleted',
-                'subject_type' => 'Appointment',
-                'subject_id' => $appointment->id,
+                'subject_type' => 'SystemAlert',
+                'subject_id' => $alert->id,
             ]);
         });
     }

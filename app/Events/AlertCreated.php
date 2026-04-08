@@ -2,6 +2,7 @@
 
 namespace App\Events;
 
+use App\Models\SystemAlert;
 use Illuminate\Broadcasting\Channel;
 use Illuminate\Contracts\Broadcasting\ShouldBroadcast;
 use Illuminate\Foundation\Events\Dispatchable;
@@ -13,7 +14,7 @@ class AlertCreated implements ShouldBroadcast
 
     public $alert;
 
-    public function __construct($alert)
+    public function __construct(SystemAlert $alert)
     {
         $this->alert = $alert;
     }
@@ -26,5 +27,19 @@ class AlertCreated implements ShouldBroadcast
     public function broadcastAs()
     {
         return 'alert.created';
+    }
+
+    public function broadcastWith()
+    {
+        return [
+            'alert' => [
+                'id' => $this->alert->id,
+                'message' => $this->alert->message,
+                'priority' => $this->alert->priority,
+                'type' => $this->alert->type,
+                'time' => $this->alert->triggered_at,
+                'read' => $this->alert->acknowledged_at !== null,
+            ]
+        ];
     }
 }
