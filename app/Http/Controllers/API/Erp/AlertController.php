@@ -12,7 +12,7 @@ class AlertController extends Controller
     public function index()
     {
         $alerts = SystemAlert::where('company_id', auth()->user()->company_id)
-            ->latest()
+            ->latest('triggered_at')
             ->take(20)
             ->get()
             ->map(function ($alert) {
