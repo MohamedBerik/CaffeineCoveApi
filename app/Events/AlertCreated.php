@@ -4,6 +4,7 @@ namespace App\Events;
 
 use App\Models\SystemAlert;
 use Illuminate\Broadcasting\Channel;
+use Illuminate\Broadcasting\PrivateChannel;
 use Illuminate\Contracts\Broadcasting\ShouldBroadcast;
 use Illuminate\Foundation\Events\Dispatchable;
 use Illuminate\Queue\SerializesModels;
@@ -19,9 +20,10 @@ class AlertCreated implements ShouldBroadcast
         $this->alert = $alert;
     }
 
+    // ✅ تغيير القناة إلى PrivateChannel خاصة بالشركة
     public function broadcastOn()
     {
-        return new Channel('alerts');
+        return new PrivateChannel('company.' . $this->alert->company_id);
     }
 
     public function broadcastAs()

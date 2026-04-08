@@ -271,6 +271,9 @@ Route::prefix('erp')
             ->get('/alerts', [AlertController::class, 'index']);
 
         Route::middleware('permission:finance.view')
+            ->get('/alerts/unread-count', [AlertController::class, 'unreadCount']);
+
+        Route::middleware('permission:finance.view')
             ->post('/alerts/{id}/ack', [AlertController::class, 'acknowledge']);
 
         /*

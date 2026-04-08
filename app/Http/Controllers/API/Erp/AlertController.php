@@ -29,6 +29,20 @@ class AlertController extends Controller
         return response()->json($alerts);
     }
 
+    // ✅ دالة جلب عدد الإشعارات غير المقروءة
+    public function unreadCount()
+    {
+        $count = SystemAlert::where('company_id', auth()->user()->company_id)
+            ->where(function ($query) {
+                $query->where('user_id', auth()->id())
+                    ->orWhereNull('user_id');
+            })
+            ->whereNull('acknowledged_at')
+            ->count();
+
+        return response()->json(['count' => $count]);
+    }
+
     // ✅ دالة تحديد كمقروء (موجودة بالفعل)
     public function acknowledge($id)
     {
