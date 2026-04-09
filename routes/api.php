@@ -51,7 +51,7 @@ use Illuminate\Support\Facades\Broadcast;
 
 Route::post('/register', [AuthController::class, 'register']);
 Route::post('/login',    [AuthController::class, 'login']);
-// Broadcast::routes(['middleware' => ['auth:sanctum']]);
+Broadcast::routes(['middleware' => ['auth:sanctum']]);
 
 /*
 |--------------------------------------------------------------------------
@@ -60,7 +60,7 @@ Route::post('/login',    [AuthController::class, 'login']);
 */
 
 Route::middleware('auth:sanctum')->group(function () {
-    Broadcast::routes();
+
     Route::get('/me', function (Request $request) {
         $user = $request->user();
 
