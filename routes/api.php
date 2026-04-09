@@ -60,7 +60,7 @@ Broadcast::routes(['middleware' => ['auth:sanctum']]);
 */
 
 Route::middleware('auth:sanctum')->group(function () {
-
+    Broadcast::routes();
     Route::get('/me', function (Request $request) {
         $user = $request->user();
 
