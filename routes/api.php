@@ -51,7 +51,6 @@ use Illuminate\Support\Facades\Broadcast;
 
 Route::post('/register', [AuthController::class, 'register']);
 Route::post('/login',    [AuthController::class, 'login']);
-Broadcast::routes(['middleware' => ['auth:sanctum']]);
 
 /*
 |--------------------------------------------------------------------------
