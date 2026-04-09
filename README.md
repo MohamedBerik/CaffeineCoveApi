@@ -1,34 +1,33 @@
-# Caffeine Cove API 🏗️
+# 🦷 Caffeine Cove API (Dental Clinic ERP)
 
-**Core Backend for ERP & Accounting System**  
-A robust REST API powering café management with double-entry accounting logic.
+**Core Backend for Dental Clinic Management & Accounting System**  
+A robust REST API powering clinic operations with double-entry accounting logic and enterprise-grade real-time notifications.
 
 [![Laravel](https://img.shields.io/badge/Laravel-10.x-red)](https://laravel.com)
 [![PHP](https://img.shields.io/badge/PHP-8.1+-purple)](https://php.net)
 [![MySQL](https://img.shields.io/badge/MySQL-8.0-blue)](https://mysql.com)
+[![Pusher](https://img.shields.io/badge/Pusher-Channels-0F0F0F)](https://pusher.com)
 
 ## 📋 Overview
 
-This API serves as the **independent backend core** for the Caffeine Cove ecosystem. Built with clean architecture principles, it handles all business logic including order processing, invoice management, payment tracking, and double-entry accounting.
+This API serves as the **independent backend core** for the Caffeine Cove ecosystem. Built with clean architecture principles, it handles business logic for dental clinic management, financial accounting, and a secure real-time notification layer.
 
 ## ✨ Key Features
 
-- **Authentication**: Laravel Sanctum with token-based auth
-- **Order Management**: Full CRUD with stock validation
-- **Invoice Engine**: Automatic status calculation (paid/partial/unpaid)
-- **Payment System**: Support partial & multiple payments
-- **Refund Engine**: Smart refund with invoice/credit separation
-- **Double-Entry Accounting**: Balanced journal entries
-- **Customer Ledger**: Complete transaction history
-- **Role-Based Access**: Admin/User separation
+- **Multi-Tenant Authentication:** Laravel Sanctum with strict `company_id` scoping.
+- **Clinic Operations:** Appointment scheduling, patient records, treatment plans, and dental procedures.
+- **Financial Engine:** Double-entry accounting, partial payments, and smart refund logic.
+- **Realtime Notifications:** Private WebSocket channels for live alerts and activity logs.
+- **Audit Trail:** Complete activity logging for financial and clinical actions.
 
 ## 🛠️ Tech Stack
 
-- **Framework**: Laravel 10+
-- **Database**: MySQL 8.0
-- **Authentication**: Laravel Sanctum
-- **API Style**: RESTful
-- **Documentation**: Postman/OpenAPI
+- **Framework:** Laravel 10+
+- **Database:** MySQL 8.0
+- **Authentication:** Laravel Sanctum (Multi-Tenant)
+- **Realtime:** Pusher Channels (Private)
+- **Queue:** Database Driver (Production Ready)
+- **API Style:** RESTful
 
 ## 🚀 Quick Start
 
@@ -37,7 +36,7 @@ This API serves as the **independent backend core** for the Caffeine Cove ecosys
 - PHP ≥ 8.1
 - Composer
 - MySQL ≥ 8.0
-- Node.js & NPM (for Laravel Mix)
+- Pusher Account (Free Tier works)
 
 ### Installation
 
@@ -52,251 +51,132 @@ composer install
 cp .env.example .env
 php artisan key:generate
 
-# Database configuration
-# Edit .env file with your database credentials
+# Configure Database & Pusher in .env
 DB_CONNECTION=mysql
 DB_HOST=127.0.0.1
-DB_PORT=3306
 DB_DATABASE=caffeine_cove
 DB_USERNAME=root
 DB_PASSWORD=
 
+PUSHER_APP_ID=your_id
+PUSHER_APP_KEY=your_key
+PUSHER_APP_SECRET=your_secret
+PUSHER_APP_CLUSTER=mt1
+
 # Run migrations & seeders
 php artisan migrate --seed
 
-# Start server
+# Start server & Queue Worker
 php artisan serve
-API will be available at: http://localhost:8000
+php artisan queue:work
+```
 
 📚 API Documentation
-Authentication
+🔐 Authentication
+Method Endpoint Description
+POST /api/login User login
+POST /api/logout User logout
+GET /api/me Get authenticated user with permissions
+🦷 Clinic Management
+Method Endpoint Description
+GET /api/erp/appointments List appointments
+POST /api/erp/appointments/book Book new appointment
+PUT /api/erp/appointments/{id} Update appointment
+GET /api/erp/customers List patients
+GET /api/erp/treatment-plans List treatment plans
+POST /api/erp/treatment-plans Create treatment plan
+📊 Finance & Accounting
+Method Endpoint Description
+GET /api/erp/invoices List invoices
+POST /api/erp/invoices/{id}/payments Process payment
+POST /api/erp/payments/{id}/refund Process refund
+GET /api/erp/customers/{id}/statement Customer ledger
+🔔 Realtime Notifications
+Method Endpoint Description
+GET /api/erp/alerts Get user alerts (Paginated)
+GET /api/erp/alerts/unread-count Get unread count
+POST /api/erp/alerts/{id}/ack Mark as read
+POST /api/broadcasting/auth WebSocket authentication
+🗄️ Database Schema (Core Tables)
+Table Description
+companies Multi-tenant clinics/organizations
+appointments Patient appointments with status tracking
+treatment_plans Multi-phase dental procedures
+system_alerts Persistent real-time notifications
+journal_entries Double-entry accounting records
+customer_ledger Patient financial history
+🔒 Security & Multi-Tenancy
+Company Scoping: All Eloquent queries are automatically scoped to company_id.
+
+Private Channels: Real-time events are broadcast to private-company.{id} ensuring data isolation.
+
+Broadcast Auth: Secure WebSocket authentication via Sanctum tokens.
+
+🔔 Realtime Architecture
 text
-POST   /api/login          - User login
-POST   /api/logout         - User logout
-GET    /api/user           - Get authenticated user
-Core Endpoints
-Orders
-text
-GET    /api/orders         - List orders (paginated)
-POST   /api/orders         - Create order
-GET    /api/orders/{id}    - Get order details
-PUT    /api/orders/{id}    - Update order
-DELETE /api/orders/{id}    - Cancel order
-Invoices
-text
-GET    /api/invoices       - List invoices
-GET    /api/invoices/{id}  - Invoice details
-POST   /api/invoices/{id}/pay - Process payment
-Payments
-text
-GET    /api/payments       - List payments
-POST   /api/payments/refund/{id} - Process refund
-Accounting
-text
-GET    /api/journal-entries - View journal entries
-GET    /api/ledger/{customer} - Customer ledger
-🗄️ Database Schema
-Core Tables
-users - System users
+SystemAlert::create()
+↓
+AlertCreated Event (ShouldBroadcast)
+↓
+Private Channel: company.{id}
+↓
+Pusher WebSocket
+↓
+React Frontend (Laravel Echo)
+Supported Alert Types:
 
-orders - Customer orders
+LOW_STOCK (Inventory warning)
 
-invoices - Generated invoices
+PAYMENT_FAILED (Financial error)
 
-payments - Payment records
+NEW_ORDER (Sales)
 
-refunds - Refund transactions
-
-journal_entries - Accounting entries
-
-journal_lines - Debit/credit lines
-
-customer_ledger - Customer balance tracking
-
-Relationships
-text
-Order → Invoice → Payments → Refunds
-      ↘ JournalEntries
-            ↘ CustomerLedger
-🔒 Security Features
-Token Authentication: Bearer tokens via Sanctum
-
-CORS: Properly configured for frontend domains
-
-Rate Limiting: API throttle protection
-
-Input Validation: Strict request validation
-
-SQL Injection Prevention: Eloquent ORM protection
+APPOINTMENT_BOOKED (Scheduling)
 
 🧪 Testing
 bash
+
 # Run all tests
+
 php artisan test
 
-# Run specific test suite
+# Run specific suite
+
 php artisan test --testsuite=Feature
-php artisan test --testsuite=Unit
-
-# With coverage (requires XDebug)
-php artisan test --coverage
-📊 Business Logic Highlights
-Invoice Status Calculation
-php
-// Auto-calculated based on payments
-- unpaid    (total_paid = 0)
-- partial   (0 < total_paid < total)
-- paid      (total_paid >= total)
-Refund Protection
-Prevents over-refunding
-
-Tracks refund per payment
-
-Auto-updates available balances
-
-Maintains ledger consistency
-
-Double-Entry Validation
-sql
--- Every transaction maintains balance
-SELECT SUM(debit) - SUM(credit)
-FROM journal_lines
-WHERE journal_entry_id = ?
--- Must equal 0
-🚦 Error Handling
-Standardized JSON responses:
-
-json
-{
-  "success": false,
-  "message": "Error description",
-  "errors": {
-    "field": ["Validation error"]
-  }
-}
 📈 Performance Optimizations
-Eager Loading: Prevents N+1 queries
+Eager Loading: Prevents N+1 query issues.
 
-Caching: Config caching for routes/config
+Pagination: Standardized 15-20 items per page.
 
-Pagination: All list endpoints paginated
+Queue Worker: Database queue for async broadcasting.
 
-Indexed Columns: Optimized database indexes
+Indexed Columns: Optimized for multi-tenant queries.
 
-🔧 Configuration
-Environment Variables
-env
-APP_NAME="Caffeine Cove API"
-APP_ENV=production
-APP_DEBUG=false
-APP_URL=http://localhost
+🛣️ Roadmap
+Core Accounting & Clinic Modules
 
-SANCTUM_STATEFUL_DOMAINS=localhost:3000
-SESSION_DOMAIN=localhost
-CORS Setup
-php
-// config/cors.php
-'paths' => ['api/*'],
-'allowed_origins' => ['http://localhost:3000'],
-🤝 Integration Guide
-For Frontend Developers
-Base URL: http://localhost:8000/api
+Multi-Tenant Architecture
 
-Authentication: Bearer token in headers
+Private Channel Broadcasting
 
-All requests require Accept: application/json
+System Alerts & Activity Logs
 
-Pagination metadata in response headers
+Automated Appointment Reminders (Cron Jobs)
 
-Example Request (JavaScript)
-javascript
-const response = await fetch('http://localhost:8000/api/orders', {
-  headers: {
-    'Authorization': `Bearer ${token}`,
-    'Accept': 'application/json'
-  }
-})
-📝 API Response Format
-Success Response
-json
-{
-  "success": true,
-  "data": {},
-  "message": "Operation successful"
-}
-Paginated Response
-json
-{
-  "data": [],
-  "links": {},
-  "meta": {
-    "current_page": 1,
-    "last_page": 10,
-    "per_page": 15,
-    "total": 150
-  }
-}
-🐛 Known Issues & Limitations
-Rate limiting per user not implemented
+PDF Invoice Generation
 
-File export (PDF/Excel) pending
+Swagger/OpenAPI Documentation
 
-Webhook notifications not included
+💼 Why This Project Matters
+This API demonstrates production-level backend engineering:
 
-🗺️ Roadmap
-Core CRUD operations
+Strict Financial Consistency: Balanced journal entries and ledger tracking.
 
-Authentication & Authorization
+Secure Real-Time Communication: Authenticated private WebSockets.
 
-Payment & Refund Engine
-
-Double-Entry Accounting
-
-Unit & Feature Tests (80%+ coverage)
-
-API Documentation (Swagger/OpenAPI)
-
-OAuth2 Support
-
-Webhook System
-
-GraphQL Support (optional)
-
-🤝 Contributing
-Fork the repository
-
-Create feature branch (git checkout -b feature/amazing)
-
-Commit changes (git commit -m 'Add amazing feature')
-
-Push branch (git push origin feature/amazing)
-
-Open Pull Request
-
-Coding Standards
-PSR-12 coding style
-
-DocBlocks for all methods
-
-Feature tests for new endpoints
-
-Update API documentation
-
-📄 License
-MIT License - feel free to use in your projects
+Scalable Multi-Tenancy: Ready for hundreds of clinics on a single server.
 
 👨‍💻 Author
 Mohamed Berik
 Full Stack Developer
-GitHub | LinkedIn
-
-🙏 Acknowledgments
-Laravel community
-
-Double-entry accounting principles
-
-Open source ERP systems inspiration
-
-⭐ Found this helpful? Star the repository!
-🐛 Found a bug? Open an issue
-```
+Laravel | React | REST APIs | ERP Systems | Real-Time Applications
