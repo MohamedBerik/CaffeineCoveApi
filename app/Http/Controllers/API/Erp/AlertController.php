@@ -9,17 +9,26 @@ use Illuminate\Http\Request;
 class AlertController extends Controller
 {
     // ✅ دالة جلب الإشعارات
-    public function index()
+    public function index(Request $request)
     {
-        $alerts = SystemAlert::where('company_id', auth()->user()->company_id)
-            // ->where(function ($query) {
-            //     $query->where('user_id', auth()->id())
-            //         ->orWhereNull('user_id');
-            // })
+        $query = SystemAlert::where('company_id', auth()->user()->company_id);
+
+        // ✅ Filter
+        if ($request->filter === 'unread') {
+            $query->whereNull('acknowledged_at');
+        }
+
+        if ($request->filter === 'high') {
+            $query->where('priority', 'high');
+        }
+
+        // ✅ Pagination (IMPORTANT)
+        $alerts = $query
             ->latest('triggered_at')
-            ->take(20)
-            ->get()
-            ->map(function ($alert) {
+            ->paginate(20);
+
+        return response()->json([
+            'data' => collect($alerts->items())->map(function ($alert) {
                 return [
                     'id' => $alert->id,
                     'message' => $alert->message,
@@ -29,9 +38,13 @@ class AlertController extends Controller
                     'time' => $alert->triggered_at,
                     'read' => $alert->acknowledged_at !== null,
                 ];
-            });
-
-        return response()->json($alerts);
+            }),
+            'meta' => [
+                'current_page' => $alerts->currentPage(),
+                'last_page' => $alerts->lastPage(),
+                'has_more' => $alerts->hasMorePages(),
+            ]
+        ]);
     }
 
     // ✅ دالة جلب عدد الإشعارات غير المقروءة
@@ -57,6 +70,17 @@ class AlertController extends Controller
         $alert->update([
             'acknowledged_at' => now()
         ]);
+
+        return response()->json(['status' => 'ok']);
+    }
+
+    public function markAllRead()
+    {
+        SystemAlert::where('company_id', auth()->user()->company_id)
+            ->whereNull('acknowledged_at')
+            ->update([
+                'acknowledged_at' => now()
+            ]);
 
         return response()->json(['status' => 'ok']);
     }

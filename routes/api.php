@@ -277,6 +277,7 @@ Route::prefix('erp')
         Route::middleware('permission:finance.view')
             ->post('/alerts/{id}/ack', [AlertController::class, 'acknowledge']);
 
+        Route::post('/alerts/mark-all-read', [AlertController::class, 'markAllRead']);
         /*
         |--------------------------------------------------------------------------
         | Appointments
