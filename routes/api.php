@@ -39,6 +39,7 @@ use App\Http\Controllers\API\Erp\ErpDashboardController;
 use App\Http\Controllers\API\Erp\PatientProfileController;
 use App\Http\Controllers\API\Erp\PatientTimelineController;
 use App\Http\Controllers\API\Erp\ProcedureController;
+use App\Http\Controllers\API\Erp\RadiologyController;
 use App\Http\Controllers\API\SaaS\ClinicOnboardingController;
 use App\Http\Controllers\API\SaaS\TenantController;
 use Illuminate\Support\Facades\Broadcast;
@@ -419,6 +420,10 @@ Route::prefix('erp')
         Route::middleware('permission:patients.view')
             ->get('/customers/{customerId}/timeline', [PatientTimelineController::class, 'index']);
 
+        Route::get('/patient-radiologies', [RadiologyController::class, 'index']);
+        Route::post('/patient-radiologies', [RadiologyController::class, 'store']);
+        Route::get('/patient-radiologies/{id}', [RadiologyController::class, 'show']);
+        Route::delete('/patient-radiologies/{id}', [RadiologyController::class, 'destroy']);
         /*
         |--------------------------------------------------------------------------
         | DentalRecord
