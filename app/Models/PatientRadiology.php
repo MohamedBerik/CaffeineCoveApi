@@ -30,6 +30,9 @@ class PatientRadiology extends Model
         'captured_at' => 'datetime',
     ];
 
+    // ✅ إضافة file_url تلقائياً في الـ JSON
+    protected $appends = ['file_url'];
+
     // Relationships
     public function company()
     {
@@ -46,14 +49,13 @@ class PatientRadiology extends Model
         return $this->belongsTo(DentalRecord::class, 'dental_record_id');
     }
 
-    // ✅ Accessor for full image URL - معدل
+    // ✅ Accessor for full image URL
     public function getFileUrlAttribute()
     {
         if (!$this->file_path) {
             return null;
         }
 
-        // تأكد من وجود الـ file في التخزين
         if (!Storage::disk('public')->exists($this->file_path)) {
             return null;
         }

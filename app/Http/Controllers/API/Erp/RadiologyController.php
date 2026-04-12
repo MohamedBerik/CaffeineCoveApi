@@ -24,11 +24,6 @@ class RadiologyController extends Controller
 
         $radiologies = $query->get();
 
-        // ✅ إضافة file_url لكل عنصر
-        $radiologies->each(function ($radiology) {
-            $radiology->file_url = $radiology->getFileUrlAttribute();
-        });
-
         return response()->json([
             'status' => 200,
             'data' => $radiologies,
@@ -72,30 +67,29 @@ class RadiologyController extends Controller
 
         $directory = "radiology/{$companyId}/{$request->customer_id}";
 
-        // ✅ المسار الكامل
-        $fullPath = storage_path("app/public/{$directory}");
-
         Log::info('Upload attempt', [
             'directory' => $directory,
-            'full_path' => $fullPath,
             'file_name' => $fileName,
         ]);
 
-        // ✅ إنشاء المجلد إذا لم يكن موجوداً
-        if (!file_exists($fullPath)) {
-            mkdir($fullPath, 0777, true);
-            Log::info('Created directory: ' . $fullPath);
+        // ✅ استخدام Storage::makeDirectory بدل mkdir يدوي
+        if (!Storage::disk('public')->exists($directory)) {
+            Storage::disk('public')->makeDirectory($directory);
+            Log::info('Created directory: ' . $directory);
         }
 
-        // ✅ نقل الملف (الطريقة اليدوية)
-        $file->move($fullPath, $fileName);
-        $filePath = "{$directory}/{$fileName}";
+        // ✅ استخدام storeAs بدل move (الأفضل لـ Laravel)
+        $filePath = $file->storeAs($directory, $fileName, 'public');
 
-        Log::info('File saved', [
-            'file_path' => $filePath,
-            'full_path' => $fullPath . '/' . $fileName,
-            'exists' => file_exists($fullPath . '/' . $fileName)
-        ]);
+        if (!$filePath) {
+            Log::error('Failed to save file', ['directory' => $directory, 'file_name' => $fileName]);
+            return response()->json([
+                'status' => 500,
+                'message' => 'Failed to save file',
+            ], 500);
+        }
+
+        Log::info('File saved successfully', ['path' => $filePath]);
 
         $radiology = PatientRadiology::create([
             'company_id' => $companyId,
