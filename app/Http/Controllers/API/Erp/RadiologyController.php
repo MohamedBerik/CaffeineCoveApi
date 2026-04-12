@@ -16,7 +16,6 @@ class RadiologyController extends Controller
         $companyId = $request->user()->company_id;
         $customerId = $request->customer_id;
 
-        // ✅ إضافة التحقق الأمني
         $query = PatientRadiology::query()
             ->where('company_id', $companyId)
             ->where('customer_id', $customerId)
@@ -51,19 +50,36 @@ class RadiologyController extends Controller
         ]);
 
         if ($validator->fails()) {
-            return response()->json(['status' => 422, 'errors' => $validator->errors()], 422);
+            return response()->json([
+                'status' => 422,
+                'errors' => $validator->errors(),
+            ], 422);
         }
 
         if (!$request->hasFile('file')) {
-            return response()->json(['status' => 400, 'message' => 'No file uploaded'], 400);
+            return response()->json([
+                'status' => 400,
+                'message' => 'No file uploaded',
+            ], 400);
         }
 
         $file = $request->file('file');
-        $fileName = time() . '_' . preg_replace('/[^a-zA-Z0-9._-]/', '_', $file->getClientOriginalName());
+
+        // ✅ تنظيف اسم الملف
+        $originalName = pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME);
+        $extension = $file->getClientOriginalExtension();
+        $fileName = time() . '_' . preg_replace('/[^a-zA-Z0-9]/', '_', $originalName) . '.' . $extension;
+
         $directory = "radiology/{$companyId}/{$request->customer_id}";
 
         // ✅ المسار الكامل
         $fullPath = storage_path("app/public/{$directory}");
+
+        Log::info('Upload attempt', [
+            'directory' => $directory,
+            'full_path' => $fullPath,
+            'file_name' => $fileName,
+        ]);
 
         // ✅ إنشاء المجلد إذا لم يكن موجوداً
         if (!file_exists($fullPath)) {
@@ -71,14 +87,14 @@ class RadiologyController extends Controller
             Log::info('Created directory: ' . $fullPath);
         }
 
-        // ✅ نقل الملف (طريقة يدوية)
+        // ✅ نقل الملف (الطريقة اليدوية)
         $file->move($fullPath, $fileName);
         $filePath = "{$directory}/{$fileName}";
 
         Log::info('File saved', [
-            'full_path' => $fullPath . '/' . $fileName,
             'file_path' => $filePath,
-            'file_exists' => file_exists($fullPath . '/' . $fileName)
+            'full_path' => $fullPath . '/' . $fileName,
+            'exists' => file_exists($fullPath . '/' . $fileName)
         ]);
 
         $radiology = PatientRadiology::create([
@@ -96,7 +112,7 @@ class RadiologyController extends Controller
 
         return response()->json([
             'status' => 201,
-            'message' => 'Uploaded successfully',
+            'message' => 'Radiology uploaded successfully',
             'data' => $radiology,
         ], 201);
     }
