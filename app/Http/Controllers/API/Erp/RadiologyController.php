@@ -51,10 +51,7 @@ class RadiologyController extends Controller
         ]);
 
         if ($validator->fails()) {
-            return response()->json([
-                'status' => 422,
-                'errors' => $validator->errors(),
-            ], 422);
+            return response()->json(['status' => 422, 'errors' => $validator->errors()], 422);
         }
 
         if (!$request->hasFile('file')) {
@@ -71,13 +68,18 @@ class RadiologyController extends Controller
         // ✅ إنشاء المجلد إذا لم يكن موجوداً
         if (!file_exists($fullPath)) {
             mkdir($fullPath, 0777, true);
+            Log::info('Created directory: ' . $fullPath);
         }
 
-        // ✅ نقل الملف
+        // ✅ نقل الملف (طريقة يدوية)
         $file->move($fullPath, $fileName);
         $filePath = "{$directory}/{$fileName}";
 
-        Log::info('File saved', ['path' => $filePath, 'full_path' => $fullPath . '/' . $fileName]);
+        Log::info('File saved', [
+            'full_path' => $fullPath . '/' . $fileName,
+            'file_path' => $filePath,
+            'file_exists' => file_exists($fullPath . '/' . $fileName)
+        ]);
 
         $radiology = PatientRadiology::create([
             'company_id' => $companyId,
