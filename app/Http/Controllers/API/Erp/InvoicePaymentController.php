@@ -11,6 +11,7 @@ use App\Models\PaymentRefund;
 use App\Services\AccountingService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use App\Events\DashboardUpdated;
 
 class InvoicePaymentController extends Controller
 {
@@ -186,6 +187,16 @@ class InvoicePaymentController extends Controller
             }
 
             $invoice->update(['status' => $status]);
+
+            // ✅ بث حدث تحديث الداشبورد
+            event(new DashboardUpdated(
+                $companyId,
+                'payment_created',
+                [
+                    'today_revenue' => $applied,
+                    'month_revenue' => $applied,
+                ]
+            ));
 
             return response()->json([
                 'msg'            => 'Payment recorded successfully',

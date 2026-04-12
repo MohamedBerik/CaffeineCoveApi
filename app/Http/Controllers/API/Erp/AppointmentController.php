@@ -26,6 +26,7 @@ use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use App\Traits\ValidatesAppointments;
 use App\Traits\HandlesAppointmentReminders;
+use App\Events\DashboardUpdated;
 
 class AppointmentController extends Controller
 {
@@ -490,6 +491,15 @@ class AppointmentController extends Controller
             ...$this->markReminderNotNeeded(),
         ]);
 
+        event(new DashboardUpdated(
+            $companyId,
+            'appointment_cancelled',
+            [
+                'cancelled_today_count' => 1,
+                'scheduled_today_count' => -1,
+            ]
+        ));
+
         ActivityLogger::log(
             $companyId,
             $request->user(),
@@ -543,6 +553,15 @@ class AppointmentController extends Controller
             'status' => 'no_show',
             ...$this->markReminderNotNeeded(),
         ]);
+
+        event(new DashboardUpdated(
+            $companyId,
+            'appointment_no_show',
+            [
+                'no_show_today_count' => 1,
+                'scheduled_today_count' => -1,
+            ]
+        ));
 
         ActivityLogger::log(
             $companyId,
@@ -917,6 +936,15 @@ class AppointmentController extends Controller
                 ]
             );
 
+            event(new DashboardUpdated(
+                $companyId,
+                'appointment_created',
+                [
+                    'today_appointments_count' => 1,
+                    'scheduled_today_count' => 1,
+                ]
+            ));
+
             return response()->json([
                 'msg' => 'Appointment booked',
                 'status' => 201,
@@ -1078,6 +1106,15 @@ class AppointmentController extends Controller
                     ...$this->markReminderNotNeeded(),
                     ...$this->initFollowUp(),
                 ]);
+
+                event(new DashboardUpdated(
+                    $companyId,
+                    'appointment_completed',
+                    [
+                        'completed_today_count' => 1,
+                        'scheduled_today_count' => -1,
+                    ]
+                ));
 
                 ActivityLogger::log(
                     $companyId,
@@ -1333,6 +1370,15 @@ class AppointmentController extends Controller
                         $dentalRecordCreated = true;
                     }
                 }
+
+                event(new DashboardUpdated(
+                    $companyId,
+                    'appointment_completed',
+                    [
+                        'completed_today_count' => 1,
+                        'scheduled_today_count' => -1,
+                    ]
+                ));
 
                 ActivityLogger::log(
                     $companyId,
