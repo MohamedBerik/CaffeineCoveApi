@@ -37,8 +37,8 @@ class RadiologyController extends Controller
         $validator = Validator::make($request->all(), [
             'customer_id' => 'required|exists:customers,id',
             'title' => 'required|string|max:255',
-            'file' => 'required|image|mimes:jpeg,png,jpg,gif|max:5120', // 5MB max
-            'file_type' => 'nullable|string|in:xray,panorama,cbct,cephalometric,other',
+            'file' => 'required|image|mimes:jpeg,png,jpg,gif,pdf,doc,docx|max:10240',
+            'file_type' => 'nullable|string|in:xray,panorama,cbct,cephalometric,report,consent,other',
             'tooth_number' => 'nullable|string|max:10',
             'captured_at' => 'nullable|date',
             'notes' => 'nullable|string',
