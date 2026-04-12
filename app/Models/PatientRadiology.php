@@ -1,18 +1,17 @@
 <?php
-// app/Models/PatientRadiology.php
 
 namespace App\Models;
 
 use App\Models\Concerns\BelongsToCompanyTrait;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 
 class PatientRadiology extends Model
 {
     use HasFactory;
     use BelongsToCompanyTrait;
-
 
     protected $fillable = [
         'company_id',
@@ -28,7 +27,7 @@ class PatientRadiology extends Model
     ];
 
     protected $casts = [
-        'captured_at' => 'date',
+        'captured_at' => 'datetime',
     ];
 
     // Relationships
@@ -47,12 +46,18 @@ class PatientRadiology extends Model
         return $this->belongsTo(DentalRecord::class, 'dental_record_id');
     }
 
-    // Accessor for full image URL
+    // ✅ Accessor for full image URL - معدل
     public function getFileUrlAttribute()
     {
         if (!$this->file_path) {
             return null;
         }
+
+        // تأكد من وجود الـ file في التخزين
+        if (!Storage::disk('public')->exists($this->file_path)) {
+            return null;
+        }
+
         return Storage::disk('public')->url($this->file_path);
     }
 
@@ -64,6 +69,7 @@ class PatientRadiology extends Model
         static::deleting(function ($radiology) {
             if ($radiology->file_path && Storage::disk('public')->exists($radiology->file_path)) {
                 Storage::disk('public')->delete($radiology->file_path);
+                Log::info('File deleted: ' . $radiology->file_path);
             }
         });
     }
