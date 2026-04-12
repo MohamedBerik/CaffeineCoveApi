@@ -40,11 +40,10 @@ class RadiologyController extends Controller
     {
         $companyId = $request->user()->company_id;
 
-        // ✅ تعديل الـ validation لدعم الصور والملفات
         $validator = Validator::make($request->all(), [
             'customer_id' => 'required|exists:customers,id',
             'title' => 'required|string|max:255',
-            'file' => 'required|file|mimes:jpeg,png,jpg,gif,pdf|max:10240', // دعم PDF والصور
+            'file' => 'required|file|mimes:jpeg,png,jpg,gif,pdf|max:10240',
             'file_type' => 'nullable|string|in:xray,panorama,cbct,cephalometric,report,consent,other',
             'tooth_number' => 'nullable|string|max:10',
             'captured_at' => 'nullable|date',
@@ -58,49 +57,28 @@ class RadiologyController extends Controller
             ], 422);
         }
 
-        // ✅ التحقق من وجود الملف
         if (!$request->hasFile('file')) {
-            return response()->json([
-                'status' => 400,
-                'message' => 'No file uploaded',
-            ], 400);
+            return response()->json(['status' => 400, 'message' => 'No file uploaded'], 400);
         }
 
         $file = $request->file('file');
-
-        // ✅ التحقق من صحة الملف
-        if (!$file->isValid()) {
-            return response()->json([
-                'status' => 400,
-                'message' => 'File is not valid: ' . $file->getError(),
-            ], 400);
-        }
-
-        // ✅ تنظيف اسم الملف
         $fileName = time() . '_' . preg_replace('/[^a-zA-Z0-9._-]/', '_', $file->getClientOriginalName());
         $directory = "radiology/{$companyId}/{$request->customer_id}";
 
-        Log::info('Upload attempt', [
-            'directory' => $directory,
-            'file_name' => $fileName,
-            'file_size' => $file->getSize(),
-            'file_mime' => $file->getMimeType(),
-        ]);
+        // ✅ المسار الكامل
+        $fullPath = storage_path("app/public/{$directory}");
 
-        // ✅ حفظ الملف
-        $filePath = $file->storeAs($directory, $fileName, 'public');
-
-        if (!$filePath) {
-            Log::error('Failed to save file', ['directory' => $directory, 'file_name' => $fileName]);
-            return response()->json([
-                'status' => 500,
-                'message' => 'Failed to save file',
-            ], 500);
+        // ✅ إنشاء المجلد إذا لم يكن موجوداً
+        if (!file_exists($fullPath)) {
+            mkdir($fullPath, 0777, true);
         }
 
-        Log::info('File saved successfully', ['path' => $filePath]);
+        // ✅ نقل الملف
+        $file->move($fullPath, $fileName);
+        $filePath = "{$directory}/{$fileName}";
 
-        // ✅ حفظ في قاعدة البيانات
+        Log::info('File saved', ['path' => $filePath, 'full_path' => $fullPath . '/' . $fileName]);
+
         $radiology = PatientRadiology::create([
             'company_id' => $companyId,
             'customer_id' => $request->customer_id,
@@ -114,14 +92,10 @@ class RadiologyController extends Controller
             'notes' => $request->notes,
         ]);
 
-        // ✅ إضافة file_url للـ response
-        $data = $radiology->toArray();
-        $data['file_url'] = $radiology->getFileUrlAttribute();
-
         return response()->json([
             'status' => 201,
-            'message' => 'Radiology image uploaded successfully',
-            'data' => $data,
+            'message' => 'Uploaded successfully',
+            'data' => $radiology,
         ], 201);
     }
 
