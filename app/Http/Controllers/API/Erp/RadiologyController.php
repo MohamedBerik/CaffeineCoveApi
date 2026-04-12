@@ -6,6 +6,7 @@ namespace App\Http\Controllers\API\Erp;
 use App\Http\Controllers\Controller;
 use App\Models\PatientRadiology;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 
@@ -34,10 +35,11 @@ class RadiologyController extends Controller
     {
         $companyId = $request->user()->company_id;
 
+        // تعديل الـ validation
         $validator = Validator::make($request->all(), [
             'customer_id' => 'required|exists:customers,id',
             'title' => 'required|string|max:255',
-            'file' => 'required|image|mimes:jpeg,png,jpg,gif,pdf,doc,docx|max:10240',
+            'file' => 'required|file|mimes:jpeg,png,jpg,gif,pdf,doc,docx|max:10240', // إزالة 'image'
             'file_type' => 'nullable|string|in:xray,panorama,cbct,cephalometric,report,consent,other',
             'tooth_number' => 'nullable|string|max:10',
             'captured_at' => 'nullable|date',
@@ -51,11 +53,42 @@ class RadiologyController extends Controller
             ], 422);
         }
 
+        // أضف debugging
+        Log::info('Upload attempt', [
+            'has_file' => $request->hasFile('file'),
+            'file_name' => $request->hasFile('file') ? $request->file('file')->getClientOriginalName() : null,
+        ]);
+
         // Handle file upload
         if ($request->hasFile('file')) {
             $file = $request->file('file');
-            $fileName = time() . '_' . $file->getClientOriginalName();
-            $filePath = $file->storeAs("radiology/{$companyId}/{$request->customer_id}", $fileName, 'public');
+
+            // تأكد من صحة الملف
+            if (!$file->isValid()) {
+                return response()->json([
+                    'status' => 400,
+                    'message' => 'File is not valid: ' . $file->getError(),
+                ], 400);
+            }
+
+            $fileName = time() . '_' . str_replace(' ', '_', $file->getClientOriginalName());
+            $directory = "radiology/{$companyId}/{$request->customer_id}";
+
+            Log::info('Saving file', [
+                'directory' => $directory,
+                'file_name' => $fileName
+            ]);
+
+            $filePath = $file->storeAs($directory, $fileName, 'public');
+
+            if (!$filePath) {
+                return response()->json([
+                    'status' => 500,
+                    'message' => 'Failed to save file',
+                ], 500);
+            }
+
+            Log::info('File saved successfully', ['path' => $filePath]);
         } else {
             return response()->json([
                 'status' => 400,
@@ -80,6 +113,7 @@ class RadiologyController extends Controller
             'status' => 201,
             'message' => 'Radiology image uploaded successfully',
             'data' => $radiology,
+            'file_url' => Storage::disk('public')->url($filePath),
         ], 201);
     }
 
