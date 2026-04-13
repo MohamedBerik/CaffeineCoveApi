@@ -8,7 +8,6 @@ use App\Models\Customer;
 use App\Models\Invoice;
 use App\Models\Payment;
 use App\Models\SystemAlert;
-use App\Services\ReminderAlertService;
 use App\Services\InsightService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -17,39 +16,86 @@ use Illuminate\Support\Facades\Cache;
 
 class ErpDashboardController extends Controller
 {
-
     public function index(Request $request)
     {
         $companyId = $request->user()->company_id;
-
-        $today = Carbon::today();
-        $monthStart = $today->copy()->startOfMonth();
-        $monthEnd = $today->copy()->endOfMonth();
+        $range = $request->get('range', 'day'); // day, week, month
 
         $data = Cache::remember(
-            "dashboard_{$companyId}",
-            60, // ⏱️ ثانية
-            function () use ($companyId, $today, $monthStart, $monthEnd) {
+            "dashboard_{$companyId}_{$range}",
+            60,
+            function () use ($companyId, $range) {
+                $dateRange = $this->getDateRange($range);
+
+                // Current Period
+                $currentStart = $dateRange['current_start'];
+                $currentEnd = $dateRange['current_end'];
+
+                // Previous Period
+                $previousStart = $dateRange['previous_start'];
+                $previousEnd = $dateRange['previous_end'];
 
                 // =================================================
                 // 1. Patients
                 // =================================================
-                $totalPatients = Customer::query()
+                $totalPatientsCurrent = Customer::query()
                     ->where('company_id', $companyId)
+                    ->whereBetween('created_at', [$currentStart, $currentEnd])
+                    ->count();
+
+                $totalPatientsPrevious = Customer::query()
+                    ->where('company_id', $companyId)
+                    ->whereBetween('created_at', [$previousStart, $previousEnd])
                     ->count();
 
                 // =================================================
                 // 2. Appointments
                 // =================================================
-                $todayAppointmentsQuery = Appointment::query()
+                $appointmentsCurrent = Appointment::query()
                     ->where('company_id', $companyId)
-                    ->whereDate('appointment_date', $today);
+                    ->whereBetween('appointment_date', [$currentStart, $currentEnd])
+                    ->count();
 
-                $todayAppointmentsCount = (clone $todayAppointmentsQuery)->count();
-                $scheduledTodayCount = (clone $todayAppointmentsQuery)->where('status', 'scheduled')->count();
-                $completedTodayCount = (clone $todayAppointmentsQuery)->where('status', 'completed')->count();
-                $cancelledTodayCount = (clone $todayAppointmentsQuery)->where('status', 'cancelled')->count();
-                $noShowTodayCount = (clone $todayAppointmentsQuery)->where('status', 'no_show')->count();
+                $appointmentsPrevious = Appointment::query()
+                    ->where('company_id', $companyId)
+                    ->whereBetween('appointment_date', [$previousStart, $previousEnd])
+                    ->count();
+
+                $completedCurrent = Appointment::query()
+                    ->where('company_id', $companyId)
+                    ->whereBetween('appointment_date', [$currentStart, $currentEnd])
+                    ->where('status', 'completed')
+                    ->count();
+
+                $completedPrevious = Appointment::query()
+                    ->where('company_id', $companyId)
+                    ->whereBetween('appointment_date', [$previousStart, $previousEnd])
+                    ->where('status', 'completed')
+                    ->count();
+
+                $cancelledCurrent = Appointment::query()
+                    ->where('company_id', $companyId)
+                    ->whereBetween('appointment_date', [$currentStart, $currentEnd])
+                    ->where('status', 'cancelled')
+                    ->count();
+
+                $cancelledPrevious = Appointment::query()
+                    ->where('company_id', $companyId)
+                    ->whereBetween('appointment_date', [$previousStart, $previousEnd])
+                    ->where('status', 'cancelled')
+                    ->count();
+
+                $noShowCurrent = Appointment::query()
+                    ->where('company_id', $companyId)
+                    ->whereBetween('appointment_date', [$currentStart, $currentEnd])
+                    ->where('status', 'no_show')
+                    ->count();
+
+                $noShowPrevious = Appointment::query()
+                    ->where('company_id', $companyId)
+                    ->whereBetween('appointment_date', [$previousStart, $previousEnd])
+                    ->where('status', 'no_show')
+                    ->count();
 
                 $recentAppointments = Appointment::query()
                     ->where('company_id', $companyId)
@@ -60,77 +106,16 @@ class ErpDashboardController extends Controller
                     ->get();
 
                 // =================================================
-                // 3. Reminders
+                // 3. Revenue
                 // =================================================
-                $reminderStats = Appointment::query()
+                $revenueCurrent = (float) Payment::query()
                     ->where('company_id', $companyId)
-                    ->selectRaw("
-                    COUNT(*) as total,
-                    SUM(reminder_status = 'pending') as pending,
-                    SUM(reminder_status = 'processing') as processing,
-                    SUM(reminder_status = 'sent') as sent,
-                    SUM(reminder_status = 'failed') as failed,
-                    SUM(reminder_status = 'skipped') as skipped
-                ")
-                    ->first();
-
-                if (!$reminderStats) {
-                    $reminderStats = (object)[
-                        'total' => 0,
-                        'pending' => 0,
-                        'processing' => 0,
-                        'sent' => 0,
-                        'failed' => 0,
-                        'skipped' => 0
-                    ];
-                }
-
-                $stuckRemindersCount = Appointment::query()
-                    ->where('company_id', $companyId)
-                    ->where('reminder_status', 'processing')
-                    ->where('updated_at', '<', now()->subMinutes(10))
-                    ->count();
-
-                $successRate = $reminderStats->total > 0
-                    ? round(($reminderStats->sent / $reminderStats->total) * 100, 2)
-                    : 0;
-
-                $failedReminders = Appointment::query()
-                    ->where('company_id', $companyId)
-                    ->where('reminder_status', 'failed')
-                    ->orderByDesc('reminder_last_attempt_at')
-                    ->limit(5)
-                    ->get();
-
-                // =================================================
-                // 4. Invoices
-                // =================================================
-                $invoicesStats = Invoice::query()
-                    ->where('company_id', $companyId)
-                    ->selectRaw("
-                    SUM(status = 'unpaid') as unpaid,
-                    SUM(status = 'partially_paid') as partially_paid,
-                    SUM(status = 'paid') as paid
-                ")
-                    ->first();
-
-                $recentInvoices = Invoice::query()
-                    ->where('company_id', $companyId)
-                    ->latest()
-                    ->limit(5)
-                    ->get();
-
-                // =================================================
-                // 5. Revenue
-                // =================================================
-                $todayRevenue = (float) Payment::query()
-                    ->where('company_id', $companyId)
-                    ->whereDate('paid_at', $today)
+                    ->whereBetween('paid_at', [$currentStart, $currentEnd])
                     ->sum('applied_amount');
 
-                $monthRevenue = (float) Payment::query()
+                $revenuePrevious = (float) Payment::query()
                     ->where('company_id', $companyId)
-                    ->whereBetween('paid_at', [$monthStart, $monthEnd])
+                    ->whereBetween('paid_at', [$previousStart, $previousEnd])
                     ->sum('applied_amount');
 
                 $recentPayments = Payment::query()
@@ -140,63 +125,100 @@ class ErpDashboardController extends Controller
                     ->get();
 
                 // =================================================
-                // 6. Credits
+                // 4. Invoices
                 // =================================================
-                $creditIssued = (float) DB::table('customer_credits')
+                $unpaidCurrent = Invoice::query()
                     ->where('company_id', $companyId)
-                    ->where('type', 'credit')
-                    ->sum('amount');
+                    ->where('status', 'unpaid')
+                    ->whereBetween('issued_at', [$currentStart, $currentEnd])
+                    ->count();
 
-                $creditUsed = (float) DB::table('customer_credits')
+                $unpaidPrevious = Invoice::query()
                     ->where('company_id', $companyId)
-                    ->where('type', 'debit')
-                    ->sum('amount');
+                    ->where('status', 'unpaid')
+                    ->whereBetween('issued_at', [$previousStart, $previousEnd])
+                    ->count();
 
-                $netCreditBalance = $creditIssued - $creditUsed;
+                $paidCurrent = Invoice::query()
+                    ->where('company_id', $companyId)
+                    ->where('status', 'paid')
+                    ->whereBetween('issued_at', [$currentStart, $currentEnd])
+                    ->count();
+
+                $paidPrevious = Invoice::query()
+                    ->where('company_id', $companyId)
+                    ->where('status', 'paid')
+                    ->whereBetween('issued_at', [$previousStart, $previousEnd])
+                    ->count();
+
+                $recentInvoices = Invoice::query()
+                    ->where('company_id', $companyId)
+                    ->latest()
+                    ->limit(5)
+                    ->get();
 
                 // =================================================
-                // RETURN DATA
+                // KPIs with Comparison
                 // =================================================
-                $revenueChartData = $this->getRevenueChartData($companyId);
-                $appointmentsChartData = $this->getAppointmentsChartData($companyId);
+                $kpis = [
+                    'revenue' => [
+                        'current' => $revenueCurrent,
+                        'previous' => $revenuePrevious,
+                        'delta' => $this->calculateDelta($revenueCurrent, $revenuePrevious),
+                    ],
+                    'appointments' => [
+                        'current' => $appointmentsCurrent,
+                        'previous' => $appointmentsPrevious,
+                        'delta' => $this->calculateDelta($appointmentsCurrent, $appointmentsPrevious),
+                    ],
+                    'completed_appointments' => [
+                        'current' => $completedCurrent,
+                        'previous' => $completedPrevious,
+                        'delta' => $this->calculateDelta($completedCurrent, $completedPrevious),
+                    ],
+                    'cancelled_appointments' => [
+                        'current' => $cancelledCurrent,
+                        'previous' => $cancelledPrevious,
+                        'delta' => $this->calculateDelta($cancelledCurrent, $cancelledPrevious),
+                    ],
+                    'no_show_appointments' => [
+                        'current' => $noShowCurrent,
+                        'previous' => $noShowPrevious,
+                        'delta' => $this->calculateDelta($noShowCurrent, $noShowPrevious),
+                    ],
+                    'unpaid_invoices' => [
+                        'current' => $unpaidCurrent,
+                        'previous' => $unpaidPrevious,
+                        'delta' => $this->calculateDelta($unpaidCurrent, $unpaidPrevious),
+                    ],
+                    'paid_invoices' => [
+                        'current' => $paidCurrent,
+                        'previous' => $paidPrevious,
+                        'delta' => $this->calculateDelta($paidCurrent, $paidPrevious),
+                    ],
+                    'total_patients' => [
+                        'current' => $totalPatientsCurrent,
+                        'previous' => $totalPatientsPrevious,
+                        'delta' => $this->calculateDelta($totalPatientsCurrent, $totalPatientsPrevious),
+                    ],
+                ];
+
+                // =================================================
+                // Charts Data
+                // =================================================
+                $revenueChartData = $this->getRevenueChartData($companyId, $range);
+                $appointmentsChartData = $this->getAppointmentsChartData($companyId, $range);
 
                 return [
-                    'kpis' => [
-                        'today_appointments_count' => $todayAppointmentsCount,
-                        'scheduled_today_count' => $scheduledTodayCount,
-                        'completed_today_count' => $completedTodayCount,
-                        'cancelled_today_count' => $cancelledTodayCount,
-                        'no_show_today_count' => $noShowTodayCount,
-
-                        'reminders_pending' => $reminderStats->pending,
-                        'reminders_processing' => $reminderStats->processing,
-                        'reminders_sent' => $reminderStats->sent,
-                        'reminders_failed' => $reminderStats->failed,
-                        'reminders_skipped' => $reminderStats->skipped,
-                        'reminders_stuck' => $stuckRemindersCount,
-                        'reminders_success_rate' => $successRate,
-
-                        'unpaid_invoices_count' => $invoicesStats->unpaid,
-                        'partially_paid_invoices_count' => $invoicesStats->partially_paid,
-                        'paid_invoices_count' => $invoicesStats->paid,
-
-                        'today_revenue' => $todayRevenue,
-                        'month_revenue' => $monthRevenue,
-
-                        'credit_balance_total' => $netCreditBalance,
-                        'total_patients' => $totalPatients,
-                    ],
+                    'kpis' => $kpis,
                     'recent_appointments' => $recentAppointments,
                     'recent_invoices' => $recentInvoices,
                     'recent_payments' => $recentPayments,
-                    'reminders' => [
-                        'stats' => $reminderStats,
-                        'failed_recent' => $failedReminders,
-                    ],
                     'charts' => [
                         'revenue' => $revenueChartData,
                         'appointments' => $appointmentsChartData,
                     ],
+                    'range' => $range,
                 ];
             }
         );
@@ -204,7 +226,6 @@ class ErpDashboardController extends Controller
         $insights = app(InsightService::class)->getAllInsights($companyId);
         $data['insights'] = $insights;
 
-        // 👇 alerts برا الكاش
         $alerts = SystemAlert::query()
             ->where('company_id', $companyId)
             ->whereNull('resolved_at')
@@ -226,69 +247,122 @@ class ErpDashboardController extends Controller
             'status' => 200,
             'data' => [
                 ...$data,
-                'reminders' => [
-                    ...($data['reminders'] ?? []),
-                    'alerts' => $alerts,
-                ]
+                'reminders' => ['alerts' => $alerts],
             ],
         ]);
     }
 
     /**
-     * Get revenue chart data for last 7 days
+     * Get date range based on selected range
      */
-    private function getRevenueChartData($companyId): array
+    private function getDateRange($range): array
     {
+        $now = Carbon::now();
+        $yesterday = Carbon::yesterday();
+        $lastWeek = Carbon::now()->subWeek();
+        $lastMonth = Carbon::now()->subMonth();
+
+        return match ($range) {
+            'week' => [
+                'current_start' => $now->copy()->startOfWeek(),
+                'current_end' => $now->copy()->endOfWeek(),
+                'previous_start' => $lastWeek->copy()->startOfWeek(),
+                'previous_end' => $lastWeek->copy()->endOfWeek(),
+            ],
+            'month' => [
+                'current_start' => $now->copy()->startOfMonth(),
+                'current_end' => $now->copy()->endOfMonth(),
+                'previous_start' => $lastMonth->copy()->startOfMonth(),
+                'previous_end' => $lastMonth->copy()->endOfMonth(),
+            ],
+            default => [ // day
+                'current_start' => $now->copy()->startOfDay(),
+                'current_end' => $now->copy()->endOfDay(),
+                'previous_start' => $yesterday->copy()->startOfDay(),
+                'previous_end' => $yesterday->copy()->endOfDay(),
+            ],
+        };
+    }
+
+    /**
+     * Calculate delta percentage
+     */
+    private function calculateDelta($current, $previous): float
+    {
+        if ($previous == 0) {
+            return $current > 0 ? 100 : 0;
+        }
+        return round((($current - $previous) / $previous) * 100, 2);
+    }
+
+    /**
+     * Get revenue chart data
+     */
+    private function getRevenueChartData($companyId, $range): array
+    {
+        $dateRange = $this->getDateRange($range);
+        $start = $dateRange['current_start'];
+        $end = $dateRange['current_end'];
+
         $data = [];
-        for ($i = 6; $i >= 0; $i--) {
-            $date = Carbon::today()->subDays($i);
+        $current = $start->copy();
+
+        while ($current <= $end) {
             $revenue = (float) Payment::query()
                 ->where('company_id', $companyId)
-                ->whereDate('paid_at', $date)
+                ->whereDate('paid_at', $current)
                 ->sum('applied_amount');
 
             $data[] = [
-                'date' => $date->toDateString(),
+                'date' => $current->toDateString(),
                 'value' => $revenue,
-                'label' => $date->format('D'),
+                'label' => $current->format($range === 'month' ? 'M d' : 'D'),
             ];
+
+            $current->addDay();
         }
         return $data;
     }
 
     /**
-     * Get appointments chart data for last 7 days
+     * Get appointments chart data
      */
-    private function getAppointmentsChartData($companyId): array
+    private function getAppointmentsChartData($companyId, $range): array
     {
-        $data = [];
-        for ($i = 6; $i >= 0; $i--) {
-            $date = Carbon::today()->subDays($i);
+        $dateRange = $this->getDateRange($range);
+        $start = $dateRange['current_start'];
+        $end = $dateRange['current_end'];
 
+        $data = [];
+        $current = $start->copy();
+
+        while ($current <= $end) {
             $total = Appointment::query()
                 ->where('company_id', $companyId)
-                ->whereDate('appointment_date', $date)
+                ->whereDate('appointment_date', $current)
                 ->count();
 
             $completed = Appointment::query()
                 ->where('company_id', $companyId)
-                ->whereDate('appointment_date', $date)
+                ->whereDate('appointment_date', $current)
                 ->where('status', 'completed')
                 ->count();
 
             $cancelled = Appointment::query()
                 ->where('company_id', $companyId)
-                ->whereDate('appointment_date', $date)
+                ->whereDate('appointment_date', $current)
                 ->where('status', 'cancelled')
                 ->count();
 
             $data[] = [
-                'date' => $date->toDateString(),
-                'label' => $date->format('D'),
+                'date' => $current->toDateString(),
+                'label' => $current->format($range === 'month' ? 'M d' : 'D'),
                 'total' => $total,
                 'completed' => $completed,
                 'cancelled' => $cancelled,
             ];
+
+            $current->addDay();
         }
         return $data;
     }
