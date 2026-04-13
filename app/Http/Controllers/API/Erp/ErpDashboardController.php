@@ -9,11 +9,11 @@ use App\Models\Invoice;
 use App\Models\Payment;
 use App\Models\SystemAlert;
 use App\Services\ReminderAlertService;
+use App\Services\InsightService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
-use App\Services\InsightService;
 
 class ErpDashboardController extends Controller
 {
@@ -157,6 +157,9 @@ class ErpDashboardController extends Controller
                 // =================================================
                 // RETURN DATA
                 // =================================================
+                $revenueChartData = $this->getRevenueChartData($companyId);
+                $appointmentsChartData = $this->getAppointmentsChartData($companyId);
+
                 return [
                     'kpis' => [
                         'today_appointments_count' => $todayAppointmentsCount,
@@ -189,6 +192,10 @@ class ErpDashboardController extends Controller
                     'reminders' => [
                         'stats' => $reminderStats,
                         'failed_recent' => $failedReminders,
+                    ],
+                    'charts' => [
+                        'revenue' => $revenueChartData,
+                        'appointments' => $appointmentsChartData,
                     ],
                 ];
             }
@@ -225,5 +232,64 @@ class ErpDashboardController extends Controller
                 ]
             ],
         ]);
+    }
+
+    /**
+     * Get revenue chart data for last 7 days
+     */
+    private function getRevenueChartData($companyId): array
+    {
+        $data = [];
+        for ($i = 6; $i >= 0; $i--) {
+            $date = Carbon::today()->subDays($i);
+            $revenue = (float) Payment::query()
+                ->where('company_id', $companyId)
+                ->whereDate('paid_at', $date)
+                ->sum('applied_amount');
+
+            $data[] = [
+                'date' => $date->toDateString(),
+                'value' => $revenue,
+                'label' => $date->format('D'),
+            ];
+        }
+        return $data;
+    }
+
+    /**
+     * Get appointments chart data for last 7 days
+     */
+    private function getAppointmentsChartData($companyId): array
+    {
+        $data = [];
+        for ($i = 6; $i >= 0; $i--) {
+            $date = Carbon::today()->subDays($i);
+
+            $total = Appointment::query()
+                ->where('company_id', $companyId)
+                ->whereDate('appointment_date', $date)
+                ->count();
+
+            $completed = Appointment::query()
+                ->where('company_id', $companyId)
+                ->whereDate('appointment_date', $date)
+                ->where('status', 'completed')
+                ->count();
+
+            $cancelled = Appointment::query()
+                ->where('company_id', $companyId)
+                ->whereDate('appointment_date', $date)
+                ->where('status', 'cancelled')
+                ->count();
+
+            $data[] = [
+                'date' => $date->toDateString(),
+                'label' => $date->format('D'),
+                'total' => $total,
+                'completed' => $completed,
+                'cancelled' => $cancelled,
+            ];
+        }
+        return $data;
     }
 }

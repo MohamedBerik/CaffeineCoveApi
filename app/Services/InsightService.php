@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\Appointment;
 use App\Models\Payment;
+use App\Models\Invoice;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 
@@ -40,6 +41,10 @@ class InsightService
                 'category' => 'revenue',
                 'priority' => 'high',
                 'message' => "Revenue dropped by " . round(abs($change)) . "%",
+                'point' => [  // ✅ Anomaly Point
+                    'date' => $today->toDateString(),
+                    'value' => $todayRevenue,
+                ],
                 'meta' => [
                     'today_revenue' => $todayRevenue,
                     'yesterday_revenue' => $yesterdayRevenue,
@@ -84,6 +89,10 @@ class InsightService
                 'category' => 'appointments',
                 'priority' => 'medium',
                 'message' => "Missed appointments increased by " . round($change) . "%",
+                'point' => [  // ✅ أضف
+                    'date' => $today->toDateString(),
+                    'value' => $todayMissed,
+                ],
                 'meta' => [
                     'today_missed' => $todayMissed,
                     'yesterday_missed' => $yesterdayMissed,
@@ -117,6 +126,10 @@ class InsightService
                 'category' => 'invoices',
                 'priority' => 'medium',
                 'message' => "You have {$unpaidCount} unpaid invoices ({$overdueCount} overdue)",
+                'point' => [  // ✅ أضف
+                    'date' => Carbon::today()->toDateString(),
+                    'value' => $unpaidCount,
+                ],
                 'meta' => [
                     'unpaid_count' => $unpaidCount,
                     'overdue_count' => $overdueCount,
@@ -169,6 +182,7 @@ class InsightService
 
         // عكس الترتيب عشان يبقى من الأقدم للأحدث
         $revenues = array_reverse($revenues);
+        $dates = array_reverse($dates);
 
         // هل آخر 3 أيام (اليوم، أمس، قبل أمس) في تزايد؟
         $growing = true;
@@ -187,6 +201,10 @@ class InsightService
                 'category' => 'revenue',
                 'priority' => 'low',
                 'message' => "Revenue growing for 3 consecutive days (+" . round($growthPercent) . "%)",
+                'point' => [  // ✅ Anomaly Point
+                    'date' => $dates[2],
+                    'value' => $revenues[2],
+                ],
                 'meta' => [
                     'trend' => 'growing',
                     'days' => 3,
@@ -225,6 +243,10 @@ class InsightService
                 'category' => 'revenue',
                 'priority' => 'low',
                 'message' => "Expected revenue today: " . number_format($expectedToday) . " EGP",
+                'point' => [  // ✅ أضف
+                    'date' => Carbon::today()->toDateString(),
+                    'value' => $expectedToday,
+                ],
                 'meta' => [
                     'forecast' => $expectedToday,
                     'current' => $todayRevenue,
@@ -258,6 +280,10 @@ class InsightService
                 'category' => 'doctors',
                 'priority' => 'low',
                 'message' => "Dr. {$topDoctor->doctor_name} has highest completion rate today ({$topDoctor->completed_count} appointments)",
+                'point' => [  // ✅ أضف
+                    'date' => $today->toDateString(),
+                    'value' => $topDoctor->completed_count,
+                ],
                 'meta' => [
                     'doctor_id' => $topDoctor->doctor_id,
                     'doctor_name' => $topDoctor->doctor_name,
@@ -296,6 +322,10 @@ class InsightService
                     'category' => 'appointments',
                     'priority' => 'medium',
                     'message' => "High cancellation rate today: " . round($cancellationRate) . "% ({$cancelledToday}/{$totalToday})",
+                    'point' => [  // ✅ Anomaly Point
+                        'date' => $today->toDateString(),
+                        'value' => $cancelledToday,
+                    ],
                     'meta' => [
                         'cancellation_rate' => round($cancellationRate, 2),
                         'cancelled' => $cancelledToday,
