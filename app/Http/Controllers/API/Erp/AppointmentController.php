@@ -27,6 +27,8 @@ use Illuminate\Validation\ValidationException;
 use App\Traits\ValidatesAppointments;
 use App\Traits\HandlesAppointmentReminders;
 use App\Events\DashboardUpdated;
+use App\Services\InsightService;
+use App\Events\InsightGenerated;
 
 class AppointmentController extends Controller
 {
@@ -562,6 +564,11 @@ class AppointmentController extends Controller
                 'scheduled_today_count' => -1,
             ]
         ));
+
+        $insight = app(InsightService::class)->missedAppointmentsInsight($companyId);
+        if ($insight) {
+            event(new InsightGenerated($companyId, $insight));
+        }
 
         ActivityLogger::log(
             $companyId,

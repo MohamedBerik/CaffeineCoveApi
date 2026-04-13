@@ -12,6 +12,8 @@ use App\Services\AccountingService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use App\Events\DashboardUpdated;
+use App\Services\InsightService;
+use App\Events\InsightGenerated;
 
 class InvoicePaymentController extends Controller
 {
@@ -197,6 +199,11 @@ class InvoicePaymentController extends Controller
                     'month_revenue' => $applied,
                 ]
             ));
+
+            $insight = app(InsightService::class)->revenueInsight($companyId);
+            if ($insight) {
+                event(new InsightGenerated($companyId, $insight));
+            }
 
             return response()->json([
                 'msg'            => 'Payment recorded successfully',

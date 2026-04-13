@@ -13,6 +13,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
+use App\Services\InsightService;
 
 class ErpDashboardController extends Controller
 {
@@ -192,6 +193,9 @@ class ErpDashboardController extends Controller
                 ];
             }
         );
+
+        $insights = app(InsightService::class)->getAllInsights($companyId);
+        $data['insights'] = $insights;
 
         // 👇 alerts برا الكاش
         $alerts = SystemAlert::query()
