@@ -204,8 +204,8 @@ class ErpDashboardController extends Controller
      */
     private function getAppointmentsChartWithComparison($companyId, array $dateRanges, bool $compare): array
     {
-        // Get current period data
-        $currentData = $this->getAppointmentsSeries(
+        // Get current period data with status breakdown
+        $currentData = $this->getAppointmentsSeriesWithStatus(
             $companyId,
             $dateRanges['current']['start'],
             $dateRanges['current']['end'],
@@ -216,17 +216,16 @@ class ErpDashboardController extends Controller
             return $currentData;
         }
 
-        // Get previous period data
-        $previousData = $this->getAppointmentsSeries(
+        $previousData = $this->getAppointmentsSeriesWithStatus(
             $companyId,
             $dateRanges['previous']['start'],
             $dateRanges['previous']['end'],
             $dateRanges
         );
 
-        // Normalize both series to same length
         return $this->normalizeSeries($currentData, $previousData);
     }
+
 
     /**
      * Get revenue time series data
@@ -257,20 +256,37 @@ class ErpDashboardController extends Controller
     /**
      * Get appointments time series data
      */
-    private function getAppointmentsSeries($companyId, Carbon $start, Carbon $end, array $dateRanges): array
+    private function getAppointmentsSeriesWithStatus($companyId, Carbon $start, Carbon $end, array $dateRanges): array
     {
         $data = [];
         $current = $start->copy();
 
         while ($current <= $end) {
+            // Total appointments
             $total = Appointment::query()
                 ->where('company_id', $companyId)
                 ->whereDate('appointment_date', $current)
                 ->count();
 
+            // Completed appointments
+            $completed = Appointment::query()
+                ->where('company_id', $companyId)
+                ->whereDate('appointment_date', $current)
+                ->where('status', 'completed')
+                ->count();
+
+            // Cancelled appointments
+            $cancelled = Appointment::query()
+                ->where('company_id', $companyId)
+                ->whereDate('appointment_date', $current)
+                ->where('status', 'cancelled')
+                ->count();
+
             $data[] = [
                 'label' => $this->getLabelForDate($current, $dateRanges),
                 'value' => $total,
+                'completed' => $completed,
+                'cancelled' => $cancelled,
                 'date' => $current->toDateString(),
             ];
 
@@ -315,10 +331,17 @@ class ErpDashboardController extends Controller
         $normalized = [];
 
         for ($i = 0; $i < $maxLength; $i++) {
+            $currentItem = $current[$i] ?? [];
+            $previousItem = $previous[$i] ?? [];
+
             $normalized[] = [
-                'label' => $current[$i]['label'] ?? $previous[$i]['label'] ?? "Item {$i}",
-                'current' => $current[$i]['value'] ?? 0,
-                'previous' => $previous[$i]['value'] ?? 0,
+                'label' => $currentItem['label'] ?? $previousItem['label'] ?? "Item {$i}",
+                'current' => $currentItem['value'] ?? 0,
+                'previous' => $previousItem['value'] ?? 0,
+                // ✅ حفظ completed و cancelled لو موجودين
+                'completed' => $currentItem['completed'] ?? $previousItem['completed'] ?? 0,
+                'cancelled' => $currentItem['cancelled'] ?? $previousItem['cancelled'] ?? 0,
+                'date' => $currentItem['date'] ?? $previousItem['date'] ?? null,
             ];
         }
 
