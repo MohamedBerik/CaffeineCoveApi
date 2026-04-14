@@ -20,4 +20,14 @@ class Company extends Model
         'trial_ends_at' => 'datetime',
         'branding' => 'array',
     ];
+
+    public function users()
+    {
+        return $this->hasMany(User::class);
+    }
+
+    public function appointments()
+    {
+        return $this->hasMany(Appointment::class);
+    }
 }
