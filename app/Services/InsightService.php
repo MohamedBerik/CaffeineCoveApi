@@ -64,6 +64,11 @@ class InsightService
                     'date' => $today->toDateString(),
                     'value' => $todayRevenue,
                 ],
+                'action' => [  // ✅ أضف هذا
+                    'type' => 'navigate',
+                    'url' => '/admin/erp/reports?type=revenue&period=week',
+                    'label' => 'Analyze revenue drop'
+                ],
                 'meta' => [
                     'today_revenue' => $todayRevenue,
                     'yesterday_revenue' => $yesterdayRevenue,
@@ -112,6 +117,11 @@ class InsightService
                     'date' => $today->toDateString(),
                     'value' => $todayMissed,
                 ],
+                'action' => [  // ✅ أضف هذا
+                    'type' => 'navigate',
+                    'url' => '/admin/erp/appointments?status=no_show',
+                    'label' => 'View no-show appointments'
+                ],
                 'meta' => [
                     'today_missed' => $todayMissed,
                     'yesterday_missed' => $yesterdayMissed,
@@ -148,6 +158,11 @@ class InsightService
                 'point' => [  // ✅ أضف
                     'date' => Carbon::today()->toDateString(),
                     'value' => $unpaidCount,
+                ],
+                'action' => [  // ✅ أضف هذا
+                    'type' => 'navigate',
+                    'url' => '/admin/erp/invoices?status=unpaid',
+                    'label' => 'View unpaid invoices'
                 ],
                 'meta' => [
                     'unpaid_count' => $unpaidCount,
@@ -203,6 +218,11 @@ class InsightService
                     'date' => $dates[2],
                     'value' => $revenues[2],
                 ],
+                'action' => [  // ✅ أضف هذا
+                    'type' => 'navigate',
+                    'url' => '/admin/erp/reports?type=revenue&trend=growth',
+                    'label' => 'View revenue trend'
+                ],
                 'meta' => [
                     'trend' => 'growing',
                     'days' => 3,
@@ -245,6 +265,11 @@ class InsightService
                     'date' => Carbon::today()->toDateString(),
                     'value' => $expectedToday,
                 ],
+                'action' => [  // ✅ أضف هذا
+                    'type' => 'navigate',
+                    'url' => '/admin/erp/reports?type=revenue&view=forecast',
+                    'label' => 'View forecast details'
+                ],
                 'meta' => [
                     'forecast' => $expectedToday,
                     'current' => $todayRevenue,
@@ -281,6 +306,11 @@ class InsightService
                 'point' => [  // ✅ أضف
                     'date' => $today->toDateString(),
                     'value' => $topDoctor->completed_count,
+                ],
+                'action' => [  // ✅ أضف هذا
+                    'type' => 'navigate',
+                    'url' => "/admin/erp/doctors/{$topDoctor->doctor_id}/performance",
+                    'label' => 'View doctor performance'
                 ],
                 'meta' => [
                     'doctor_id' => $topDoctor->doctor_id,
@@ -323,6 +353,11 @@ class InsightService
                     'point' => [  // ✅ Anomaly Point
                         'date' => $today->toDateString(),
                         'value' => $cancelledToday,
+                    ],
+                    'action' => [  // ✅ أضف هذا
+                        'type' => 'navigate',
+                        'url' => '/admin/erp/appointments?status=cancelled',
+                        'label' => 'View cancelled appointments'
                     ],
                     'meta' => [
                         'cancellation_rate' => round($cancellationRate, 2),
