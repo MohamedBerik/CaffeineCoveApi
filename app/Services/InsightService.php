@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Appointment;
+use App\Models\Customer;
 use App\Models\Payment;
 use App\Models\Invoice;
 use Illuminate\Support\Carbon;
@@ -21,6 +22,8 @@ class InsightService
             $this->revenueForecastInsight($companyId), // ✅ أضف هنا
             $this->topDoctorInsight($companyId), // ✅ أضف هنا
             $this->highCancellationRateInsight($companyId), // ✅ أضف هنا
+            ...$this->getNoShowInsights($companyId),
+            ...$this->getPatientInsights($companyId),
 
 
 
@@ -55,6 +58,17 @@ class InsightService
 
         // Drop > 20% → insight
         if ($change < -20) {
+            $cancelledToday = Appointment::query()
+                ->where('company_id', $companyId)
+                ->whereDate('appointment_date', $today)
+                ->where('status', 'cancelled')
+                ->count();
+
+            $noShowToday = Appointment::query()
+                ->where('company_id', $companyId)
+                ->whereDate('appointment_date', $today)
+                ->where('status', 'no_show')
+                ->count();
             return [
                 'type' => 'insight',
                 'category' => 'revenue',
@@ -68,6 +82,16 @@ class InsightService
                     'type' => 'navigate',
                     'url' => '/admin/erp/reports?type=revenue&period=week',
                     'label' => 'Analyze revenue drop'
+                ],
+                'explanation' => [
+                    'summary' => 'Revenue drop causes',
+                    'factors' => [
+                        ['label' => 'Today\'s Revenue', 'value' => number_format($todayRevenue) . ' EGP'],
+                        ['label' => 'Yesterday\'s Revenue', 'value' => number_format($yesterdayRevenue) . ' EGP'],
+                        ['label' => 'Change', 'value' => round($change) . '%'],
+                        ['label' => 'Cancelled Appointments', 'value' => $cancelledToday],
+                        ['label' => 'No-Show Appointments', 'value' => $noShowToday],
+                    ]
                 ],
                 'meta' => [
                     'today_revenue' => $todayRevenue,
@@ -108,6 +132,11 @@ class InsightService
 
         // Increase > 30% → insight
         if ($change > 30) {
+            $weekMissed = Appointment::query()
+                ->where('company_id', $companyId)
+                ->whereBetween('appointment_date', [Carbon::today()->subDays(7), $today])
+                ->where('status', 'no_show')
+                ->count();
             return [
                 'type' => 'insight',
                 'category' => 'appointments',
@@ -121,6 +150,15 @@ class InsightService
                     'type' => 'navigate',
                     'url' => '/admin/erp/appointments?status=no_show',
                     'label' => 'View no-show appointments'
+                ],
+                'explanation' => [
+                    'summary' => 'No-show appointments breakdown',
+                    'factors' => [
+                        ['label' => 'Today\'s No-Shows', 'value' => $todayMissed],
+                        ['label' => 'Yesterday\'s No-Shows', 'value' => $yesterdayMissed],
+                        ['label' => 'Increase', 'value' => round($change) . '%'],
+                        ['label' => 'Last 7 Days Total', 'value' => $weekMissed],
+                    ]
                 ],
                 'meta' => [
                     'today_missed' => $todayMissed,
@@ -164,6 +202,19 @@ class InsightService
                     'url' => '/admin/erp/invoices?status=unpaid',
                     'label' => 'View unpaid invoices'
                 ],
+                'explanation' => [
+                    'summary' => 'Unpaid invoices breakdown',
+                    'factors' => [
+                        ['label' => 'Total Unpaid', 'value' => $unpaidCount],
+                        ['label' => 'Overdue (>30 days)', 'value' => $overdueCount],
+                        ['label' => 'Overdue (>60 days)', 'value' => Invoice::query()
+                            ->where('company_id', $companyId)
+                            ->where('status', 'unpaid')
+                            ->whereDate('issued_at', '<=', Carbon::now()->subDays(60))
+                            ->count()],
+                    ]
+                ],
+
                 'meta' => [
                     'unpaid_count' => $unpaidCount,
                     'overdue_count' => $overdueCount,
@@ -223,6 +274,15 @@ class InsightService
                     'url' => '/admin/erp/reports?type=revenue&trend=growth',
                     'label' => 'View revenue trend'
                 ],
+                'explanation' => [
+                    'summary' => 'Revenue growth trend',
+                    'factors' => [
+                        ['label' => 'Day 1', 'value' => number_format($revenues[0]) . ' EGP'],
+                        ['label' => 'Day 2', 'value' => number_format($revenues[1]) . ' EGP'],
+                        ['label' => 'Day 3 (Today)', 'value' => number_format($revenues[2]) . ' EGP'],
+                        ['label' => 'Total Growth', 'value' => '+' . round($growthPercent) . '%'],
+                    ]
+                ],
                 'meta' => [
                     'trend' => 'growing',
                     'days' => 3,
@@ -255,6 +315,15 @@ class InsightService
 
         $expectedToday = max($avgRevenue, $todayRevenue);
 
+        $maxDayRevenue = Payment::query()
+            ->where('company_id', $companyId)
+            ->whereDate('paid_at', '>=', Carbon::today()->subDays(7))
+            ->whereDate('paid_at', '<', Carbon::today())
+            ->selectRaw('DATE(paid_at) as date, SUM(applied_amount) as total')
+            ->groupBy('date')
+            ->orderByDesc('total')
+            ->first();
+
         if ($expectedToday > 1000) { // لو المتوقع > 1000 جنيه
             return [
                 'type' => 'insight',
@@ -269,6 +338,15 @@ class InsightService
                     'type' => 'navigate',
                     'url' => '/admin/erp/reports?type=revenue&view=forecast',
                     'label' => 'View forecast details'
+                ],
+                'explanation' => [
+                    'summary' => 'Revenue forecast based on last 7 days',
+                    'factors' => [
+                        ['label' => '7-Day Average', 'value' => number_format($avgRevenue) . ' EGP'],
+                        ['label' => 'Current Revenue', 'value' => number_format($todayRevenue) . ' EGP'],
+                        ['label' => 'Expected Today', 'value' => number_format($expectedToday) . ' EGP'],
+                        ['label' => 'Best Day (Last Week)', 'value' => $maxDayRevenue ? number_format($maxDayRevenue->total) . ' EGP' : 'N/A'],
+                    ]
                 ],
                 'meta' => [
                     'forecast' => $expectedToday,
@@ -298,6 +376,14 @@ class InsightService
             ->first();
 
         if ($topDoctor && $topDoctor->completed_count >= 3) {
+            $totalAppointments = Appointment::query()
+                ->where('company_id', $companyId)
+                ->whereDate('appointment_date', $today)
+                ->where('doctor_id', $topDoctor->doctor_id)
+                ->count();
+
+            $completionRate = ($topDoctor->completed_count / $totalAppointments) * 100;
+
             return [
                 'type' => 'insight',
                 'category' => 'doctors',
@@ -311,6 +397,15 @@ class InsightService
                     'type' => 'navigate',
                     'url' => "/admin/erp/doctors/{$topDoctor->doctor_id}/performance",
                     'label' => 'View doctor performance'
+                ],
+                'explanation' => [
+                    'summary' => 'Doctor performance breakdown',
+                    'factors' => [
+                        ['label' => 'Doctor Name', 'value' => $topDoctor->doctor_name],
+                        ['label' => 'Completed Appointments', 'value' => $topDoctor->completed_count],
+                        ['label' => 'Total Appointments', 'value' => $totalAppointments],
+                        ['label' => 'Completion Rate', 'value' => round($completionRate) . '%'],
+                    ]
                 ],
                 'meta' => [
                     'doctor_id' => $topDoctor->doctor_id,
@@ -345,6 +440,14 @@ class InsightService
             $cancellationRate = ($cancelledToday / $totalToday) * 100;
 
             if ($cancellationRate > 30) {
+                $topCancellingDoctor = Appointment::query()
+                    ->where('company_id', $companyId)
+                    ->whereDate('appointment_date', $today)
+                    ->where('status', 'cancelled')
+                    ->select('doctor_name', DB::raw('COUNT(*) as cancelled_count'))
+                    ->groupBy('doctor_name')
+                    ->orderByDesc('cancelled_count')
+                    ->first();
                 return [
                     'type' => 'insight',
                     'category' => 'appointments',
@@ -359,6 +462,15 @@ class InsightService
                         'url' => '/admin/erp/appointments?status=cancelled',
                         'label' => 'View cancelled appointments'
                     ],
+                    'explanation' => [
+                        'summary' => 'Cancellation breakdown',
+                        'factors' => [
+                            ['label' => 'Total Appointments', 'value' => $totalToday],
+                            ['label' => 'Cancelled', 'value' => $cancelledToday],
+                            ['label' => 'Cancellation Rate', 'value' => round($cancellationRate) . '%'],
+                            ['label' => 'Highest Cancelling Doctor', 'value' => $topCancellingDoctor ? $topCancellingDoctor->doctor_name . ' (' . $topCancellingDoctor->cancelled_count . ')' : 'N/A'],
+                        ]
+                    ],
                     'meta' => [
                         'cancellation_rate' => round($cancellationRate, 2),
                         'cancelled' => $cancelledToday,
@@ -369,5 +481,92 @@ class InsightService
         }
 
         return null;
+    }
+
+    private function getNoShowInsights($companyId): array
+    {
+        $insights = [];
+        $monthStart = Carbon::now()->startOfMonth();
+
+        $noShows = Appointment::query()
+            ->where('company_id', $companyId)
+            ->whereBetween('appointment_date', [$monthStart, Carbon::now()])
+            ->where('status', 'no_show')
+            ->count();
+
+        // جلب أكثر دكتور عنده no-shows
+        $topNoShowDoctor = Appointment::query()
+            ->where('company_id', $companyId)
+            ->whereBetween('appointment_date', [$monthStart, Carbon::now()])
+            ->where('status', 'no_show')
+            ->select('doctor_name', DB::raw('COUNT(*) as no_show_count'))
+            ->groupBy('doctor_name')
+            ->orderByDesc('no_show_count')
+            ->first();
+
+        if ($noShows > 3) {
+            $insights[] = [
+                'category' => 'appointments',
+                'priority' => 'high',
+                'message' => "High no-show rate: {$noShows} patients didn't show up this month",
+                'action' => [
+                    'type' => 'navigate',
+                    'url' => '/admin/erp/appointments?status=no_show',
+                    'label' => 'View no-show appointments'
+                ],
+                'explanation' => [
+                    'summary' => 'No-show appointments this month',
+                    'factors' => [
+                        ['label' => 'Total No-Shows', 'value' => $noShows],
+                        ['label' => 'Most Affected Doctor', 'value' => $topNoShowDoctor ? $topNoShowDoctor->doctor_name . ' (' . $topNoShowDoctor->no_show_count . ')' : 'N/A'],
+                    ]
+                ],
+                'point' => [
+                    'date' => Carbon::today()->toDateString(),
+                    'value' => $noShows,
+                ],
+            ];
+        }
+
+        return $insights;
+    }
+
+    private function getPatientInsights($companyId): array
+    {
+        $insights = [];
+        $lastMonth = Carbon::now()->subMonth();
+
+        $newPatients = Customer::query()
+            ->where('company_id', $companyId)
+            ->whereBetween('created_at', [$lastMonth, Carbon::now()])
+            ->count();
+
+        // جلب إجمالي المرضى
+        $totalPatients = Customer::query()
+            ->where('company_id', $companyId)
+            ->count();
+
+        if ($newPatients > 10) {
+            $insights[] = [
+                'category' => 'patients',
+                'priority' => 'positive',
+                'message' => "Great! {$newPatients} new patients joined this month",
+                'action' => [
+                    'type' => 'navigate',
+                    'url' => '/admin/erp/patients?period=month',
+                    'label' => 'View new patients'
+                ],
+                'explanation' => [
+                    'summary' => 'Patient growth this month',
+                    'factors' => [
+                        ['label' => 'New Patients', 'value' => $newPatients],
+                        ['label' => 'Total Patients', 'value' => $totalPatients],
+                        ['label' => 'Growth Rate', 'value' => $totalPatients > 0 ? round(($newPatients / $totalPatients) * 100) . '%' : '100%'],
+                    ]
+                ],
+            ];
+        }
+
+        return $insights;
     }
 }
