@@ -14,6 +14,8 @@ class User extends Authenticatable
     use HasApiTokens, Notifiable;
     use BelongsToCompanyTrait;
 
+    protected static $hasCompanyColumn = true;
+
     protected $fillable = [
         'company_id',
         'name',

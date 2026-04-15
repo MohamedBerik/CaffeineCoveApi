@@ -1,44 +1,40 @@
 <?php
+// app/Models/Concerns/CompanyScope.php
 
 namespace App\Models\Concerns;
 
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Scope;
-use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Schema;
+use App\Services\Tenant;
 
 class CompanyScope implements Scope
 {
     public function apply(Builder $builder, Model $model)
     {
-        // في حالات console / seeder / job
-        if (!Auth::check()) {
+        // ✅ استخدام Tenant بدل Auth (يدعم CLI/Jobs)
+        $companyId = Tenant::id();
+        $isSuperAdmin = Tenant::isSuperAdmin();
+
+        // Super admin يرى كل الشركات
+        if ($isSuperAdmin) {
             return;
         }
 
-        $user = Auth::user();
-
-        // super admin يرى كل الشركات
-        if (method_exists($user, 'isSuperAdmin') && $user->isSuperAdmin()) {
+        // ✅ Performance fix: التحقق من وجود العمود عن طريق property
+        if (!property_exists($model, 'hasCompanyColumn') || !$model::$hasCompanyColumn) {
             return;
         }
 
-        // لو الجدول لا يحتوي company_id أصلاً
-        if (!Schema::hasColumn($model->getTable(), 'company_id')) {
-            return;
-        }
-
-        // مستخدم بدون شركة (غير مسموح له أصلاً في API)
-        if (!$user->company_id) {
-            // نخلي الاستعلام يرجع فاضي بدل ما يرجّع كل الداتا
+        // مستخدم بدون شركة - يرجع فاضي
+        if (!$companyId) {
             $builder->whereRaw('1 = 0');
             return;
         }
 
         $builder->where(
             $model->getTable() . '.company_id',
-            $user->company_id
+            $companyId
         );
     }
 }
