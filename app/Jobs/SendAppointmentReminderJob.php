@@ -6,6 +6,8 @@ use App\Models\Appointment;
 use App\Services\ActivityLogger;
 use App\Services\Whatsapp\TwilioWhatsappService;
 use App\Traits\HandlesAppointmentReminders;
+use App\Jobs\Concerns\ResetsTenantContext;
+use App\Services\Tenant;
 use Carbon\Carbon;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
@@ -20,9 +22,11 @@ use Throwable;
 class SendAppointmentReminderJob implements ShouldQueue, ShouldBeUnique
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels, HandlesAppointmentReminders;
+    use ResetsTenantContext;
 
     public int $appointmentId;
     public ?int $userId;
+    public ?int $companyId;
 
     public $tries = 3;
     public $timeout = 120;
@@ -31,10 +35,22 @@ class SendAppointmentReminderJob implements ShouldQueue, ShouldBeUnique
     {
         $this->appointmentId = $appointmentId;
         $this->userId = $userId;
+
+        $appointment = Appointment::with('patient')->find($appointmentId);
+        $this->companyId = $appointment?->company_id;
     }
 
     public function handle(): void
     {
+        $this->process();
+    }
+
+    protected function process(): void
+    {
+        if ($this->companyId) {
+            Tenant::setId($this->companyId);
+        }
+
         DB::transaction(function () {
 
             $appointment = Appointment::query()
@@ -46,20 +62,16 @@ class SendAppointmentReminderJob implements ShouldQueue, ShouldBeUnique
                 return;
             }
 
-            // لازم يكون processing
             if ($appointment->reminder_status !== 'processing') {
                 return;
             }
 
-            // 🧱 Idempotency key
             $dedupKey = "appointment_{$appointment->id}_stage_{$appointment->reminder_stage}";
 
-            // 🛑 لو اتبعت قبل كده
             if ($appointment->reminder_dedup_key === $dedupKey) {
                 return;
             }
 
-            // 🛑 cooldown protection (double trigger protection)
             if (
                 $appointment->last_reminder_at &&
                 Carbon::parse($appointment->last_reminder_at)->diffInSeconds(now()) < 30
@@ -67,7 +79,6 @@ class SendAppointmentReminderJob implements ShouldQueue, ShouldBeUnique
                 return;
             }
 
-            // ✅ validation
             $validationError = $this->validateReminderCanBeSent($appointment);
 
             if ($validationError) {
@@ -173,7 +184,6 @@ class SendAppointmentReminderJob implements ShouldQueue, ShouldBeUnique
 
     public function failed(Throwable $exception): void
     {
-        // اختياري: log failure
         Log::error('SendAppointmentReminderJob failed', [
             'appointment_id' => $this->appointmentId,
             'error' => $exception->getMessage(),

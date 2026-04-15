@@ -4,6 +4,8 @@ namespace App\Jobs;
 
 use App\Models\Appointment;
 use App\Traits\HandlesAppointmentFollowUps;
+use App\Jobs\Concerns\ResetsTenantContext;
+use App\Services\Tenant;
 use Illuminate\Bus\Queueable;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -13,11 +15,32 @@ use Illuminate\Support\Facades\Log;
 class SendAppointmentFollowUpJob implements ShouldQueue
 {
     use HandlesAppointmentFollowUps, Dispatchable, Queueable, SerializesModels;
+    use ResetsTenantContext;
 
-    public function __construct(public int $appointmentId) {}
+    public int $appointmentId;
+    public ?int $companyId;
+
+    public function __construct(int $appointmentId)
+    {
+        $this->appointmentId = $appointmentId;
+
+        // ✅ جلب company_id من الموعد
+        $appointment = Appointment::with('patient')->find($appointmentId);
+        $this->companyId = $appointment?->company_id;
+    }
 
     public function handle(): void
     {
+        $this->process();
+    }
+
+    protected function process(): void
+    {
+        // ✅ تعيين الـ Tenant Context
+        if ($this->companyId) {
+            Tenant::setId($this->companyId);
+        }
+
         $appointment = Appointment::with('patient:id,phone')
             ->where('id', $this->appointmentId)
             ->whereIn('follow_up_state', ['pending', 'retrying'])
@@ -37,6 +60,7 @@ class SendAppointmentFollowUpJob implements ShouldQueue
 
             Log::info('Follow-up skipped', [
                 'appointment_id' => $appointment->id,
+                'company_id' => $this->companyId, // ✅ إضافة company_id للـ log
                 'reason' => 'Validation failed'
             ]);
 
@@ -52,7 +76,8 @@ class SendAppointmentFollowUpJob implements ShouldQueue
         if (!$phone) {
 
             Log::warning('Follow-up skipped: missing phone', [
-                'appointment_id' => $appointment->id
+                'appointment_id' => $appointment->id,
+                'company_id' => $this->companyId, // ✅ إضافة company_id للـ log
             ]);
 
             $retryCount = $appointment->follow_up_retry_count + 1;
@@ -81,12 +106,14 @@ class SendAppointmentFollowUpJob implements ShouldQueue
 
             Log::info('Follow-up sent successfully', [
                 'appointment_id' => $appointment->id,
+                'company_id' => $this->companyId, // ✅ إضافة company_id للـ log
                 'phone' => $phone
             ]);
         } catch (\Exception $e) {
 
             Log::error('Follow-up failed', [
                 'appointment_id' => $appointment->id,
+                'company_id' => $this->companyId, // ✅ إضافة company_id للـ log
                 'error' => $e->getMessage()
             ]);
 
@@ -100,6 +127,7 @@ class SendAppointmentFollowUpJob implements ShouldQueue
 
             Log::warning('Follow-up retry scheduled', [
                 'appointment_id' => $appointment->id,
+                'company_id' => $this->companyId, // ✅ إضافة company_id للـ log
                 'retry_count' => $retryCount
             ]);
         }
