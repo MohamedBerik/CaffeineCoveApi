@@ -3,9 +3,16 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use App\Models\Concerns\BelongsToCompanyTrait;
 
 class ClinicSetting extends Model
 {
+    // ✅ الـ Trait - ضروري
+    use BelongsToCompanyTrait;
+
+    // ✅ Performance fix - ضروري
+    protected static $hasCompanyColumn = true;
+
     protected $fillable = [
         'company_id',
         'clinic_name',
@@ -19,6 +26,9 @@ class ClinicSetting extends Model
         'language',
     ];
 
+    /**
+     * العلاقة مع Company
+     */
     public function company()
     {
         return $this->belongsTo(Company::class);

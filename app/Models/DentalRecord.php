@@ -11,6 +11,15 @@ class DentalRecord extends Model
     use HasFactory;
     use BelongsToCompanyTrait;
 
+    // ✅ Performance fix
+    protected static $hasCompanyColumn = true;
+
+    // ✅ الثوابت
+    const STATUS_PLANNED = 'planned';
+    const STATUS_IN_PROGRESS = 'in_progress';
+    const STATUS_COMPLETED = 'completed';
+    const STATUS_CANCELLED = 'cancelled';
+
     protected $fillable = [
         'company_id',
         'customer_id',
@@ -23,6 +32,13 @@ class DentalRecord extends Model
         'notes',
         'treatment_plan_item_id',
     ];
+
+    // ============ Relationships ============
+
+    public function company()
+    {
+        return $this->belongsTo(Company::class);
+    }
 
     public function customer()
     {
@@ -46,6 +62,68 @@ class DentalRecord extends Model
 
     public function treatmentPlanItem()
     {
-        return $this->belongsTo(\App\Models\TreatmentPlanItem::class);
+        return $this->belongsTo(TreatmentPlanItem::class);
+    }
+
+    // ============ Scopes ============
+
+    public function scopeForCustomer($query, $customerId)
+    {
+        return $query->where('customer_id', $customerId);
+    }
+
+    public function scopeForTooth($query, string $toothNumber)
+    {
+        return $query->where('tooth_number', $toothNumber);
+    }
+
+    public function scopeByStatus($query, string $status)
+    {
+        return $query->where('status', $status);
+    }
+
+    public function scopeCompleted($query)
+    {
+        return $query->where('status', self::STATUS_COMPLETED);
+    }
+
+    public function scopeInProgress($query)
+    {
+        return $query->where('status', self::STATUS_IN_PROGRESS);
+    }
+
+    // ============ Helpers ============
+
+    public function isCompleted(): bool
+    {
+        return $this->status === self::STATUS_COMPLETED;
+    }
+
+    public function isInProgress(): bool
+    {
+        return $this->status === self::STATUS_IN_PROGRESS;
+    }
+
+    public function isPlanned(): bool
+    {
+        return $this->status === self::STATUS_PLANNED;
+    }
+
+    public function isCancelled(): bool
+    {
+        return $this->status === self::STATUS_CANCELLED;
+    }
+
+    public function markAsCompleted(): void
+    {
+        $this->update(['status' => self::STATUS_COMPLETED]);
+    }
+
+    public function getToothWithSurfaceAttribute(): string
+    {
+        if ($this->surface) {
+            return $this->tooth_number . ' (' . $this->surface . ')';
+        }
+        return $this->tooth_number;
     }
 }

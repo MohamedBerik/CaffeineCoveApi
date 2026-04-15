@@ -11,21 +11,96 @@ class PurchaseOrderItem extends Model
     use HasFactory;
     use BelongsToCompanyTrait;
 
+    // ✅ Performance fix
+    protected static $hasCompanyColumn = true;
+
     protected $fillable = [
         'company_id',
         'purchase_order_id',
         'product_id',
         'quantity',
         'unit_cost',
-        'total'
+        'total',
     ];
-    public function product()
-    {
-        return $this->belongsTo(Product::class)
-            ->where('company_id', $this->company_id);
-    }
+
+    protected $casts = [
+        'quantity' => 'integer',
+        'unit_cost' => 'decimal:2',
+        'total' => 'decimal:2',
+    ];
+
+    // ============ Relationships ============
+
     public function company()
     {
         return $this->belongsTo(Company::class);
+    }
+
+    public function purchaseOrder()
+    {
+        return $this->belongsTo(PurchaseOrder::class);
+    }
+
+    public function product()
+    {
+        return $this->belongsTo(Product::class);
+    }
+
+    // ============ Boot ============
+
+    protected static function booted()
+    {
+        static::saving(function ($item) {
+            $item->total = $item->quantity * $item->unit_cost;
+        });
+
+        static::saved(function ($item) {
+            if ($item->purchaseOrder) {
+                $item->purchaseOrder->update(['total' => $item->purchaseOrder->items()->sum('total')]);
+            }
+        });
+
+        static::deleted(function ($item) {
+            if ($item->purchaseOrder) {
+                $item->purchaseOrder->update(['total' => $item->purchaseOrder->items()->sum('total')]);
+            }
+        });
+    }
+
+    // ============ Accessors ============
+
+    public function getSubtotalAttribute(): float
+    {
+        return $this->quantity * $this->unit_cost;
+    }
+
+    // ============ Helpers ============
+
+    public function getReceivedQuantityAttribute(): float
+    {
+        return StockMovement::where('reference_type', PurchaseOrder::class)
+            ->where('reference_id', $this->purchase_order_id)
+            ->where('product_id', $this->product_id)
+            ->where('type', StockMovement::TYPE_IN)
+            ->sum('quantity');
+    }
+
+    public function getReturnedQuantityAttribute(): float
+    {
+        return StockMovement::where('reference_type', PurchaseOrder::class)
+            ->where('reference_id', $this->purchase_order_id)
+            ->where('product_id', $this->product_id)
+            ->where('type', StockMovement::TYPE_OUT)
+            ->sum('quantity');
+    }
+
+    public function getRemainingQuantityAttribute(): float
+    {
+        return max(0, $this->received_quantity - $this->returned_quantity);
+    }
+
+    public function isFullyReceived(): bool
+    {
+        return $this->received_quantity >= $this->quantity;
     }
 }

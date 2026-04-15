@@ -5,26 +5,51 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use App\Models\Concerns\BelongsToCompanyTrait;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Support\Facades\Cache;
 
 class Payment extends Model
 {
     use HasFactory;
     use BelongsToCompanyTrait;
 
+    // ✅ Performance fix
+    protected static $hasCompanyColumn = true;
+
+    // ✅ الثوابت
+    const METHOD_CASH = 'cash';
+    const METHOD_CARD = 'card';
+    const METHOD_BANK_TRANSFER = 'bank_transfer';
+    const METHOD_CHECK = 'check';
+    const METHOD_OTHER = 'other';
+
     protected $fillable = [
         'company_id',
         'invoice_id',
         'amount',
+        'applied_amount',
+        'credit_amount',
         'method',
         'paid_at',
-        'received_by'
+        'received_by',
     ];
 
     protected $casts = [
         'amount' => 'decimal:2',
+        'applied_amount' => 'decimal:2',
+        'credit_amount' => 'decimal:2',
         'paid_at' => 'datetime',
     ];
+
+    protected $attributes = [
+        'applied_amount' => 0,
+        'credit_amount' => 0,
+    ];
+
+    // ============ Relationships ============
+
+    public function company()
+    {
+        return $this->belongsTo(Company::class);
+    }
 
     public function invoice()
     {
@@ -41,48 +66,143 @@ class Payment extends Model
         return $this->hasMany(CustomerLedgerEntry::class);
     }
 
-    public function company()
+    public function receiver()
     {
-        return $this->belongsTo(Company::class);
+        return $this->belongsTo(User::class, 'received_by');
     }
+
+    // ============ Scopes ============
+
+    public function scopeForInvoice($query, $invoiceId)
+    {
+        return $query->where('invoice_id', $invoiceId);
+    }
+
+    public function scopeByMethod($query, string $method)
+    {
+        return $query->where('method', $method);
+    }
+
+    public function scopeBetweenDates($query, $from, $to)
+    {
+        return $query->whereBetween('paid_at', [$from, $to]);
+    }
+
+    // ============ Accessors ============
+
+    public function getAvailableInvoiceRefundAttribute(): float
+    {
+        $refunded = $this->refunds()
+            ->where('applies_to', 'invoice')
+            ->sum('amount');
+
+        return max(0, $this->applied_amount - $refunded);
+    }
+
+    public function getAvailableCreditRefundAttribute(): float
+    {
+        $refunded = $this->refunds()
+            ->where('applies_to', 'credit')
+            ->sum('amount');
+
+        return max(0, $this->credit_amount - $refunded);
+    }
+
+    public function getTotalRefundedAttribute(): float
+    {
+        return $this->refunds()->sum('amount');
+    }
+
+    public function getNetPaymentAttribute(): float
+    {
+        return $this->amount - $this->total_refunded;
+    }
+
+    // ============ Helpers ============
+
+    public function hasCredit(): bool
+    {
+        return $this->credit_amount > 0;
+    }
+
+    public function canRefundInvoice(): bool
+    {
+        return $this->available_invoice_refund > 0;
+    }
+
+    public function canRefundCredit(): bool
+    {
+        return $this->available_credit_refund > 0;
+    }
+
+    public function isFullyRefunded(): bool
+    {
+        return $this->total_refunded >= $this->amount;
+    }
+
+    // ============ Boot - Activity Logging ============
 
     protected static function booted()
     {
-        static::created(function ($appointment) {
-            ActivityLog::create([
-                'company_id' => $appointment->company_id,
-                'user_id' => auth()->id(),
-                'action' => 'created',
-                'subject_type' => 'Appointment',
-                'subject_id' => $appointment->id,
-                'properties' => [
-                    'new' => $appointment->toArray()
-                ]
-            ]);
+        static::creating(function ($payment) {
+            // توزيع المبلغ تلقائيًا لو مش محدد
+            if (!$payment->applied_amount && !$payment->credit_amount) {
+                $payment->applied_amount = $payment->amount;
+                $payment->credit_amount = 0;
+            }
         });
 
-        static::updated(function ($appointment) {
-            ActivityLog::create([
-                'company_id' => $appointment->company_id,
-                'user_id' => auth()->id(),
-                'action' => 'updated',
-                'subject_type' => 'Appointment',
-                'subject_id' => $appointment->id,
-                'properties' => [
-                    'old' => $appointment->getOriginal(),
-                    'changes' => $appointment->getChanges()
-                ]
-            ]);
+        static::created(function ($payment) {
+            if (auth()->check()) {
+                ActivityLog::create([
+                    'company_id' => $payment->company_id,
+                    'user_id' => auth()->id(),
+                    'action' => 'payment.created',
+                    'subject_type' => Payment::class,
+                    'subject_id' => $payment->id,
+                    'properties' => [
+                        'invoice_id' => $payment->invoice_id,
+                        'amount' => $payment->amount,
+                        'method' => $payment->method,
+                    ]
+                ]);
+            }
         });
 
-        static::deleted(function ($appointment) {
-            ActivityLog::create([
-                'company_id' => $appointment->company_id,
-                'user_id' => auth()->id(),
-                'action' => 'deleted',
-                'subject_type' => 'Appointment',
-                'subject_id' => $appointment->id,
-            ]);
+        static::updated(function ($payment) {
+            if (auth()->check()) {
+                $changes = $payment->getChanges();
+                unset($changes['updated_at']);
+
+                if (!empty($changes)) {
+                    ActivityLog::create([
+                        'company_id' => $payment->company_id,
+                        'user_id' => auth()->id(),
+                        'action' => 'payment.updated',
+                        'subject_type' => Payment::class,
+                        'subject_id' => $payment->id,
+                        'properties' => [
+                            'changes' => $changes,
+                        ]
+                    ]);
+                }
+            }
+        });
+
+        static::deleted(function ($payment) {
+            if (auth()->check()) {
+                ActivityLog::create([
+                    'company_id' => $payment->company_id,
+                    'user_id' => auth()->id(),
+                    'action' => 'payment.deleted',
+                    'subject_type' => Payment::class,
+                    'subject_id' => $payment->id,
+                    'properties' => [
+                        'invoice_id' => $payment->invoice_id,
+                        'amount' => $payment->amount,
+                    ]
+                ]);
+            }
         });
     }
 }

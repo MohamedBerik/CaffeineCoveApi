@@ -11,6 +11,9 @@ class JournalLine extends Model
     use HasFactory;
     use BelongsToCompanyTrait;
 
+    // ✅ Performance fix
+    protected static $hasCompanyColumn = true;
+
     protected $fillable = [
         'company_id',
         'journal_entry_id',
@@ -18,6 +21,18 @@ class JournalLine extends Model
         'debit',
         'credit',
     ];
+
+    protected $casts = [
+        'debit' => 'decimal:2',
+        'credit' => 'decimal:2',
+    ];
+
+    // ============ Relationships ============
+
+    public function company()
+    {
+        return $this->belongsTo(Company::class);
+    }
 
     public function entry()
     {
@@ -27,5 +42,27 @@ class JournalLine extends Model
     public function account()
     {
         return $this->belongsTo(Account::class);
+    }
+
+    // ============ Helpers ============
+
+    public function getNetAmountAttribute(): float
+    {
+        return $this->debit - $this->credit;
+    }
+
+    public function isDebit(): bool
+    {
+        return $this->debit > 0;
+    }
+
+    public function isCredit(): bool
+    {
+        return $this->credit > 0;
+    }
+
+    public function getAmountAttribute(): float
+    {
+        return $this->debit > 0 ? $this->debit : $this->credit;
     }
 }

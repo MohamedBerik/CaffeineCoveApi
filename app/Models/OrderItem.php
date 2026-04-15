@@ -11,6 +11,9 @@ class OrderItem extends Model
     use HasFactory;
     use BelongsToCompanyTrait;
 
+    // ✅ Performance fix
+    protected static $hasCompanyColumn = true;
+
     protected $fillable = [
         'company_id',
         'order_id',
@@ -19,6 +22,19 @@ class OrderItem extends Model
         'unit_price',
         'total',
     ];
+
+    protected $casts = [
+        'quantity' => 'integer',
+        'unit_price' => 'decimal:2',
+        'total' => 'decimal:2',
+    ];
+
+    // ============ Relationships ============
+
+    public function company()
+    {
+        return $this->belongsTo(Company::class);
+    }
 
     public function order()
     {
@@ -30,8 +46,31 @@ class OrderItem extends Model
         return $this->belongsTo(Product::class);
     }
 
-    public function company()
+    // ============ Boot ============
+
+    protected static function booted()
     {
-        return $this->belongsTo(Company::class);
+        static::saving(function ($item) {
+            $item->total = $item->quantity * $item->unit_price;
+        });
+
+        static::saved(function ($item) {
+            if ($item->order) {
+                $item->order->recalculateTotal();
+            }
+        });
+
+        static::deleted(function ($item) {
+            if ($item->order) {
+                $item->order->recalculateTotal();
+            }
+        });
+    }
+
+    // ============ Helpers ============
+
+    public function getSubtotalAttribute(): float
+    {
+        return $this->quantity * $this->unit_price;
     }
 }

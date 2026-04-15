@@ -14,9 +14,20 @@ class User extends Authenticatable
     use HasApiTokens, Notifiable;
     use BelongsToCompanyTrait;
 
+    // ✅ Performance fix - تفعيل
     // protected static $hasCompanyColumn = true;
-    // public static bool $hasCompanyColumn = true; 
+    // public static bool $hasCompanyColumn = true;
 
+
+    // ✅ الثوابت
+    const ROLE_SUPER_ADMIN = 'super_admin';
+    const ROLE_ADMIN = 'admin';
+    const ROLE_DOCTOR = 'doctor';
+    const ROLE_RECEPTIONIST = 'receptionist';
+    const ROLE_USER = 'user';
+
+    const STATUS_ACTIVE = 1;
+    const STATUS_INACTIVE = 0;
 
     protected $fillable = [
         'company_id',
@@ -36,11 +47,15 @@ class User extends Authenticatable
     protected $casts = [
         'email_verified_at' => 'datetime',
         'is_super_admin'    => 'boolean',
+        'status'            => 'integer',
     ];
 
-    /* =====================================================
-     | Relations
-     * ===================================================== */
+    protected $attributes = [
+        'status' => self::STATUS_ACTIVE,
+        'is_super_admin' => false,
+    ];
+
+    // ============ Relationships ============
 
     public function company()
     {
@@ -57,41 +72,188 @@ class User extends Authenticatable
         );
     }
 
-    /* =====================================================
-     | Helpers
-     * ===================================================== */
+    public function createdAppointments()
+    {
+        return $this->hasMany(Appointment::class, 'created_by');
+    }
+
+    public function doctorAppointments()
+    {
+        return $this->hasMany(Appointment::class, 'doctor_id');
+    }
+
+    public function createdOrders()
+    {
+        return $this->hasMany(Order::class, 'created_by');
+    }
+
+    public function receivedPayments()
+    {
+        return $this->hasMany(Payment::class, 'received_by');
+    }
+
+    public function activityLogs()
+    {
+        return $this->hasMany(ActivityLog::class);
+    }
+
+    // ============ Scopes ============
+
+    public function scopeActive($query)
+    {
+        return $query->where('status', self::STATUS_ACTIVE);
+    }
+
+    public function scopeInactive($query)
+    {
+        return $query->where('status', self::STATUS_INACTIVE);
+    }
+
+    public function scopeByRole($query, string $role)
+    {
+        return $query->where('role', $role);
+    }
+
+    public function scopeAdmins($query)
+    {
+        return $query->where('role', self::ROLE_ADMIN);
+    }
+
+    public function scopeDoctors($query)
+    {
+        return $query->where('role', self::ROLE_DOCTOR);
+    }
+
+    public function scopeSuperAdmins($query)
+    {
+        return $query->where('is_super_admin', true);
+    }
+
+    public function scopeRegularUsers($query)
+    {
+        return $query->where('is_super_admin', false);
+    }
+
+    public function scopeSearch($query, string $term)
+    {
+        return $query->where(function ($q) use ($term) {
+            $q->where('name', 'like', "%{$term}%")
+                ->orWhere('email', 'like', "%{$term}%");
+        });
+    }
+
+    // ============ Accessors ============
+
+    public function getIsActiveAttribute(): bool
+    {
+        return $this->status === self::STATUS_ACTIVE;
+    }
+
+    public function getRoleLabelAttribute(): string
+    {
+        return match ($this->role) {
+            self::ROLE_SUPER_ADMIN => 'Super Admin',
+            self::ROLE_ADMIN => 'Admin',
+            self::ROLE_DOCTOR => 'Doctor',
+            self::ROLE_RECEPTIONIST => 'Receptionist',
+            self::ROLE_USER => 'User',
+            default => ucfirst($this->role),
+        };
+    }
+
+    public function getStatusLabelAttribute(): string
+    {
+        return $this->is_active ? 'Active' : 'Inactive';
+    }
+
+    // ============ Helpers ============
 
     public function isSuperAdmin(): bool
     {
         return (bool) $this->is_super_admin;
     }
 
-    /*
-     | صلاحيات ERP
-     | لاحقًا يمكن ربطها بجدول permissions
-     */
+    public function isAdmin(): bool
+    {
+        return $this->role === self::ROLE_ADMIN;
+    }
+
+    public function isDoctor(): bool
+    {
+        return $this->role === self::ROLE_DOCTOR;
+    }
+
+    public function isReceptionist(): bool
+    {
+        return $this->role === self::ROLE_RECEPTIONIST;
+    }
+
+    public function isActive(): bool
+    {
+        return $this->status === self::STATUS_ACTIVE;
+    }
+
     public function hasPermission(string $permission): bool
     {
-        // super admin يتجاوز كل القيود
         if ($this->isSuperAdmin()) {
             return true;
         }
 
-        // admin داخل الشركة
-        if ($this->role === 'admin') {
+        if ($this->isAdmin()) {
             return true;
         }
 
-        // حاليا لا يوجد نظام صلاحيات دقيق بعد
         return false;
     }
 
-    /*
-     | هل المستخدم مرتبط بشركة؟
-     | super admin مسموح له بدون شركة
-     */
     public function mustHaveCompany(): bool
     {
-        return ! $this->isSuperAdmin();
+        return !$this->isSuperAdmin();
+    }
+
+    public function belongsToCompany(Company $company): bool
+    {
+        return $this->company_id === $company->id;
+    }
+
+    public function canAccessCompany(Company $company): bool
+    {
+        return $this->isSuperAdmin() || $this->belongsToCompany($company);
+    }
+
+    public function activate(): void
+    {
+        $this->update(['status' => self::STATUS_ACTIVE]);
+    }
+
+    public function deactivate(): void
+    {
+        $this->update(['status' => self::STATUS_INACTIVE]);
+    }
+
+    // ============ Boot ============
+
+    protected static function booted()
+    {
+        static::creating(function ($user) {
+            if (!$user->status) {
+                $user->status = self::STATUS_ACTIVE;
+            }
+        });
+
+        static::created(function ($user) {
+            ActivityLog::create([
+                'company_id' => $user->company_id,
+                'user_id' => auth()->id(),
+                'action' => 'user.created',
+                'subject_type' => User::class,
+                'subject_id' => $user->id,
+                'properties' => [
+                    'name' => $user->name,
+                    'email' => $user->email,
+                    'role' => $user->role,
+                ]
+            ]);
+        });
     }
 }

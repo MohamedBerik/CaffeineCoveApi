@@ -5,13 +5,21 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use App\Models\Concerns\BelongsToCompanyTrait;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 
 class Invoice extends Model
 {
     use HasFactory;
     use BelongsToCompanyTrait;
+
+    // ✅ Performance fix
+    protected static $hasCompanyColumn = true;
+
+    // ✅ الثوابت
+    const STATUS_UNPAID = 'unpaid';
+    const STATUS_PARTIALLY_PAID = 'partially_paid';
+    const STATUS_PAID = 'paid';
+    const STATUS_CANCELLED = 'cancelled';
 
     protected $fillable = [
         'company_id',
@@ -30,17 +38,20 @@ class Invoice extends Model
         'total'     => 'decimal:2',
     ];
 
-    // Optional: computed attributes appear in JSON automatically
     protected $appends = [
         'total_paid',
         'total_refunded',
+        'total_credit_applied',
         'net_paid',
         'remaining',
     ];
 
-    /* =========================
-     | Relations
-     * ========================= */
+    // ============ Relationships ============
+
+    public function company()
+    {
+        return $this->belongsTo(Company::class);
+    }
 
     public function customer()
     {
@@ -67,10 +78,10 @@ class Invoice extends Model
         return $this->hasManyThrough(
             PaymentRefund::class,
             Payment::class,
-            'invoice_id',   // FK on payments
-            'payment_id',   // FK on payment_refunds
-            'id',           // local key on invoices
-            'id'            // local key on payments
+            'invoice_id',
+            'payment_id',
+            'id',
+            'id'
         );
     }
 
@@ -94,86 +105,159 @@ class Invoice extends Model
         return $this->belongsTo(TreatmentPlan::class, 'treatment_plan_id');
     }
 
-    public function company()
+    // ============ Scopes ============
+
+    public function scopeUnpaid($query)
     {
-        return $this->belongsTo(Company::class);
+        return $query->where('status', self::STATUS_UNPAID);
     }
 
-    protected static function booted()
+    public function scopePartiallyPaid($query)
     {
-        static::created(function ($appointment) {
-            ActivityLog::create([
-                'company_id' => $appointment->company_id,
-                'user_id' => auth()->id(),
-                'action' => 'created',
-                'subject_type' => 'Appointment',
-                'subject_id' => $appointment->id,
-                'properties' => [
-                    'new' => $appointment->toArray()
-                ]
-            ]);
-        });
-
-        static::updated(function ($appointment) {
-            ActivityLog::create([
-                'company_id' => $appointment->company_id,
-                'user_id' => auth()->id(),
-                'action' => 'updated',
-                'subject_type' => 'Appointment',
-                'subject_id' => $appointment->id,
-                'properties' => [
-                    'old' => $appointment->getOriginal(),
-                    'changes' => $appointment->getChanges()
-                ]
-            ]);
-        });
-
-        static::deleted(function ($appointment) {
-            ActivityLog::create([
-                'company_id' => $appointment->company_id,
-                'user_id' => auth()->id(),
-                'action' => 'deleted',
-                'subject_type' => 'Appointment',
-                'subject_id' => $appointment->id,
-            ]);
-        });
+        return $query->where('status', self::STATUS_PARTIALLY_PAID);
     }
 
-    /* =========================
-     | Computed attributes
-     * ========================= */
+    public function scopePaid($query)
+    {
+        return $query->where('status', self::STATUS_PAID);
+    }
+
+    public function scopeCancelled($query)
+    {
+        return $query->where('status', self::STATUS_CANCELLED);
+    }
+
+    public function scopeForCustomer($query, $customerId)
+    {
+        return $query->where('customer_id', $customerId);
+    }
+
+    public function scopeBetweenDates($query, $from, $to)
+    {
+        return $query->whereBetween('issued_at', [$from, $to]);
+    }
+
+    // ============ Computed Attributes ============
 
     public function getTotalPaidAttribute(): float
     {
-        // only applied_amount counts as paid against invoice
         return (float) $this->payments()
-            ->where('company_id', $this->company_id)
             ->sum('applied_amount');
     }
 
     public function getTotalRefundedAttribute(): float
     {
-        /**
-         * IMPORTANT:
-         * Avoid ambiguous "amount" because both payments and payment_refunds have "amount".
-         * Use fully-qualified column: payment_refunds.amount
-         */
         return (float) DB::table('payment_refunds')
             ->join('payments', 'payments.id', '=', 'payment_refunds.payment_id')
             ->where('payments.invoice_id', $this->id)
-            ->where('payments.company_id', $this->company_id)
-            ->where('payment_refunds.company_id', $this->company_id)
             ->where('payment_refunds.applies_to', 'invoice')
             ->sum('payment_refunds.amount');
     }
 
+    public function getTotalCreditAppliedAttribute(): float
+    {
+        return (float) DB::table('customer_credits')
+            ->where('invoice_id', $this->id)
+            ->where('type', 'debit')
+            ->sum('amount');
+    }
+
     public function getNetPaidAttribute(): float
     {
-        return (float) $this->total_paid - (float) $this->total_refunded;
+        return $this->total_paid - $this->total_refunded + $this->total_credit_applied;
     }
 
     public function getRemainingAttribute(): float
     {
-        return max(0, (float) $this->total - (float) $this->net_paid);
+        return max(0, $this->total - $this->net_paid);
+    }
+
+    // ============ Helpers ============
+
+    public function isPaid(): bool
+    {
+        return $this->status === self::STATUS_PAID;
+    }
+
+    public function isUnpaid(): bool
+    {
+        return $this->status === self::STATUS_UNPAID;
+    }
+
+    public function isPartiallyPaid(): bool
+    {
+        return $this->status === self::STATUS_PARTIALLY_PAID;
+    }
+
+    public function isCancelled(): bool
+    {
+        return $this->status === self::STATUS_CANCELLED;
+    }
+
+    public function updateStatus(): void
+    {
+        $netPaid = $this->net_paid;
+
+        if ($netPaid <= 0) {
+            $status = self::STATUS_UNPAID;
+        } elseif ($netPaid < $this->total) {
+            $status = self::STATUS_PARTIALLY_PAID;
+        } else {
+            $status = self::STATUS_PAID;
+        }
+
+        $this->update(['status' => $status]);
+    }
+
+    public function markAsPaid(): void
+    {
+        $this->update(['status' => self::STATUS_PAID]);
+    }
+
+    public function markAsCancelled(): void
+    {
+        $this->update(['status' => self::STATUS_CANCELLED]);
+    }
+
+    // ============ Boot - Activity Logging ============
+
+    protected static function booted()
+    {
+        static::created(function ($invoice) {
+            if (auth()->check()) {
+                ActivityLog::create([
+                    'company_id' => $invoice->company_id,
+                    'user_id' => auth()->id(),
+                    'action' => 'invoice.created',
+                    'subject_type' => Invoice::class,
+                    'subject_id' => $invoice->id,
+                    'properties' => [
+                        'number' => $invoice->number,
+                        'customer_id' => $invoice->customer_id,
+                        'total' => $invoice->total,
+                    ]
+                ]);
+            }
+        });
+
+        static::updated(function ($invoice) {
+            if (auth()->check()) {
+                $changes = $invoice->getChanges();
+                unset($changes['updated_at']);
+
+                if (!empty($changes)) {
+                    ActivityLog::create([
+                        'company_id' => $invoice->company_id,
+                        'user_id' => auth()->id(),
+                        'action' => 'invoice.updated',
+                        'subject_type' => Invoice::class,
+                        'subject_id' => $invoice->id,
+                        'properties' => [
+                            'changes' => $changes,
+                        ]
+                    ]);
+                }
+            }
+        });
     }
 }
