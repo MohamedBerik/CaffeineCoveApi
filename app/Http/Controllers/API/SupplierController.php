@@ -5,152 +5,145 @@ namespace App\Http\Controllers\API;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\SupplierResource;
 use App\Models\Supplier;
+use App\Services\Tenant;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Validator;
-use Illuminate\Validation\Rule;
-use Illuminate\Support\Facades\Hash;
-
 
 class SupplierController extends Controller
 {
-    function index(Request $request)
+    public function index(Request $request)
     {
-        $companyId = $request->user()->company_id;
-
-        $supplier = SupplierResource::collection(
-            Supplier::where('company_id', $companyId)->get()
+        $suppliers = SupplierResource::collection(
+            Supplier::query()->get()
         );
 
         return response()->json([
-            "msg" => "Return All Data From supplier Table",
+            "msg" => "Return All Data From Supplier Table",
             "status" => 200,
-            "data" => $supplier
+            "data" => $suppliers
         ]);
     }
 
-
-    function show(Request $request, $id)
+    public function show(Request $request, $id)
     {
-        $supplier = Supplier::where('company_id', $request->user()->company_id)
-            ->find($id);
+        $supplier = Supplier::query()->find($id);
 
         if ($supplier) {
-            $data = [
+            return response()->json([
                 "msg" => "Return One Record of Supplier Table",
                 "status" => 200,
                 "data" => new SupplierResource($supplier)
-            ];
-            return response()->json($data);
-        } else {
-            $data = [
-                "msg" => "No Such id",
-                "status" => 205,
-                "data" => null
-            ];
-            return response()->json($data);
+            ]);
         }
+
+        return response()->json([
+            "msg" => "No Such id",
+            "status" => 404,
+            "data" => null
+        ], 404);
     }
 
-    function delete(Request $request)
+    public function delete(Request $request)
     {
         $id = $request->id;
-        $supplier = Supplier::where('company_id', $request->user()->company_id)
-            ->find($id);
-        if ($supplier) {
+        $supplier = Supplier::query()->find($id);
 
+        if ($supplier) {
             $supplier->delete();
-            $data = [
+
+            return response()->json([
                 "msg" => "Deleted Successfully",
                 "status" => 200,
                 "data" => null
-            ];
-            return response()->json($data);
-        } else {
-            $data = [
-                "msg" => "No Such id",
-                "status" => 205,
-                "data" => null
-            ];
-            return response()->json($data);
+            ]);
         }
+
+        return response()->json([
+            "msg" => "No Such id",
+            "status" => 404,
+            "data" => null
+        ], 404);
     }
 
     public function store(Request $request)
     {
-
         $validate = Validator::make($request->all(), [
             'name' => 'required|min:3|max:255',
-            'email' => 'required|min:3|max:255',
+            'email' => 'required|email|unique:suppliers,email',
             'phone' => 'required|min:3|max:255',
+            'address' => 'nullable|string|max:500',
+            'contact_person' => 'nullable|string|max:255',
+            'notes' => 'nullable|string',
         ]);
 
         if ($validate->fails()) {
-            $data = [
+            return response()->json([
                 "msg" => "Validation required",
-                "status" => 201,
+                "status" => 422,
                 "data" => $validate->errors()
-            ];
-            return response()->json($data);
+            ], 422);
         }
 
         $supplier = Supplier::create([
-            "company_id" => $request->user()->company_id,
-            "name"  => $request->name,
+            "company_id" => Tenant::id(),
+            "name" => $request->name,
             "email" => $request->email,
             "phone" => $request->phone,
+            "address" => $request->address,
+            "contact_person" => $request->contact_person,
+            "notes" => $request->notes,
         ]);
 
-        $data = [
+        return response()->json([
             "msg" => "Created Successfully",
-            "status" => 200,
+            "status" => 201,
             "data" => new SupplierResource($supplier)
-        ];
-        return response()->json($data);
+        ], 201);
     }
 
     public function update(Request $request)
     {
         $old_id = $request->old_id;
-        $supplier = Supplier::where('company_id', $request->user()->company_id)
-            ->find($old_id);
+        $supplier = Supplier::query()->find($old_id);
+
+        if (!$supplier) {
+            return response()->json([
+                "msg" => "No such id",
+                "status" => 404,
+                "data" => null
+            ], 404);
+        }
 
         $validate = Validator::make($request->all(), [
             "name" => "required|min:3|max:255",
-            "email" => "required|min:3|max:255",
+            "email" => "required|email|unique:suppliers,email," . $old_id,
             "phone" => "required|min:3|max:255",
+            "address" => "nullable|string|max:500",
+            "contact_person" => "nullable|string|max:255",
+            "notes" => "nullable|string",
         ]);
 
         if ($validate->fails()) {
-            $data = [
+            return response()->json([
                 "msg" => "Validation required",
-                "status" => 201,
+                "status" => 422,
                 "data" => $validate->errors()
-            ];
-            return response()->json($data);
+            ], 422);
         }
 
+        $supplier->update([
+            "name" => $request->name,
+            "email" => $request->email,
+            "phone" => $request->phone,
+            "address" => $request->address,
+            "contact_person" => $request->contact_person,
+            "notes" => $request->notes,
+        ]);
 
-        if ($supplier) {
-
-            $supplier->update([
-                "name" => $request->name,
-                "email" => $request->email,
-                "phone" => $request->phone,
-            ]);
-            $data = [
-                "msg" => "Updated Successfully",
-                "status" => 200,
-                "data" => new SupplierResource($supplier)
-            ];
-            return response()->json($data);
-        } else {
-            $data = [
-                "msg" => "No such id",
-                "status" => 205,
-                "data" => null
-            ];
-            return response()->json($data);
-        }
+        return response()->json([
+            "msg" => "Updated Successfully",
+            "status" => 200,
+            "data" => new SupplierResource($supplier->fresh())
+        ]);
     }
 }

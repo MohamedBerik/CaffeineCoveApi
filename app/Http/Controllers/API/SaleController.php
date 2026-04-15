@@ -5,89 +5,89 @@ namespace App\Http\Controllers\API;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\SaleResource;
 use App\Models\Sale;
+use App\Services\Tenant;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
 
 class SaleController extends Controller
 {
-    function index()
+    public function index()
     {
-        $sale = SaleResource::collection(Sale::all());
-        $data = [
+        $sales = SaleResource::collection(
+            Sale::query()->get()
+        );
+
+        return response()->json([
             "msg" => "Return All Data From Sale Table",
             "status" => 200,
-            "data" => $sale
-        ];
-        return response()->json($data);
+            "data" => $sales
+        ]);
     }
-    function show($id)
+
+    public function show($id)
     {
-        $sale = Sale::find($id);
+        $sale = Sale::query()->find($id);
 
         if ($sale) {
-            $data = [
+            return response()->json([
                 "msg" => "Return One Record of Sale Table",
                 "status" => 200,
                 "data" => new SaleResource($sale)
-            ];
-            return response()->json($data);
-        } else {
-            $data = [
-                "msg" => "No Such id",
-                "status" => 205,
-                "data" => null
-            ];
-            return response()->json($data);
+            ]);
         }
+
+        return response()->json([
+            "msg" => "No Such id",
+            "status" => 404,
+            "data" => null
+        ], 404);
     }
-    function delete(Request $request)
+
+    public function delete(Request $request)
     {
         $id = $request->id;
-        $sale = Sale::find($id);
-        if($sale){
+        $sale = Sale::query()->find($id);
+
+        if ($sale) {
             $sale->delete();
-            $data = [
+
+            return response()->json([
                 "msg" => "Deleted Successfully",
                 "status" => 200,
                 "data" => null
-            ];
-            return response()->json($data);
-        } else {
-            $data = [
-                "msg" => "No Such id",
-                "status" => 205,
-                "data" => null
-            ];
-            return response()->json($data);
+            ]);
         }
+
+        return response()->json([
+            "msg" => "No Such id",
+            "status" => 404,
+            "data" => null
+        ], 404);
     }
+
     public function store(Request $request)
     {
-
         $validate = Validator::make($request->all(), [
-            'id' => 'required|unique:sales|max:20',
             'title_en' => 'required|min:3|max:255',
             'title_ar' => 'required|min:3|max:255',
-            'description_en' => 'required|min:3|max:255',
-            'description_ar' => 'required|min:3|max:255',
-            'price' => 'required',
-            'quantity' => 'required',
-            'employee_id' => 'required',
+            'description_en' => 'nullable|string',
+            'description_ar' => 'nullable|string',
+            'price' => 'required|numeric|min:0',
+            'quantity' => 'required|integer|min:1',
+            'employee_id' => 'required|exists:employees,id',
         ]);
 
         if ($validate->fails()) {
-            $data = [
+            return response()->json([
                 "msg" => "Validation required",
-                "status" => 201,
+                "status" => 422,
                 "data" => $validate->errors()
-            ];
-            return response()->json($data);
+            ], 422);
         }
 
         $sale = Sale::create([
-            "id" => $request->id,
+            "company_id" => Tenant::id(),
             "title_en" => $request->title_en,
             "title_ar" => $request->title_ar,
             "description_en" => $request->description_en,
@@ -96,68 +96,59 @@ class SaleController extends Controller
             "quantity" => $request->quantity,
             "employee_id" => $request->employee_id,
         ]);
-        $data = [
+
+        return response()->json([
             "msg" => "Created Successfully",
-            "status" => 200,
+            "status" => 201,
             "data" => new SaleResource($sale)
-        ];
-        return response()->json($data);
+        ], 201);
     }
+
     public function update(Request $request)
     {
         $old_id = $request->old_id;
-        $sale = Sale::find($old_id);
+        $sale = Sale::query()->find($old_id);
+
+        if (!$sale) {
+            return response()->json([
+                "msg" => "No such id",
+                "status" => 404,
+                "data" => null
+            ], 404);
+        }
 
         $validate = Validator::make($request->all(), [
-            "id" => ['required', Rule::unique('sales')->ignore($old_id)],
             "title_en" => "required|min:3|max:255",
             "title_ar" => "required|min:3|max:255",
-            "description_en" => "required|min:3|max:255",
-            "description_ar" => "required|min:3|max:255",
-            "price" => "required",
-            "quantity" => "required",
-            "employee_id" => "required",
+            "description_en" => "nullable|string",
+            "description_ar" => "nullable|string",
+            "price" => "required|numeric|min:0",
+            "quantity" => "required|integer|min:1",
+            "employee_id" => "required|exists:employees,id",
         ]);
 
         if ($validate->fails()) {
-            $data = [
+            return response()->json([
                 "msg" => "Validation required",
-                "status" => 201,
+                "status" => 422,
                 "data" => $validate->errors()
-            ];
-            return response()->json($data);
+            ], 422);
         }
 
+        $sale->update([
+            "title_en" => $request->title_en,
+            "title_ar" => $request->title_ar,
+            "description_en" => $request->description_en,
+            "description_ar" => $request->description_ar,
+            "price" => $request->price,
+            "quantity" => $request->quantity,
+            "employee_id" => $request->employee_id,
+        ]);
 
-
-
-
-
-        if ($sale) {
-
-            $sale->update([
-                "id" => $request->id,
-                "title_en" => $request->title_en,
-                "title_ar" => $request->title_ar,
-                "description_en" => $request->description_en,
-                "description_ar" => $request->description_ar,
-                "price" => $request->price,
-                "quantity" => $request->quantity,
-                "employee_id" => $request->employee_id,
-            ]);
-            $data = [
-                "msg" => "Updated Successfully",
-                "status" => 200,
-                "data" => new SaleResource($sale)
-            ];
-            return response()->json($data);
-        } else {
-            $data = [
-                "msg" => "No such id",
-                "status" => 205,
-                "data" => null
-            ];
-            return response()->json($data);
-        }
+        return response()->json([
+            "msg" => "Updated Successfully",
+            "status" => 200,
+            "data" => new SaleResource($sale->fresh())
+        ]);
     }
 }

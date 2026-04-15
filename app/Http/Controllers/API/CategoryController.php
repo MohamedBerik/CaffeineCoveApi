@@ -5,6 +5,7 @@ namespace App\Http\Controllers\API;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\CategoryResource;
 use App\Models\Category;
+use App\Services\Tenant;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Validator;
@@ -12,96 +13,67 @@ use Illuminate\Validation\Rule;
 
 class CategoryController extends Controller
 {
-    function index(Request $request)
+    public function index(Request $request)
     {
-        $companyId = $request->user()->company_id;
-
-        $category = CategoryResource::collection(
-            Category::where('company_id', $companyId)->get()
+        $categories = CategoryResource::collection(
+            Category::query()->get()
         );
 
-        $data = [
+        return response()->json([
             "msg" => "Return All Data From Category Table",
             "status" => 200,
-            "data" => $category
-        ];
-        return response()->json($data);
+            "data" => $categories
+        ]);
     }
 
-    function show(Request $request, $id)
+    public function show(Request $request, $id)
     {
-        $companyId = $request->user()->company_id;
-
-        $category = Category::where('company_id', $companyId)
-            ->find($id);
+        $category = Category::query()->find($id);
 
         if ($category) {
-            $data = [
+            return response()->json([
                 "msg" => "Return One Record of Category Table",
                 "status" => 200,
                 "data" => new CategoryResource($category)
-            ];
-            return response()->json($data);
-        } else {
-            $data = [
-                "msg" => "No Such id",
-                "status" => 205,
-                "data" => null
-            ];
-            return response()->json($data);
+            ]);
         }
+
+        return response()->json([
+            "msg" => "No Such id",
+            "status" => 404,
+            "data" => null
+        ], 404);
     }
 
-    function delete(Request $request)
+    public function delete(Request $request)
     {
-        $companyId = $request->user()->company_id;
-
         $id = $request->id;
-
-        $category = Category::where('company_id', $companyId)
-            ->find($id);
+        $category = Category::query()->find($id);
 
         if ($category) {
-
-            if (File::exists(public_path("/img/category/" . $category->cate_image))) {
+            if ($category->cate_image && File::exists(public_path("/img/category/" . $category->cate_image))) {
                 File::delete(public_path("/img/category/" . $category->cate_image));
             }
 
             $category->delete();
 
-            $data = [
+            return response()->json([
                 "msg" => "Deleted Successfully",
                 "status" => 200,
                 "data" => null
-            ];
-            return response()->json($data);
-        } else {
-
-            $data = [
-                "msg" => "No Such id",
-                "status" => 205,
-                "data" => null
-            ];
-            return response()->json($data);
+            ]);
         }
+
+        return response()->json([
+            "msg" => "No Such id",
+            "status" => 404,
+            "data" => null
+        ], 404);
     }
 
     public function store(Request $request)
     {
-        // $companyId = $request->user()->company_id;
-
         $validate = Validator::make($request->all(), [
-            // 'cate_image' => 'required|image|max:2048|mimes:png,jpeg',
-
-            // unique per company
-            // 'id' => [
-            //     'required',
-            //     'max:20',
-            //     Rule::unique('categories')->where(function ($q) use ($companyId) {
-            //         return $q->where('company_id', $companyId);
-            //     }),
-            // ],
-
             'title_en' => 'required|min:3|max:255',
             'title_ar' => 'required|min:3|max:255',
             'description_en' => 'required|min:3|max:255',
@@ -109,59 +81,55 @@ class CategoryController extends Controller
         ]);
 
         if ($validate->fails()) {
-            $data = [
+            return response()->json([
                 "msg" => "Validation required",
-                "status" => 201,
+                "status" => 422,
                 "data" => $validate->errors()
-            ];
-            return response()->json($data);
+            ], 422);
         }
 
-        // if ($request->hasFile("cate_image")) {
-        //     $image = $request->cate_image;
-        //     $imageName = rand(1, 1000) . "_" . time() . "." . $image->extension();
-        //     $image->move(public_path("/img/category/"), $imageName);
-        // }
+        $imageName = null;
+        if ($request->hasFile("cate_image")) {
+            $image = $request->cate_image;
+            $imageName = rand(1, 1000) . "_" . time() . "." . $image->extension();
+            $image->move(public_path("/img/category/"), $imageName);
+        }
 
         $category = Category::create([
-            "company_id" => $request->user()->company_id,
-            // "cate_image"     => $imageName,
-            "title_en"       => $request->title_en,
-            "title_ar"       => $request->title_ar,
+            "company_id" => Tenant::id(),
+            "cate_image" => $imageName,
+            "title_en" => $request->title_en,
+            "title_ar" => $request->title_ar,
             "description_en" => $request->description_en,
             "description_ar" => $request->description_ar,
         ]);
 
-        $data = [
+        return response()->json([
             "msg" => "Created Successfully",
-            "status" => 200,
+            "status" => 201,
             "data" => new CategoryResource($category)
-        ];
-        return response()->json($data);
+        ], 201);
     }
 
     public function update(Request $request)
     {
-        $companyId = $request->user()->company_id;
-
         $old_id = $request->old_id;
+        $category = Category::query()->find($old_id);
 
-        $category = Category::where('company_id', $companyId)
-            ->find($old_id);
+        if (!$category) {
+            return response()->json([
+                "msg" => "No such id",
+                "status" => 404,
+                "data" => null
+            ], 404);
+        }
 
         $validate = Validator::make($request->all(), [
-            "cate_image" => "image|max:2048|mimes:png,jpeg",
-
-            // unique per company
+            "cate_image" => "nullable|image|max:2048|mimes:png,jpeg",
             "id" => [
                 'required',
-                Rule::unique('categories')
-                    ->where(function ($q) use ($companyId) {
-                        return $q->where('company_id', $companyId);
-                    })
-                    ->ignore($old_id),
+                Rule::unique('categories')->ignore($old_id),
             ],
-
             "title_en" => "required|min:3|max:255",
             "title_ar" => "required|min:3|max:255",
             "description_en" => "required|min:3|max:255",
@@ -169,54 +137,39 @@ class CategoryController extends Controller
         ]);
 
         if ($validate->fails()) {
-            $data = [
+            return response()->json([
                 "msg" => "Validation required",
-                "status" => 201,
+                "status" => 422,
                 "data" => $validate->errors()
-            ];
-            return response()->json($data);
+            ], 422);
         }
 
-        if ($category) {
+        $imageName = $category->cate_image;
 
-            if ($request->hasFile("cate_image")) {
+        if ($request->hasFile("cate_image")) {
+            $image = $request->cate_image;
+            $imageName = rand(1, 1000) . "_" . time() . "." . $image->extension();
 
-                $image = $request->cate_image;
-                $imageName = rand(1, 1000) . "_" . time() . "." . $image->extension();
-
-                if (File::exists(public_path("/img/category/" . $category->cate_image))) {
-                    File::delete(public_path("/img/category/" . $category->cate_image));
-                }
-
-                $image->move(public_path("/img/category/"), $imageName);
-            } else {
-
-                $imageName = $category->cate_image;
+            if ($category->cate_image && File::exists(public_path("/img/category/" . $category->cate_image))) {
+                File::delete(public_path("/img/category/" . $category->cate_image));
             }
 
-            $category->update([
-                "cate_image"     => $imageName,
-                "id"             => $request->id,
-                "title_en"       => $request->title_en,
-                "title_ar"       => $request->title_ar,
-                "description_en" => $request->description_en,
-                "description_ar" => $request->description_ar,
-            ]);
-
-            $data = [
-                "msg" => "Updated Successfully",
-                "status" => 200,
-                "data" => new CategoryResource($category)
-            ];
-            return response()->json($data);
-        } else {
-
-            $data = [
-                "msg" => "No such id",
-                "status" => 205,
-                "data" => null
-            ];
-            return response()->json($data);
+            $image->move(public_path("/img/category/"), $imageName);
         }
+
+        $category->update([
+            "cate_image" => $imageName,
+            "id" => $request->id,
+            "title_en" => $request->title_en,
+            "title_ar" => $request->title_ar,
+            "description_en" => $request->description_en,
+            "description_ar" => $request->description_ar,
+        ]);
+
+        return response()->json([
+            "msg" => "Updated Successfully",
+            "status" => 200,
+            "data" => new CategoryResource($category)
+        ]);
     }
 }

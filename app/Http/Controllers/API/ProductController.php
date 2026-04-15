@@ -5,171 +5,177 @@ namespace App\Http\Controllers\API;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\ProductResource;
 use App\Models\Product;
+use App\Services\Tenant;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Validator;
-use Illuminate\Validation\Rule;
 
 class ProductController extends Controller
 {
     public function index(Request $request)
     {
-        $companyId = $request->user()->company_id;
-
-        $product = ProductResource::collection(
-            Product::where('company_id', $companyId)->get()
+        $products = ProductResource::collection(
+            Product::query()->get()
         );
 
         return response()->json([
             "msg" => "Return All Data From Product Table",
             "status" => 200,
-            "data" => $product
+            "data" => $products
         ]);
     }
 
-    function show(Request $request, $id)
+    public function show(Request $request, $id)
     {
-        $product = Product::where('company_id', $request->user()->company_id)
-            ->find($id);
+        $product = Product::query()->find($id);
 
         if ($product) {
-            $data = [
+            return response()->json([
                 "msg" => "Return One Record of Product Table",
                 "status" => 200,
                 "data" => new ProductResource($product)
-            ];
-            return response()->json($data);
-        } else {
-            $data = [
-                "msg" => "No Such id",
-                "status" => 205,
-                "data" => null
-            ];
-            return response()->json($data);
+            ]);
         }
+
+        return response()->json([
+            "msg" => "No Such id",
+            "status" => 404,
+            "data" => null
+        ], 404);
     }
-    function delete(Request $request)
+
+    public function delete(Request $request)
     {
         $id = $request->id;
-        $product = Product::where('company_id', $request->user()->company_id)
-            ->find($id);
+        $product = Product::query()->find($id);
+
         if ($product) {
-            // if (File::exists(public_path("/img/product/" . $product->product_image))) {
-            //     File::delete(public_path("/img/product/" . $product->product_image));
-            // }
+            if ($product->product_image && File::exists(public_path("/img/product/" . $product->product_image))) {
+                File::delete(public_path("/img/product/" . $product->product_image));
+            }
             $product->delete();
-            $data = [
+
+            return response()->json([
                 "msg" => "Deleted Successfully",
                 "status" => 200,
                 "data" => null
-            ];
-            return response()->json($data);
-        } else {
-            $data = [
-                "msg" => "No Such id",
-                "status" => 205,
-                "data" => null
-            ];
-            return response()->json($data);
+            ]);
         }
+
+        return response()->json([
+            "msg" => "No Such id",
+            "status" => 404,
+            "data" => null
+        ], 404);
     }
+
     public function store(Request $request)
     {
-
         $validate = Validator::make($request->all(), [
             'title_en' => 'required|min:3|max:255',
             'title_ar' => 'required|min:3|max:255',
-            'description_en' => 'required|min:3|max:255',
-            'description_ar' => 'required|min:3|max:255',
-            'unit_price' => 'required|numeric',
+            'description_en' => 'nullable|string',
+            'description_ar' => 'nullable|string',
+            'unit_price' => 'required|numeric|min:0',
             'category_id' => 'required|exists:categories,id',
-            // 'product_image' => 'required|image|max:2048|mimes:png,jpeg',
+            'product_image' => 'nullable|image|max:2048|mimes:png,jpeg,jpg',
+            'quantity' => 'nullable|integer|min:0',
         ]);
 
         if ($validate->fails()) {
-            $data = [
+            return response()->json([
                 "msg" => "Validation required",
-                "status" => 201,
+                "status" => 422,
                 "data" => $validate->errors()
-            ];
-            return response()->json($data);
+            ], 422);
         }
 
-        // if ($request->hasFile("product_image")) {
-        //     $image = $request->product_image;
-        //     $imageName = rand(1, 1000) . "_" . time() . "." . $image->extension();
-        //     $image->move(public_path("/img/product/"), $imageName);
-        // }
+        $imageName = null;
+        if ($request->hasFile("product_image")) {
+            $image = $request->product_image;
+            $imageName = rand(1, 1000) . "_" . time() . "." . $image->extension();
+            $image->move(public_path("/img/product/"), $imageName);
+        }
 
         $product = Product::create([
-            "company_id"     => $request->user()->company_id,
+            "company_id"     => Tenant::id(),
             "title_en"       => $request->title_en,
             "title_ar"       => $request->title_ar,
             "description_en" => $request->description_en,
             "description_ar" => $request->description_ar,
             "unit_price"     => $request->unit_price,
-            "stock_quantity" => 0,
+            "stock_quantity" => $request->quantity ?? 0,
             "category_id"    => $request->category_id,
-            "quantity"       => $request->quantity,
-            // "product_image"  => $imageName,
+            "product_image"  => $imageName,
         ]);
 
-        $data = [
+        return response()->json([
             "msg" => "Created Successfully",
-            "status" => 200,
+            "status" => 201,
             "data" => new ProductResource($product)
-        ];
-        return response()->json($data);
+        ], 201);
     }
+
     public function update(Request $request)
     {
         $old_id = $request->old_id;
-        $product = Product::where('company_id', $request->user()->company_id)
-            ->find($old_id);
+        $product = Product::query()->find($old_id);
+
+        if (!$product) {
+            return response()->json([
+                "msg" => "No such id",
+                "status" => 404,
+                "data" => null
+            ], 404);
+        }
 
         $validate = Validator::make($request->all(), [
             "title_en" => "required|min:3|max:255",
             "title_ar" => "required|min:3|max:255",
-            "description_en" => "required|min:3|max:255",
-            "description_ar" => "required|min:3|max:255",
-            "unit_price" => "required",
-            "category_id" => "required",
-            "product_image" => "required|image|max:2048|mimes:png,jpeg",
+            "description_en" => "nullable|string",
+            "description_ar" => "nullable|string",
+            "unit_price" => "required|numeric|min:0",
+            "category_id" => "required|exists:categories,id",
+            "product_image" => "nullable|image|max:2048|mimes:png,jpeg,jpg",
+            "quantity" => "nullable|integer|min:0",
         ]);
 
         if ($validate->fails()) {
-            $data = [
+            return response()->json([
                 "msg" => "Validation required",
-                "status" => 201,
+                "status" => 422,
                 "data" => $validate->errors()
-            ];
-            return response()->json($data);
+            ], 422);
         }
 
-        if ($product) {
+        $imageName = $product->product_image;
 
-            $product->update([
-                "title_en" => $request->title_en,
-                "title_ar" => $request->title_ar,
-                "description_en" => $request->description_en,
-                "description_ar" => $request->description_ar,
-                "unit_price" => $request->unit_price,
-                // "stock_quantity" => $request->stock_quantity,
-                "category_id" => $request->category_id,
-            ]);
-            $data = [
-                "msg" => "Updated Successfully",
-                "status" => 200,
-                "data" => new ProductResource($product)
-            ];
-            return response()->json($data);
-        } else {
-            $data = [
-                "msg" => "No such id",
-                "status" => 205,
-                "data" => null
-            ];
-            return response()->json($data);
+        if ($request->hasFile("product_image")) {
+            $image = $request->product_image;
+            $imageName = rand(1, 1000) . "_" . time() . "." . $image->extension();
+
+            if ($product->product_image && File::exists(public_path("/img/product/" . $product->product_image))) {
+                File::delete(public_path("/img/product/" . $product->product_image));
+            }
+
+            $image->move(public_path("/img/product/"), $imageName);
         }
+
+        $product->update([
+            "title_en" => $request->title_en,
+            "title_ar" => $request->title_ar,
+            "description_en" => $request->description_en,
+            "description_ar" => $request->description_ar,
+            "unit_price" => $request->unit_price,
+            "stock_quantity" => $request->quantity ?? $product->stock_quantity,
+            "category_id" => $request->category_id,
+            "product_image" => $imageName,
+        ]);
+
+        return response()->json([
+            "msg" => "Updated Successfully",
+            "status" => 200,
+            "data" => new ProductResource($product)
+        ]);
     }
 }
