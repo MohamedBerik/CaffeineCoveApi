@@ -1,15 +1,31 @@
 <?php
 
-use Illuminate\Support\Facades\Route;
-use App\Http\Controllers\API\SaaS\ClinicOnboardingController;
 use App\Http\Controllers\API\SaaS\TenantController;
+use App\Http\Controllers\API\SaaS\ClinicOnboardingController;
+use Illuminate\Support\Facades\Route;
+
 /*
 |--------------------------------------------------------------------------
-| SaaS routes (tenant onboarding)
+| SaaS Routes (Super Admin Only)
 |--------------------------------------------------------------------------
 */
 
-Route::middleware(['auth:sanctum', 'company.user'])->prefix('saas')->group(function () {
-    Route::get('/me', [TenantController::class, 'me']);
-    Route::post('/register-clinic', [ClinicOnboardingController::class, 'register']);
-});
+Route::prefix('saas')
+    ->middleware(['auth:sanctum', 'super.admin'])
+    ->group(function () {
+
+        // Tenant management
+        Route::get('/me', [TenantController::class, 'me']);
+        Route::post('/switch-company', [TenantController::class, 'switch']);
+        Route::post('/exit-company', [TenantController::class, 'exitCompany']);
+
+        // Clinic onboarding (public - no auth required for register)
+        Route::post('/register-clinic', [ClinicOnboardingController::class, 'register'])
+            ->withoutMiddleware(['auth:sanctum', 'super.admin']);
+
+        Route::get('/check-slug', [ClinicOnboardingController::class, 'checkSlug'])
+            ->withoutMiddleware(['auth:sanctum', 'super.admin']);
+
+        Route::get('/onboarding-progress', [ClinicOnboardingController::class, 'progress'])
+            ->withoutMiddleware(['auth:sanctum', 'super.admin']);
+    });

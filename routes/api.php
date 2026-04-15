@@ -1,5 +1,4 @@
 <?php
-// routes/api.php
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
@@ -13,7 +12,7 @@ use App\Http\Controllers\API\SaleController;
 use App\Http\Controllers\API\ReservationController;
 use App\Http\Controllers\API\AdminDashboardController;
 use App\Http\Controllers\API\AdminCrudController;
-// ERP
+// ERP Controllers
 use App\Http\Controllers\API\Erp\OrderController;
 use App\Http\Controllers\API\Erp\InvoicePaymentController;
 use App\Http\Controllers\API\Erp\InvoiceController;
@@ -44,21 +43,22 @@ use App\Services\Tenant;
 
 /*
 |--------------------------------------------------------------------------
-| Public auth
+| Public Routes (No Authentication Required)
 |--------------------------------------------------------------------------
 */
 
-Route::post('/register', [AuthController::class, 'register']);
 Route::post('/login', [AuthController::class, 'login']);
+Route::post('/register', [AuthController::class, 'register']);
 
 /*
 |--------------------------------------------------------------------------
-| Authenticated routes (all users)
+| Authenticated Routes (All Users)
 |--------------------------------------------------------------------------
 */
 
 Route::middleware(['auth:sanctum', 'company.user'])->group(function () {
 
+    // User Profile
     Route::get('/me', function (Request $request) {
         $user = $request->user();
 
@@ -93,12 +93,13 @@ Route::middleware(['auth:sanctum', 'company.user'])->group(function () {
             'name' => $user->name,
             'email' => $user->email,
             'role' => $user->role,
-            'company_id' => Tenant::id(), // ✅ استخدام Tenant بدل user->company_id
+            'company_id' => Tenant::id(),
             'is_super_admin' => (bool) $user->is_super_admin,
             'permissions' => $permissions,
         ]);
     });
 
+    // Logout
     Route::post('/logout', function (Request $request) {
         $request->user()->currentAccessToken()->delete();
         return response()->json(['message' => 'Logged out successfully']);
@@ -107,28 +108,31 @@ Route::middleware(['auth:sanctum', 'company.user'])->group(function () {
 
 /*
 |--------------------------------------------------------------------------
-| Super Admin only
+| Super Admin Routes (Global Access)
 |--------------------------------------------------------------------------
 */
 
-Route::middleware(['auth:sanctum', 'super.admin'])->group(function () {
-    Route::get('/admin-crud/{table}', [AdminCrudController::class, 'index']);
-    Route::get('/admin-crud/{table}/{id}', [AdminCrudController::class, 'show']);
-    Route::post('/admin-crud/{table}', [AdminCrudController::class, 'store']);
-    Route::put('/admin-crud/{table}/{id}', [AdminCrudController::class, 'update']);
-    Route::delete('/admin-crud/{table}/{id}', [AdminCrudController::class, 'destroy']);
+Route::middleware(['auth:sanctum', 'super.admin'])->prefix('admin')->group(function () {
+    // Generic CRUD for any table
+    Route::get('/crud/{table}', [AdminCrudController::class, 'index']);
+    Route::get('/crud/{table}/{id}', [AdminCrudController::class, 'show']);
+    Route::post('/crud/{table}', [AdminCrudController::class, 'store']);
+    Route::put('/crud/{table}/{id}', [AdminCrudController::class, 'update']);
+    Route::delete('/crud/{table}/{id}', [AdminCrudController::class, 'destroy']);
+
+    // Super Admin Dashboard
+    Route::get('/dashboard', [AdminDashboardController::class, 'index']);
 });
 
 /*
 |--------------------------------------------------------------------------
-| Admin dashboard (admin role only - inside company)
+| Company Admin Routes (Tenant Admin)
 |--------------------------------------------------------------------------
 */
 
 Route::middleware(['auth:sanctum', 'admin', 'company.user', 'throttle:120,1'])
     ->prefix('admin')
     ->group(function () {
-        Route::get('/dashboard', [AdminDashboardController::class, 'index']);
         Route::apiResource('categories', CategoryController::class);
         Route::apiResource('suppliers', SupplierController::class);
         Route::apiResource('employees', EmployeeController::class);
@@ -137,6 +141,7 @@ Route::middleware(['auth:sanctum', 'admin', 'company.user', 'throttle:120,1'])
         Route::apiResource('sales', SaleController::class);
         Route::apiResource('appointments', AppointmentController::class);
 
+        // Reservations
         Route::get('/reservations', [ReservationController::class, 'index']);
         Route::post('/reservations', [ReservationController::class, 'store']);
         Route::post('/reservations/{id}/confirm', [ReservationController::class, 'confirm']);
@@ -146,93 +151,116 @@ Route::middleware(['auth:sanctum', 'admin', 'company.user', 'throttle:120,1'])
 
 /*
 |--------------------------------------------------------------------------
-| ERP routes (multi-tenant)
+| ERP Routes (Multi-tenant Clinic Management)
 |--------------------------------------------------------------------------
 */
 
 Route::prefix('erp')
-    ->middleware(['auth:sanctum', 'company.user']) // ✅ إضافة company.user
+    ->middleware(['auth:sanctum', 'company.user'])
     ->group(function () {
 
-        // Orders
+        // ==================== DASHBOARD & REPORTS ====================
+        Route::middleware('permission:finance.view')->group(function () {
+            Route::get('/dashboard', [ErpDashboardController::class, 'index']);
+            Route::get('/dashboard/finance', [FinanceDashboardController::class, 'index']);
+            Route::get('/activity-logs', [ActivityLogController::class, 'index']);
+        });
+
+        // ==================== ALERTS ====================
+        Route::middleware('permission:finance.view')->group(function () {
+            Route::get('/alerts', [AlertController::class, 'index']);
+            Route::get('/alerts/unread-count', [AlertController::class, 'unreadCount']);
+            Route::post('/alerts/{id}/ack', [AlertController::class, 'acknowledge']);
+            Route::post('/alerts/mark-all-read', [AlertController::class, 'markAllRead']);
+        });
+
+        // ==================== ORDERS ====================
         Route::middleware('permission:orders.manage')->post('/orders', [OrderController::class, 'storeErp']);
         Route::middleware('permission:orders.view')->get('/orders', [OrderController::class, 'indexErp']);
         Route::middleware('permission:orders.view')->get('/orders/{id}', [OrderController::class, 'showErp']);
         Route::middleware('permission:orders.confirm')->post('/orders/{id}/confirm', [OrderController::class, 'confirm']);
         Route::middleware('permission:orders.cancel')->post('/orders/{id}/cancel', [OrderController::class, 'cancel']);
 
-        // Invoices
-        Route::middleware('permission:finance.view')->get('/invoices', [InvoiceController::class, 'indexErp']);
-        Route::middleware('permission:finance.view')->get('/invoices/{id}', [InvoiceController::class, 'show']);
-        Route::middleware('permission:finance.view')->get('/invoices/{id}/full', [InvoiceController::class, 'showFullInvoice']);
+        // ==================== INVOICES ====================
+        Route::middleware('permission:finance.view')->group(function () {
+            Route::get('/invoices', [InvoiceController::class, 'indexErp']);
+            Route::get('/invoices/{id}', [InvoiceController::class, 'show']);
+            Route::get('/invoices/{id}/full', [InvoiceController::class, 'showFullInvoice']);
+            Route::get('/invoices/{invoiceId}/journal-entries', [InvoiceJournalController::class, 'index']);
+        });
         Route::middleware('permission:finance.create')->post('/invoices/{invoice}/payments', [InvoicePaymentController::class, 'store']);
-        Route::middleware('permission:finance.view')->get('/invoices/{invoiceId}/journal-entries', [InvoiceJournalController::class, 'index']);
         Route::post('/invoices/{invoice}/apply-credit', [InvoicePaymentController::class, 'applyCustomerCredit']);
 
-        // Payments / Refunds
+        // ==================== PAYMENTS & REFUNDS ====================
         Route::middleware('permission:payments.refund')->post('/payments/{payment}/refund', [PaymentRefundController::class, 'refund']);
 
-        // Purchase Orders
+        // ==================== PURCHASE ORDERS ====================
         Route::middleware('permission:purchases.manage')->post('/purchase-orders', [PurchaseOrderController::class, 'store']);
-        Route::middleware('permission:finance.view')->get('/purchase-orders', [PurchaseOrderController::class, 'indexErp']);
-        Route::middleware('permission:finance.view')->get('/purchase-orders/{id}', [PurchaseOrderController::class, 'showErp']);
+        Route::middleware('permission:finance.view')->group(function () {
+            Route::get('/purchase-orders', [PurchaseOrderController::class, 'indexErp']);
+            Route::get('/purchase-orders/{id}', [PurchaseOrderController::class, 'showErp']);
+            Route::get('/purchase-orders/{id}/returnable-items', [PurchaseOrderController::class, 'getReturnableItems']);
+            Route::get('/purchase-orders/{id}/returns-history', [PurchaseOrderController::class, 'returnHistory']);
+            Route::post('/purchase-orders/{id}/pay', [PurchaseOrderController::class, 'pay']);
+        });
         Route::middleware('permission:purchases.receive')->post('/purchase-orders/{id}/receive', [PurchaseOrderController::class, 'receive']);
         Route::middleware('permission:purchases.return')->post('/purchase-orders/{id}/return', [PurchaseOrderController::class, 'returnItems']);
-        Route::middleware('permission:finance.view')->get('/purchase-orders/{id}/returnable-items', [PurchaseOrderController::class, 'getReturnableItems']);
-        Route::middleware('permission:finance.view')->get('/purchase-orders/{id}/returns-history', [PurchaseOrderController::class, 'returnHistory']);
-        Route::middleware('permission:finance.view')->post('/purchase-orders/{id}/pay', [PurchaseOrderController::class, 'pay']);
 
-        // Statements
-        Route::middleware('permission:finance.view')->get('/customers/{customerId}/statement', [CustomerStatementController::class, 'show']);
-        Route::middleware('permission:finance.view')->get('/suppliers/{supplier}/statement', [SupplierStatementController::class, 'show']);
+        // ==================== STATEMENTS ====================
+        Route::middleware('permission:finance.view')->group(function () {
+            Route::get('/customers/{customerId}/statement', [CustomerStatementController::class, 'show']);
+            Route::get('/suppliers/{supplier}/statement', [SupplierStatementController::class, 'show']);
+            Route::get('/customers/{customerId}/credit-balance', [CustomerCreditController::class, 'show']);
+        });
 
-        // Dashboard & logs & Alerts
-        Route::middleware('permission:finance.view')->get('/dashboard/finance', [FinanceDashboardController::class, 'index']);
-        Route::middleware('permission:finance.view')->get('/activity-logs', [ActivityLogController::class, 'index']);
-        Route::middleware('permission:finance.view')->get('/dashboard', [ErpDashboardController::class, 'index']);
-        Route::middleware('permission:finance.view')->get('/alerts', [AlertController::class, 'index']);
-        Route::middleware('permission:finance.view')->get('/alerts/unread-count', [AlertController::class, 'unreadCount']);
-        Route::middleware('permission:finance.view')->post('/alerts/{id}/ack', [AlertController::class, 'acknowledge']);
-        Route::post('/alerts/mark-all-read', [AlertController::class, 'markAllRead']);
-
-        // Appointments
-        Route::middleware('permission:appointments.view')->get('/appointments', [AppointmentController::class, 'index']);
-        Route::middleware('permission:appointments.view')->get('/appointments/available-slots', [AppointmentAvailabilityController::class, 'index']);
-        Route::middleware('permission:appointments.view')->get('/appointments/{id}', [AppointmentController::class, 'show']);
-        Route::middleware('permission:appointments.manage')->post('/appointments/book', [AppointmentController::class, 'book']);
-        Route::middleware('permission:appointments.manage')->put('/appointments/{id}', [AppointmentController::class, 'update']);
-        Route::middleware('permission:appointments.manage')->post('/appointments/{id}/cancel', [AppointmentController::class, 'cancel']);
+        // ==================== APPOINTMENTS ====================
+        Route::middleware('permission:appointments.view')->group(function () {
+            Route::get('/appointments', [AppointmentController::class, 'index']);
+            Route::get('/appointments/available-slots', [AppointmentAvailabilityController::class, 'index']);
+            Route::get('/appointments/{id}', [AppointmentController::class, 'show']);
+            Route::get('/appointments/{id}/activity', [AppointmentActivityController::class, 'index']);
+        });
+        Route::middleware('permission:appointments.manage')->group(function () {
+            Route::post('/appointments/book', [AppointmentController::class, 'book']);
+            Route::put('/appointments/{id}', [AppointmentController::class, 'update']);
+            Route::post('/appointments/{id}/cancel', [AppointmentController::class, 'cancel']);
+            Route::post('/appointments/{id}/no-show', [AppointmentController::class, 'noShow']);
+            Route::post('/appointments/{id}/reschedule', [AppointmentController::class, 'reschedule']);
+            Route::post('/appointments/{id}/send-reminder', [AppointmentController::class, 'sendReminder']);
+        });
         Route::middleware('permission:appointments.complete')->post('/appointments/{id}/complete', [AppointmentController::class, 'complete']);
-        Route::middleware('permission:appointments.manage')->post('/appointments/{id}/no-show', [AppointmentController::class, 'noShow']);
-        Route::middleware('permission:appointments.manage')->post('/appointments/{id}/reschedule', [AppointmentController::class, 'reschedule']);
-        Route::middleware('permission:appointments.manage')->post('/appointments/{id}/send-reminder', [AppointmentController::class, 'sendReminder']);
-        Route::middleware('permission:finance.view')->get('/appointments/{id}/activity', [AppointmentActivityController::class, 'index']);
 
-        Route::get('/customers/{customerId}/credit-balance', [CustomerCreditController::class, 'show']);
+        // ==================== TREATMENT PLANS ====================
+        Route::middleware('permission:treatment_plans.view')->group(function () {
+            Route::get('/treatment-plans', [TreatmentPlanController::class, 'index']);
+            Route::get('/treatment-plans/{id}', [TreatmentPlanController::class, 'show']);
+            Route::get('/treatment-plans/{id}/summary', [TreatmentPlanController::class, 'summary']);
+            Route::get('/treatment-plans/{id}/cash-summary', [TreatmentPlanController::class, 'cashSummary']);
+            Route::get('/treatment-plans/{itemId}/items', [TreatmentPlanController::class, 'items']);
+        });
+        Route::middleware('permission:treatment_plans.manage')->group(function () {
+            Route::post('/treatment-plans', [TreatmentPlanController::class, 'store']);
+            Route::put('/treatment-plans/{id}', [TreatmentPlanController::class, 'update']);
+            Route::delete('/treatment-plans/{id}', [TreatmentPlanController::class, 'destroy']);
+            Route::post('/treatment-plans/{itemId}/items', [TreatmentPlanController::class, 'addItem']);
+            Route::put('/treatment-plan-items/{itemId}', [TreatmentPlanController::class, 'updateItem']);
+            Route::delete('/treatment-plan-items/{itemId}', [TreatmentPlanController::class, 'deleteItem']);
+            Route::post('/treatment-plan-items/{itemId}/start', [TreatmentPlanController::class, 'startItem']);
+            Route::post('/treatment-plan-items/{itemId}/attach-appointment', [TreatmentPlanController::class, 'attachAppointment']);
+        });
 
-        // TreatmentPlan
-        Route::middleware('permission:treatment_plans.view')->get('/treatment-plans', [TreatmentPlanController::class, 'index']);
-        Route::middleware('permission:treatment_plans.manage')->post('/treatment-plans', [TreatmentPlanController::class, 'store']);
-        Route::middleware('permission:treatment_plans.view')->get('/treatment-plans/{id}', [TreatmentPlanController::class, 'show']);
-        Route::middleware('permission:treatment_plans.manage')->put('/treatment-plans/{id}', [TreatmentPlanController::class, 'update']);
-        Route::middleware('permission:treatment_plans.manage')->delete('/treatment-plans/{id}', [TreatmentPlanController::class, 'destroy']);
-        Route::middleware('permission:treatment_plans.view')->get('/treatment-plans/{id}/summary', [TreatmentPlanController::class, 'summary']);
-        Route::middleware('permission:treatment_plans.view')->get('/treatment-plans/{id}/cash-summary', [TreatmentPlanController::class, 'cashSummary']);
-        Route::middleware('permission:treatment_plans.view')->get('/treatment-plans/{itemId}/items', [TreatmentPlanController::class, 'items']);
-        Route::middleware('permission:treatment_plans.manage')->post('/treatment-plans/{itemId}/items', [TreatmentPlanController::class, 'addItem']);
-        Route::middleware('permission:treatment_plans.manage')->put('/treatment-plan-items/{itemId}', [TreatmentPlanController::class, 'updateItem']);
-        Route::middleware('permission:treatment_plans.manage')->delete('/treatment-plan-items/{itemId}', [TreatmentPlanController::class, 'deleteItem']);
-        Route::middleware('permission:treatment_plans.manage')->post('/treatment-plan-items/{itemId}/start', [TreatmentPlanController::class, 'startItem']);
-        Route::middleware('permission:treatment_plans.manage')->post('/treatment-plan-items/{itemId}/attach-appointment', [TreatmentPlanController::class, 'attachAppointment']);
+        // ==================== PROCEDURES ====================
+        Route::middleware('permission:procedures.view')->group(function () {
+            Route::get('/procedures', [ProcedureController::class, 'index']);
+            Route::get('/procedures/{id}', [ProcedureController::class, 'show']);
+        });
+        Route::middleware('permission:procedures.manage')->group(function () {
+            Route::post('/procedures', [ProcedureController::class, 'store']);
+            Route::put('/procedures/{id}', [ProcedureController::class, 'update']);
+            Route::delete('/procedures/{id}', [ProcedureController::class, 'destroy']);
+        });
 
-        // Procedure
-        Route::middleware('permission:procedures.view')->get('/procedures', [ProcedureController::class, 'index']);
-        Route::middleware('permission:procedures.view')->get('/procedures/{id}', [ProcedureController::class, 'show']);
-        Route::middleware('permission:procedures.manage')->post('/procedures', [ProcedureController::class, 'store']);
-        Route::middleware('permission:procedures.manage')->put('/procedures/{id}', [ProcedureController::class, 'update']);
-        Route::middleware('permission:procedures.manage')->delete('/procedures/{id}', [ProcedureController::class, 'destroy']);
-
-        // Doctors
+        // ==================== DOCTORS ====================
         Route::get('/doctors', [DoctorController::class, 'index']);
         Route::post('/doctors', [DoctorController::class, 'store']);
         Route::get('/doctors/{id}', [DoctorController::class, 'show']);
@@ -240,30 +268,39 @@ Route::prefix('erp')
         Route::delete('/doctors/{id}', [DoctorController::class, 'destroy']);
         Route::get('/doctors/{doctorId}/availability', [DoctorAvailabilityController::class, 'show']);
 
-        // Customers (Patients)
-        Route::middleware('permission:patients.view')->get('/customers', [CustomerController::class, 'index']);
-        Route::middleware('permission:patients.view')->get('/customers/{id}', [CustomerController::class, 'show']);
-        Route::middleware('permission:patients.manage')->post('/customers', [CustomerController::class, 'store']);
-        Route::middleware('permission:patients.manage')->put('/customers/{id}', [CustomerController::class, 'update']);
-        Route::middleware('permission:patients.manage')->delete('/customers/{id}', [CustomerController::class, 'destroy']);
-        Route::middleware('permission:patients.view')->get('/customers/{customerId}/profile', [PatientProfileController::class, 'show']);
-        Route::middleware('permission:patients.view')->get('/customers/{customerId}/timeline', [PatientTimelineController::class, 'index']);
+        // ==================== CUSTOMERS (PATIENTS) ====================
+        Route::middleware('permission:patients.view')->group(function () {
+            Route::get('/customers', [CustomerController::class, 'index']);
+            Route::get('/customers/{id}', [CustomerController::class, 'show']);
+            Route::get('/customers/{customerId}/profile', [PatientProfileController::class, 'show']);
+            Route::get('/customers/{customerId}/timeline', [PatientTimelineController::class, 'index']);
+        });
+        Route::middleware('permission:patients.manage')->group(function () {
+            Route::post('/customers', [CustomerController::class, 'store']);
+            Route::put('/customers/{id}', [CustomerController::class, 'update']);
+            Route::delete('/customers/{id}', [CustomerController::class, 'destroy']);
+        });
 
-        // Radiology
+        // ==================== RADIOLOGY ====================
         Route::get('/patient-radiologies', [RadiologyController::class, 'index']);
         Route::post('/patient-radiologies', [RadiologyController::class, 'store']);
         Route::get('/patient-radiologies/{id}', [RadiologyController::class, 'show']);
         Route::delete('/patient-radiologies/{id}', [RadiologyController::class, 'destroy']);
 
-        // DentalRecord
-        Route::middleware('permission:patients.view')->get('/dental-records', [DentalRecordController::class, 'index']);
-        Route::middleware('permission:patients.manage')->post('/dental-records', [DentalRecordController::class, 'store']);
-        Route::middleware('permission:patients.view')->get('/dental-records/{id}', [DentalRecordController::class, 'show']);
-        Route::middleware('permission:patients.manage')->put('/dental-records/{id}', [DentalRecordController::class, 'update']);
-        Route::middleware('permission:patients.manage')->delete('/dental-records/{id}', [DentalRecordController::class, 'destroy']);
-        Route::middleware('permission:treatment_plans.manage')->post('/dental-records/{id}/to-treatment-plan-item', [DentalRecordController::class, 'toTreatmentPlanItem']);
+        // ==================== DENTAL RECORDS ====================
+        Route::middleware('permission:patients.view')->group(function () {
+            Route::get('/dental-records', [DentalRecordController::class, 'index']);
+            Route::get('/dental-records/{id}', [DentalRecordController::class, 'show']);
+        });
+        Route::middleware('permission:patients.manage')->group(function () {
+            Route::post('/dental-records', [DentalRecordController::class, 'store']);
+            Route::put('/dental-records/{id}', [DentalRecordController::class, 'update']);
+            Route::delete('/dental-records/{id}', [DentalRecordController::class, 'destroy']);
+        });
+        Route::middleware('permission:treatment_plans.manage')
+            ->post('/dental-records/{id}/to-treatment-plan-item', [DentalRecordController::class, 'toTreatmentPlanItem']);
 
-        // Clinic settings
+        // ==================== CLINIC SETTINGS ====================
         Route::get('/clinic-settings', [ClinicSettingController::class, 'show']);
         Route::put('/clinic-settings', [ClinicSettingController::class, 'update']);
     });
