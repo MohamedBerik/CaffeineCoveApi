@@ -13,30 +13,26 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
+use App\Services\Tenant; // ✅ استخدام Tenant
+
 
 class ErpDashboardController extends Controller
 {
     public function index(Request $request)
     {
-        $companyId = $request->user()->company_id;
-        $range = $request->get('range', 'day'); // day, week, month
-        $compare = $request->get('compare', false); // true/false
+        $companyId = Tenant::id(); // ✅ استخدام Tenant
+        $range = $request->get('range', 'day');
+        $compare = $request->get('compare', false);
 
-        $cacheKey = "dashboard_{$companyId}_{$range}_" . ($compare ? 'compare' : 'normal');
+        $cacheKey = tenant_cache_key("dashboard_{$range}_" . ($compare ? 'compare' : 'normal')); // ✅ Tenant-aware cache
 
         $data = Cache::remember(
             $cacheKey,
             60,
             function () use ($companyId, $range, $compare) {
 
-                // =================================================
-                // 1. Get Date Ranges for Current & Previous
-                // =================================================
                 $dateRanges = $this->getDateRanges($range);
 
-                // =================================================
-                // 2. Charts Data with Comparison Support
-                // =================================================
                 $revenueChart = $this->getRevenueChartWithComparison(
                     $companyId,
                     $dateRanges,
@@ -49,20 +45,14 @@ class ErpDashboardController extends Controller
                     $compare
                 );
 
-                // =================================================
-                // 3. KPIs with Delta Calculation
-                // =================================================
                 $kpis = $this->getKpisWithComparison(
                     $companyId,
                     $dateRanges,
                     $compare
                 );
 
-                // =================================================
-                // 4. Recent Data (No comparison needed)
-                // =================================================
+                // ✅ إزالة where('company_id') - الـ Scope بيتعامل معاها
                 $recentAppointments = Appointment::query()
-                    ->where('company_id', $companyId)
                     ->with(['patient:id,name,email', 'doctor:id,name'])
                     ->orderByDesc('appointment_date')
                     ->orderByDesc('appointment_time')
@@ -70,13 +60,11 @@ class ErpDashboardController extends Controller
                     ->get();
 
                 $recentPayments = Payment::query()
-                    ->where('company_id', $companyId)
                     ->latest()
                     ->limit(5)
                     ->get();
 
                 $recentInvoices = Invoice::query()
-                    ->where('company_id', $companyId)
                     ->latest()
                     ->limit(5)
                     ->get();
@@ -99,12 +87,11 @@ class ErpDashboardController extends Controller
             }
         );
 
-        // Insights & Alerts (Not cached or separate cache)
         $insights = app(InsightService::class)->getAllInsights($companyId);
         $data['insights'] = $insights;
 
+        // ✅ إزالة where('company_id')
         $alerts = SystemAlert::query()
-            ->where('company_id', $companyId)
             ->whereNull('resolved_at')
             ->whereNull('acknowledged_at')
             ->latest()
@@ -128,6 +115,7 @@ class ErpDashboardController extends Controller
             ],
         ]);
     }
+
 
     /**
      * Get date ranges for current and previous periods
@@ -236,8 +224,8 @@ class ErpDashboardController extends Controller
         $current = $start->copy();
 
         while ($current <= $end) {
+            // ✅ بدون where('company_id')
             $revenue = (float) Payment::query()
-                ->where('company_id', $companyId)
                 ->whereDate('paid_at', $current)
                 ->sum('applied_amount');
 
@@ -253,6 +241,7 @@ class ErpDashboardController extends Controller
         return $data;
     }
 
+
     /**
      * Get appointments time series data
      */
@@ -262,22 +251,17 @@ class ErpDashboardController extends Controller
         $current = $start->copy();
 
         while ($current <= $end) {
-            // Total appointments
+            // ✅ بدون where('company_id')
             $total = Appointment::query()
-                ->where('company_id', $companyId)
                 ->whereDate('appointment_date', $current)
                 ->count();
 
-            // Completed appointments
             $completed = Appointment::query()
-                ->where('company_id', $companyId)
                 ->whereDate('appointment_date', $current)
                 ->where('status', 'completed')
                 ->count();
 
-            // Cancelled appointments
             $cancelled = Appointment::query()
-                ->where('company_id', $companyId)
                 ->whereDate('appointment_date', $current)
                 ->where('status', 'cancelled')
                 ->count();
@@ -295,6 +279,7 @@ class ErpDashboardController extends Controller
 
         return $data;
     }
+
 
     /**
      * Get label for date based on range
@@ -469,8 +454,8 @@ class ErpDashboardController extends Controller
      */
     private function sumRevenue($companyId, Carbon $start, Carbon $end): float
     {
+        // ✅ بدون where('company_id')
         return (float) Payment::query()
-            ->where('company_id', $companyId)
             ->whereBetween('paid_at', [$start, $end])
             ->sum('applied_amount');
     }
@@ -480,8 +465,8 @@ class ErpDashboardController extends Controller
      */
     private function countAppointments($companyId, Carbon $start, Carbon $end): int
     {
+        // ✅ بدون where('company_id')
         return Appointment::query()
-            ->where('company_id', $companyId)
             ->whereBetween('appointment_date', [$start, $end])
             ->count();
     }
@@ -491,20 +476,19 @@ class ErpDashboardController extends Controller
      */
     private function countAppointmentsByStatus($companyId, Carbon $start, Carbon $end, string $status): int
     {
+        // ✅ بدون where('company_id')
         return Appointment::query()
-            ->where('company_id', $companyId)
             ->whereBetween('appointment_date', [$start, $end])
             ->where('status', $status)
             ->count();
     }
-
     /**
      * Count customers (patients)
      */
     private function countCustomers($companyId, Carbon $start, Carbon $end): int
     {
+        // ✅ بدون where('company_id')
         return Customer::query()
-            ->where('company_id', $companyId)
             ->whereBetween('created_at', [$start, $end])
             ->count();
     }
@@ -514,8 +498,8 @@ class ErpDashboardController extends Controller
      */
     private function countInvoicesByStatus($companyId, Carbon $start, Carbon $end, string $status): int
     {
+        // ✅ بدون where('company_id')
         return Invoice::query()
-            ->where('company_id', $companyId)
             ->where('status', $status)
             ->whereBetween('issued_at', [$start, $end])
             ->count();
