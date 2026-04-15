@@ -5,21 +5,17 @@ namespace App\Http\Controllers\API\Erp;
 use App\Http\Controllers\Controller;
 use App\Models\ActivityLog;
 use App\Models\Appointment;
+use App\Services\Tenant;
 use Illuminate\Http\Request;
 
 class AppointmentActivityController extends Controller
 {
     public function index(Request $request, $id)
     {
-        $companyId = $request->user()->company_id;
-
-        // ✅ تأكيد أن الموعد بتاع نفس الشركة (Tenant safe)
-        Appointment::query()
-            ->where('company_id', $companyId)
-            ->findOrFail($id);
+        // ✅ تأكيد أن الموعد بتاع نفس الشركة (Tenant safe - الـ Scope هيتأكد)
+        Appointment::query()->findOrFail($id);
 
         $logs = ActivityLog::query()
-            ->where('company_id', $companyId)
             ->where('subject_type', Appointment::class)
             ->where('subject_id', (int) $id)
             ->orderByDesc('id')

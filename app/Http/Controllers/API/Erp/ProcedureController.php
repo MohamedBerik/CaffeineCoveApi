@@ -4,6 +4,7 @@ namespace App\Http\Controllers\API\Erp;
 
 use App\Http\Controllers\Controller;
 use App\Models\Procedure;
+use App\Services\Tenant;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 
@@ -11,11 +12,7 @@ class ProcedureController extends Controller
 {
     public function index(Request $request)
     {
-        $companyId = $request->user()->company_id;
-
-        $q = Procedure::query()
-            ->where('company_id', $companyId)
-            ->orderByDesc('id');
+        $q = Procedure::query()->orderByDesc('id');
 
         if ($request->has('is_active')) {
             $isActive = filter_var(
@@ -42,11 +39,7 @@ class ProcedureController extends Controller
 
     public function show(Request $request, $id)
     {
-        $companyId = $request->user()->company_id;
-
-        $procedure = Procedure::query()
-            ->where('company_id', $companyId)
-            ->findOrFail($id);
+        $procedure = Procedure::query()->findOrFail($id);
 
         return response()->json([
             'msg' => 'Procedure details',
@@ -57,16 +50,14 @@ class ProcedureController extends Controller
 
     public function store(Request $request)
     {
-        $companyId = $request->user()->company_id;
+        $companyId = Tenant::id();
 
         $data = $request->validate([
             'name' => [
                 'required',
                 'string',
                 'max:190',
-                Rule::unique('procedures', 'name')->where(
-                    fn($q) => $q->where('company_id', $companyId)
-                ),
+                Rule::unique('procedures', 'name'),
             ],
             'default_price' => ['nullable', 'numeric', 'min:0'],
             'is_active' => ['nullable', 'boolean'],
@@ -88,9 +79,7 @@ class ProcedureController extends Controller
 
     public function update(Request $request, $id)
     {
-        $companyId = $request->user()->company_id;
-
-        $procedure = Procedure::where('company_id', $companyId)->findOrFail($id);
+        $procedure = Procedure::query()->findOrFail($id);
 
         $data = $request->validate([
             'name' => [
@@ -98,9 +87,7 @@ class ProcedureController extends Controller
                 'required',
                 'string',
                 'max:190',
-                Rule::unique('procedures', 'name')
-                    ->where(fn($q) => $q->where('company_id', $companyId))
-                    ->ignore($procedure->id),
+                Rule::unique('procedures', 'name')->ignore($procedure->id),
             ],
             'default_price' => ['sometimes', 'nullable', 'numeric', 'min:0'],
             'is_active' => ['sometimes', 'nullable', 'boolean'],
@@ -123,14 +110,9 @@ class ProcedureController extends Controller
         ]);
     }
 
-    /**
-     * بدل الحذف الفعلي نخليه inactive
-     */
     public function destroy(Request $request, $id)
     {
-        $companyId = $request->user()->company_id;
-
-        $procedure = Procedure::where('company_id', $companyId)->findOrFail($id);
+        $procedure = Procedure::query()->findOrFail($id);
 
         $procedure->update(['is_active' => false]);
 

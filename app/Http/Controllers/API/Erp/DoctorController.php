@@ -5,6 +5,7 @@ namespace App\Http\Controllers\API\Erp;
 use App\Http\Controllers\Controller;
 use App\Models\Doctor;
 use App\Models\Appointment;
+use App\Services\Tenant;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 use Carbon\Carbon;
@@ -13,9 +14,7 @@ class DoctorController extends Controller
 {
     public function index(Request $request)
     {
-        $companyId = $request->user()->company_id;
-
-        $q = Doctor::where('company_id', $companyId)->orderByDesc('id');
+        $q = Doctor::query()->orderByDesc('id');
 
         if ($search = trim((string)$request->get('search', ''))) {
             $q->where('name', 'like', "%{$search}%");
@@ -30,14 +29,14 @@ class DoctorController extends Controller
 
     public function store(Request $request)
     {
-        $companyId = $request->user()->company_id;
+        $companyId = Tenant::id();
 
         $data = $request->validate([
             'name' => [
                 'required',
                 'string',
                 'max:190',
-                Rule::unique('doctors', 'name')->where(fn($q) => $q->where('company_id', $companyId))
+                Rule::unique('doctors', 'name')
             ],
             'phone' => ['nullable', 'string', 'max:50'],
             'email' => ['nullable', 'email', 'max:190'],
@@ -64,16 +63,14 @@ class DoctorController extends Controller
 
     public function show(Request $request, $id)
     {
-        $companyId = $request->user()->company_id;
-        $doctor = Doctor::where('company_id', $companyId)->findOrFail($id);
+        $doctor = Doctor::query()->findOrFail($id);
 
         return response()->json(['msg' => 'Doctor details', 'status' => 200, 'data' => $doctor]);
     }
 
     public function update(Request $request, $id)
     {
-        $companyId = $request->user()->company_id;
-        $doctor = Doctor::where('company_id', $companyId)->findOrFail($id);
+        $doctor = Doctor::query()->findOrFail($id);
 
         $data = $request->validate([
             'name' => [
@@ -81,7 +78,7 @@ class DoctorController extends Controller
                 'required',
                 'string',
                 'max:190',
-                Rule::unique('doctors', 'name')->where(fn($q) => $q->where('company_id', $companyId))->ignore($doctor->id)
+                Rule::unique('doctors', 'name')->ignore($doctor->id)
             ],
             'phone' => ['nullable', 'string', 'max:50'],
             'email' => ['nullable', 'email', 'max:190'],
@@ -98,10 +95,12 @@ class DoctorController extends Controller
 
     public function destroy(Request $request, $id)
     {
-        $companyId = $request->user()->company_id;
-        $doctor = Doctor::where('company_id', $companyId)->findOrFail($id);
+        $doctor = Doctor::query()->findOrFail($id);
 
-        $hasAppointments = Appointment::where('company_id', $companyId)->where('doctor_id', $doctor->id)->exists();
+        $hasAppointments = Appointment::query()
+            ->where('doctor_id', $doctor->id)
+            ->exists();
+
         if ($hasAppointments) {
             return response()->json(['msg' => 'Cannot delete doctor with appointments'], 422);
         }
@@ -110,11 +109,9 @@ class DoctorController extends Controller
         return response()->json(['msg' => 'Doctor deleted', 'status' => 200]);
     }
 
-    // V1: availability by day slots (based on doctor working hours + existing appointments)
     public function availability(Request $request, $id)
     {
-        $companyId = $request->user()->company_id;
-        $doctor = Doctor::where('company_id', $companyId)->findOrFail($id);
+        $doctor = Doctor::query()->findOrFail($id);
 
         $date = Carbon::parse($request->query('date', now()->toDateString()))->toDateString();
 
@@ -123,7 +120,7 @@ class DoctorController extends Controller
 
         $slot = max(5, (int)$doctor->slot_minutes);
 
-        $booked = Appointment::where('company_id', $companyId)
+        $booked = Appointment::query()
             ->where('doctor_id', $doctor->id)
             ->whereDate('appointment_date', $date)
             ->whereIn('status', ['scheduled', 'completed', 'no_show'])

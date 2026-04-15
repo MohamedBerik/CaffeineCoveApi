@@ -8,6 +8,7 @@ use App\Models\Customer;
 use App\Models\DentalRecord;
 use App\Models\Invoice;
 use App\Models\Payment;
+use App\Services\Tenant;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -16,14 +17,11 @@ class PatientTimelineController extends Controller
 {
     public function index(Request $request, $customerId)
     {
-        $companyId = $request->user()->company_id;
+        $companyId = Tenant::id();
 
-        $customer = Customer::query()
-            ->where('company_id', $companyId)
-            ->findOrFail($customerId);
+        $customer = Customer::query()->findOrFail($customerId);
 
         $appointments = Appointment::query()
-            ->where('company_id', $companyId)
             ->where('patient_id', $customer->id)
             ->with([
                 'doctor:id,name,company_id',
@@ -55,7 +53,6 @@ class PatientTimelineController extends Controller
             });
 
         $dentalRecords = DentalRecord::query()
-            ->where('company_id', $companyId)
             ->where('customer_id', $customer->id)
             ->with([
                 'procedure:id,name,default_price',
@@ -98,7 +95,6 @@ class PatientTimelineController extends Controller
             });
 
         $invoices = Invoice::query()
-            ->where('company_id', $companyId)
             ->where('customer_id', $customer->id)
             ->get()
             ->map(function ($row) {
@@ -121,11 +117,9 @@ class PatientTimelineController extends Controller
             });
 
         $payments = Payment::query()
-            ->where('company_id', $companyId)
-            ->whereIn('invoice_id', function ($q) use ($companyId, $customer) {
+            ->whereIn('invoice_id', function ($q) use ($customer) {
                 $q->select('id')
                     ->from('invoices')
-                    ->where('company_id', $companyId)
                     ->where('customer_id', $customer->id);
             })
             ->get()
@@ -151,8 +145,6 @@ class PatientTimelineController extends Controller
         $refunds = DB::table('payment_refunds')
             ->join('payments', 'payments.id', '=', 'payment_refunds.payment_id')
             ->join('invoices', 'invoices.id', '=', 'payments.invoice_id')
-            ->where('payment_refunds.company_id', $companyId)
-            ->where('invoices.company_id', $companyId)
             ->where('invoices.customer_id', $customer->id)
             ->select([
                 'payment_refunds.id',

@@ -4,23 +4,20 @@ namespace App\Http\Controllers\API\Erp;
 
 use App\Http\Controllers\Controller;
 use App\Models\Invoice;
+use App\Services\Tenant;
 use Illuminate\Http\Request;
 
 class InvoiceJournalController extends Controller
 {
     public function index(Request $request, $invoiceId)
     {
-        $companyId = $request->user()->company_id;
+        // ✅ تأكد أن الفاتورة تخص نفس الشركة (الـ Scope هيتأكد)
+        $invoice = Invoice::findOrFail($invoiceId);
 
-        // ✅ تأكد أن الفاتورة تخص نفس الشركة
-        $invoice = Invoice::where('company_id', $companyId)->findOrFail($invoiceId);
-
-        // ✅ اعتمد على علاقة journalEntries (morphMany) بدل query يدوي
+        // ✅ اعتمد على علاقة journalEntries (morphMany)
         $entries = $invoice->journalEntries()
             ->with([
-                'lines.account' => function ($q) use ($companyId) {
-                    $q->where('company_id', $companyId);
-                }
+                'lines.account'
             ])
             ->orderBy('id')
             ->get();

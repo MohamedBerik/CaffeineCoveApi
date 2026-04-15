@@ -9,6 +9,7 @@ use App\Models\IdempotencyKey;
 use App\Models\Invoice;
 use App\Models\Payment;
 use App\Services\AccountingService;
+use App\Services\Tenant;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -21,17 +22,17 @@ class PaymentRefundController extends Controller
             'applies_to'  => ['nullable', 'in:invoice,credit'],
         ]);
 
-        $companyId = $request->user()->company_id;
+        $companyId = Tenant::id();
         $appliesTo = $request->input('applies_to', 'invoice');
         $amountReq = (float) $request->amount;
 
-        // ✅ Idempotency-Key (header)
+        // Idempotency-Key (header)
         $idemKey = trim((string) ($request->header('Idempotency-Key') ?? $request->header('X-Idempotency-Key') ?? ''));
 
-        // endpoint identifier ثابت (مهم للـ unique)
+        // endpoint identifier ثابت
         $endpoint = "POST /api/erp/payments/{$paymentId}/refund";
 
-        // hash للـ payload عشان لو حد استخدم نفس key مع payload مختلف نرفض
+        // hash للـ payload
         $payloadForHash = [
             'payment_id'  => (int) $paymentId,
             'amount'      => (string) number_format($amountReq, 2, '.', ''),
@@ -43,36 +44,31 @@ class PaymentRefundController extends Controller
 
             $idemRow = null;
 
-            // 1) ✅ لو فيه Idempotency-Key: حاول "تحجز" المفتاح
+            // 1) لو فيه Idempotency-Key
             if ($idemKey !== '') {
 
-                // لو موجود قبل كده: رجّع نفس الرد القديم
-                $existing = IdempotencyKey::where('company_id', $companyId)
+                $existing = IdempotencyKey::query()
                     ->where('key', $idemKey)
                     ->where('endpoint', $endpoint)
                     ->lockForUpdate()
                     ->first();
 
                 if ($existing) {
-                    // لو نفس الـ key اتستخدم مع payload مختلف => 409 (Misuse)
                     if ($existing->request_hash !== $requestHash) {
                         return response()->json([
                             'msg' => 'Idempotency-Key conflict: same key used with different request body',
                         ], 409);
                     }
 
-                    // لو الرد متخزن: رجّعه كما هو (بدون تنفيذ refund)
                     if (!is_null($existing->status_code) && !is_null($existing->response_body)) {
                         return response()->json($existing->response_body, (int) $existing->status_code);
                     }
 
-                    // لو موجود بس لسه مفيش response (طلب سابق لسه بيشتغل) => 409
                     return response()->json([
                         'msg' => 'Request is already being processed',
                     ], 409);
                 }
 
-                // مش موجود => اعمل row جديد "in-progress"
                 $idemRow = IdempotencyKey::create([
                     'company_id'    => $companyId,
                     'key'           => $idemKey,
@@ -84,14 +80,14 @@ class PaymentRefundController extends Controller
             }
 
             // 2) lock payment + load refunds
-            $payment = Payment::where('company_id', $companyId)
+            $payment = Payment::query()
                 ->lockForUpdate()
                 ->with(['refunds'])
                 ->findOrFail($paymentId);
 
-            // 3) invoice required (حتى للـ credit refund عشان نعرف customer_id)
+            // 3) invoice required
             $invoice = $payment->invoice_id
-                ? Invoice::where('company_id', $companyId)->find($payment->invoice_id)
+                ? Invoice::query()->find($payment->invoice_id)
                 : null;
 
             if (!$invoice) {
@@ -104,7 +100,6 @@ class PaymentRefundController extends Controller
                         'payment_invoice_id' => $payment->invoice_id,
                     ]
                 ];
-                // خزّن الرد لو idem
                 if ($idemRow) {
                     $idemRow->update(['status_code' => 422, 'response_body' => $resp]);
                 }
@@ -142,9 +137,9 @@ class PaymentRefundController extends Controller
             ]);
 
             // 6) accounts
-            $cashAccount   = Account::where('company_id', $companyId)->where('code', '1000')->firstOrFail();
-            $arAccount     = Account::where('company_id', $companyId)->where('code', '1100')->firstOrFail();
-            $creditAccount = Account::where('company_id', $companyId)->where('code', '2100')->firstOrFail();
+            $cashAccount   = Account::query()->where('code', '1000')->firstOrFail();
+            $arAccount     = Account::query()->where('code', '1100')->firstOrFail();
+            $creditAccount = Account::query()->where('code', '2100')->firstOrFail();
 
             // 7) ledger + accounting
             if ($appliesTo === 'invoice') {
@@ -173,15 +168,13 @@ class PaymentRefundController extends Controller
                     now()->toDateString()
                 );
 
-                $totalApplied = Payment::where('company_id', $companyId)
+                $totalApplied = Payment::query()
                     ->where('invoice_id', $invoice->id)
                     ->sum('applied_amount');
 
                 $totalRefundedInvoice = DB::table('payment_refunds')
                     ->join('payments', 'payments.id', '=', 'payment_refunds.payment_id')
-                    ->where('payments.company_id', $companyId)
                     ->where('payments.invoice_id', $invoice->id)
-                    ->where('payment_refunds.company_id', $companyId)
                     ->where('payment_refunds.applies_to', 'invoice')
                     ->sum('payment_refunds.amount');
 
@@ -210,7 +203,6 @@ class PaymentRefundController extends Controller
                 return response()->json($resp);
             } else {
 
-                // ✅ CREDIT REFUND: لازم invoice_id = null في ledger
                 CustomerLedgerEntry::create([
                     'company_id'  => $companyId,
                     'customer_id' => $invoice->customer_id,
@@ -224,7 +216,6 @@ class PaymentRefundController extends Controller
                     'description' => 'Credit refund for payment #' . $payment->id,
                 ]);
 
-                // ✅ customer_credits: unique on (company_id, refund_id) عندك بالفعل
                 DB::table('customer_credits')->insert([
                     'company_id'  => $companyId,
                     'customer_id' => $invoice->customer_id,

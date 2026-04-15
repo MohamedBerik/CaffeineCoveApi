@@ -16,6 +16,7 @@ use App\Models\Product;
 use App\Models\TreatmentPlan;
 use App\Services\ActivityLogger;
 use App\Services\InvoiceNumberService;
+use App\Services\Tenant;
 use Carbon\Carbon;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
@@ -36,10 +37,7 @@ class AppointmentController extends Controller
 
     public function index(Request $request)
     {
-        $companyId = $request->user()->company_id;
-
         $query = Appointment::query()
-            ->where('company_id', $companyId)
             ->with([
                 'patient:id,name,email,company_id',
                 'doctor:id,name,company_id,work_start,work_end,slot_minutes',
@@ -70,38 +68,26 @@ class AppointmentController extends Controller
             return [
                 'id' => $appointment->id,
                 'company_id' => $appointment->company_id,
-
                 'patient_id' => $appointment->patient_id,
                 'doctor_id' => $appointment->doctor_id,
-
                 'doctor_name' => $appointment->doctor_name,
-
                 'appointment_date' => $appointment->appointment_date,
                 'appointment_time' => $appointment->appointment_time,
-
                 'appointment_type' => $appointment->appointment_type,
                 'status' => $appointment->status,
-
                 'notes' => $appointment->notes,
-
-                // ✅ clinical data
                 'clinical_notes' => $appointment->clinical_notes,
                 'diagnosis' => $appointment->diagnosis,
                 'next_step' => $appointment->next_step,
-
                 'created_at' => $appointment->created_at,
                 'updated_at' => $appointment->updated_at,
-
                 'invoice_id' => $appointment->invoice?->id,
                 'invoice_number' => $appointment->invoice?->number,
                 'invoice_status' => $appointment->invoice?->status,
                 'invoice_total' => $appointment->invoice?->total,
-
                 'treatment_plan_id' => $appointment->invoice?->treatment_plan_id,
-
                 'patient' => $appointment->patient,
                 'doctor' => $appointment->doctor,
-
                 'reminder_status' => $appointment->reminder_status,
                 'last_reminder_at' => $appointment->last_reminder_at,
                 'next_reminder_at' => $appointment->next_reminder_at,
@@ -125,22 +111,18 @@ class AppointmentController extends Controller
 
     public function store(Request $request)
     {
-        $companyId = $request->user()->company_id;
+        $companyId = Tenant::id();
 
         $v = Validator::make($request->all(), [
             'patient_id' => [
                 'required',
                 'integer',
-                Rule::exists('customers', 'id')->where(
-                    fn($q) => $q->where('company_id', $companyId)
-                ),
+                Rule::exists('customers', 'id'),
             ],
             'doctor_id' => [
                 'required',
                 'integer',
-                Rule::exists('doctors', 'id')->where(
-                    fn($q) => $q->where('company_id', $companyId)->where('is_active', true)
-                ),
+                Rule::exists('doctors', 'id')->where('is_active', true),
             ],
             'doctor_name' => ['nullable', 'string', 'max:190'],
             'appointment_date' => ['required', 'date'],
@@ -163,7 +145,6 @@ class AppointmentController extends Controller
         $time = $data['appointment_time'];
 
         $doctor = Doctor::query()
-            ->where('company_id', $companyId)
             ->where('is_active', true)
             ->findOrFail((int) $data['doctor_id']);
 
@@ -172,7 +153,6 @@ class AppointmentController extends Controller
         $requestedStatus = $data['status'] ?? 'scheduled';
         $blockedStatuses = ['scheduled', 'completed', 'no_show'];
 
-        // validation من الـ trait
         $this->validateAppointmentDateTime($doctor, $date, $time);
 
         return DB::transaction(function () use (
@@ -187,7 +167,6 @@ class AppointmentController extends Controller
             $requestedStatus
         ) {
             $existing = Appointment::query()
-                ->where('company_id', $companyId)
                 ->where('doctor_id', $doctor->id)
                 ->whereDate('appointment_date', $date)
                 ->whereTime('appointment_time', $time)
@@ -293,10 +272,9 @@ class AppointmentController extends Controller
 
     public function show(Request $request, $id)
     {
-        $companyId = $request->user()->company_id;
+        $companyId = Tenant::id();
 
         $appointment = Appointment::query()
-            ->where('company_id', $companyId)
             ->with([
                 'patient:id,name,email,company_id',
                 'doctor:id,name,company_id,work_start,work_end,slot_minutes',
@@ -304,9 +282,7 @@ class AppointmentController extends Controller
             ])
             ->findOrFail($id);
 
-        // extract linked treatment plan item if exists
         $planItem = \App\Models\TreatmentPlanItem::query()
-            ->where('company_id', $companyId)
             ->where('appointment_id', $appointment->id)
             ->first();
 
@@ -328,20 +304,14 @@ class AppointmentController extends Controller
                 'next_step'      => $appointment->next_step,
                 'created_at' => $appointment->created_at,
                 'updated_at' => $appointment->updated_at,
-
                 'patient' => $appointment->patient,
                 'doctor' => $appointment->doctor,
-
-                // NEW IMPORTANT DATA
                 'invoice_id' => $appointment->invoice?->id,
                 'invoice_number' => $appointment->invoice?->number,
                 'invoice_status' => $appointment->invoice?->status,
                 'invoice_total' => $appointment->invoice?->total,
-
                 'treatment_plan_id' => $appointment->invoice?->treatment_plan_id,
-
                 'treatment_plan_item_id' => $planItem?->id,
-
                 'reminder_status' => $appointment->reminder_status,
                 'last_reminder_at' => $appointment->last_reminder_at,
                 'next_reminder_at' => $appointment->next_reminder_at,
@@ -353,16 +323,11 @@ class AppointmentController extends Controller
 
     public function update(Request $request, $id)
     {
-        $companyId = $request->user()->company_id;
-
-        $appointment = Appointment::query()
-            ->where('company_id', $companyId)
-            ->findOrFail($id);
+        $appointment = Appointment::query()->findOrFail($id);
 
         $v = Validator::make($request->all(), [
             'notes'  => ['nullable', 'string'],
             'status' => ['sometimes', Rule::in(['scheduled', 'cancelled', 'no_show'])],
-
             'clinical_notes' => ['nullable', 'string'],
             'diagnosis'      => ['nullable', 'string'],
             'next_step'      => ['nullable', 'string'],
@@ -398,7 +363,6 @@ class AppointmentController extends Controller
             'next_step' => array_key_exists('next_step', $data) ? $data['next_step'] : $appointment->next_step,
         ];
 
-        // status only if appointment is not completed
         if ($appointment->status !== 'completed' && array_key_exists('status', $data)) {
             $updateData['status'] = $data['status'];
         }
@@ -420,7 +384,7 @@ class AppointmentController extends Controller
         }
 
         ActivityLogger::log(
-            $companyId,
+            Tenant::id(),
             $request->user(),
             'appointment.updated',
             Appointment::class,
@@ -450,12 +414,7 @@ class AppointmentController extends Controller
 
     public function destroy(Request $request, $id)
     {
-        $companyId = $request->user()->company_id;
-
-        $appointment = Appointment::query()
-            ->where('company_id', $companyId)
-            ->findOrFail($id);
-
+        $appointment = Appointment::query()->findOrFail($id);
         $appointment->delete();
 
         return response()->json([
@@ -467,11 +426,9 @@ class AppointmentController extends Controller
 
     public function cancel(Request $request, $id)
     {
-        $companyId = $request->user()->company_id;
+        $companyId = Tenant::id();
 
-        $appointment = Appointment::query()
-            ->where('company_id', $companyId)
-            ->findOrFail($id);
+        $appointment = Appointment::query()->findOrFail($id);
 
         if ($appointment->status === 'cancelled') {
             return response()->json([
@@ -530,11 +487,9 @@ class AppointmentController extends Controller
 
     public function noShow(Request $request, $id)
     {
-        $companyId = $request->user()->company_id;
+        $companyId = Tenant::id();
 
-        $appointment = Appointment::query()
-            ->where('company_id', $companyId)
-            ->findOrFail($id);
+        $appointment = Appointment::query()->findOrFail($id);
 
         if ($appointment->status === 'no_show') {
             return response()->json([
@@ -598,11 +553,9 @@ class AppointmentController extends Controller
 
     public function reschedule(Request $request, $id)
     {
-        $companyId = $request->user()->company_id;
+        $companyId = Tenant::id();
 
-        $appointment = Appointment::query()
-            ->where('company_id', $companyId)
-            ->findOrFail($id);
+        $appointment = Appointment::query()->findOrFail($id);
 
         if ($appointment->status === 'completed') {
             return response()->json([
@@ -617,9 +570,7 @@ class AppointmentController extends Controller
             'doctor_id' => [
                 'required',
                 'integer',
-                Rule::exists('doctors', 'id')->where(
-                    fn($q) => $q->where('company_id', $companyId)->where('is_active', true)
-                ),
+                Rule::exists('doctors', 'id')->where('is_active', true),
             ],
         ]);
 
@@ -628,7 +579,6 @@ class AppointmentController extends Controller
         $newDoctorId = (int) $data['doctor_id'];
 
         $doctor = Doctor::query()
-            ->where('company_id', $companyId)
             ->where('is_active', true)
             ->findOrFail($newDoctorId);
 
@@ -647,7 +597,6 @@ class AppointmentController extends Controller
             $doctor
         ) {
             $from = Appointment::query()
-                ->where('company_id', $companyId)
                 ->lockForUpdate()
                 ->findOrFail($appointment->id);
 
@@ -679,7 +628,6 @@ class AppointmentController extends Controller
             }
 
             $to = Appointment::query()
-                ->where('company_id', $companyId)
                 ->where('doctor_id', $newDoctorId)
                 ->whereDate('appointment_date', $newDate)
                 ->whereTime('appointment_time', $newTime)
@@ -717,7 +665,6 @@ class AppointmentController extends Controller
                     'status' => 'scheduled',
                     'notes' => $from->notes,
                     'created_by' => $request->user()->id,
-
                     ...$this->buildPendingReminder($newDate, $newTime),
                 ]);
 
@@ -760,7 +707,6 @@ class AppointmentController extends Controller
                     'appointment_date' => $newDate,
                     'appointment_time' => $newTime,
                     'status' => 'scheduled',
-
                     ...$this->buildPendingReminder($newDate, $newTime),
                 ]);
             } catch (QueryException $e) {
@@ -806,15 +752,13 @@ class AppointmentController extends Controller
 
     public function book(Request $request)
     {
-        $companyId = $request->user()->company_id;
+        $companyId = Tenant::id();
 
         $data = $request->validate([
             'patient_id' => [
                 'required',
                 'integer',
-                Rule::exists('customers', 'id')->where(
-                    fn($q) => $q->where('company_id', $companyId)
-                ),
+                Rule::exists('customers', 'id'),
             ],
             'doctor_id' => ['nullable', 'integer'],
             'doctor_name' => ['nullable', 'string', 'max:190'],
@@ -831,12 +775,10 @@ class AppointmentController extends Controller
 
         if (!empty($data['doctor_id'])) {
             $doctor = Doctor::query()
-                ->where('company_id', $companyId)
                 ->where('is_active', true)
                 ->findOrFail((int) $data['doctor_id']);
         } else {
             $doctor = Doctor::query()
-                ->where('company_id', $companyId)
                 ->where('is_active', true)
                 ->orderBy('id')
                 ->first();
@@ -852,7 +794,6 @@ class AppointmentController extends Controller
         $doctorId = (int) $doctor->id;
         $doctorName = trim((string) ($data['doctor_name'] ?? '')) ?: $doctor->name;
 
-        // validation من الـ trait
         $this->validateAppointmentDateTime($doctor, $date, $time);
 
         return DB::transaction(function () use (
@@ -866,7 +807,6 @@ class AppointmentController extends Controller
             $appointmentType
         ) {
             $existing = Appointment::query()
-                ->where('company_id', $companyId)
                 ->where('doctor_id', $doctorId)
                 ->whereDate('appointment_date', $date)
                 ->whereTime('appointment_time', $time)
@@ -965,14 +905,12 @@ class AppointmentController extends Controller
         $companyId = $appointment->company_id;
 
         $exists = Invoice::query()
-            ->where('company_id', $companyId)
             ->where('appointment_id', $appointment->id)
             ->exists();
 
         if ($exists) return;
 
         $product = Product::query()
-            ->where('company_id', $companyId)
             ->where('title_en', 'Consultation')
             ->first();
 
@@ -1035,16 +973,13 @@ class AppointmentController extends Controller
 
     public function complete(Request $request, $id)
     {
-        $companyId = $request->user()->company_id;
+        $companyId = Tenant::id();
 
-        $appointment = Appointment::query()
-            ->where('company_id', $companyId)
-            ->findOrFail($id);
+        $appointment = Appointment::query()->findOrFail($id);
 
         $data = $request->validate([
             'doctor_name' => ['nullable', 'string', 'max:190'],
             'notes' => ['nullable', 'string'],
-
             'clinical_notes' => ['nullable', 'string'],
             'diagnosis' => ['nullable', 'string'],
             'next_step' => ['nullable', 'string'],
@@ -1052,7 +987,6 @@ class AppointmentController extends Controller
 
         return DB::transaction(function () use ($request, $companyId, $data, $appointment) {
             $appointment = Appointment::query()
-                ->where('company_id', $companyId)
                 ->lockForUpdate()
                 ->findOrFail($appointment->id);
 
@@ -1083,17 +1017,8 @@ class AppointmentController extends Controller
                 'next_step' => array_key_exists('next_step', $data) ? $data['next_step'] : $appointment->next_step,
             ]);
 
-            /*
-        |--------------------------------------------------------------------------
-        | 1) Consultation Appointment
-        |--------------------------------------------------------------------------
-        | - invoice is created earlier during booking
-        | - complete should NOT create another invoice
-        | - it should only close the appointment and return existing invoice_id
-        */
             if ($appointmentType === 'consultation') {
                 $existingConsultationInvoice = Invoice::query()
-                    ->where('company_id', $companyId)
                     ->where('appointment_id', $appointment->id)
                     ->lockForUpdate()
                     ->first();
@@ -1151,19 +1076,8 @@ class AppointmentController extends Controller
                 ], 200);
             }
 
-            /*
-        |--------------------------------------------------------------------------
-        | 2) Treatment Appointment
-        |--------------------------------------------------------------------------
-        | - appointment must come from Start Procedure
-        | - it must be linked to one treatment_plan_item
-        | - complete creates invoice for THIS item only
-        | - then auto-apply any available customer credit
-        | - then create dental record automatically
-        */
             if ($appointmentType === 'treatment') {
                 $linkedPlanItem = \App\Models\TreatmentPlanItem::query()
-                    ->where('company_id', $companyId)
                     ->where('appointment_id', $appointment->id)
                     ->lockForUpdate()
                     ->first();
@@ -1185,9 +1099,7 @@ class AppointmentController extends Controller
                     ], 409);
                 }
 
-                $plan = TreatmentPlan::query()
-                    ->where('company_id', $companyId)
-                    ->findOrFail($linkedPlanItem->treatment_plan_id);
+                $plan = TreatmentPlan::query()->findOrFail($linkedPlanItem->treatment_plan_id);
 
                 if ((int) $plan->customer_id !== (int) $appointment->patient_id) {
                     return response()->json([
@@ -1200,7 +1112,6 @@ class AppointmentController extends Controller
                 }
 
                 $existingTreatmentInvoice = Invoice::query()
-                    ->where('company_id', $companyId)
                     ->where('appointment_id', $appointment->id)
                     ->whereHas('order', function ($q) {
                         $q->where('title_en', 'Appointment Service');
@@ -1235,7 +1146,6 @@ class AppointmentController extends Controller
                 }
 
                 $treatmentServiceProduct = \App\Models\Product::query()
-                    ->where('company_id', $companyId)
                     ->where('title_en', 'Appointment Service')
                     ->first();
 
@@ -1292,7 +1202,6 @@ class AppointmentController extends Controller
                 ]);
 
                 $exists = CustomerLedgerEntry::query()
-                    ->where('company_id', $companyId)
                     ->where('invoice_id', $invoice->id)
                     ->where('type', 'invoice')
                     ->exists();
@@ -1312,7 +1221,6 @@ class AppointmentController extends Controller
                     ]);
                 }
 
-                // Auto-apply available customer credit
                 $this->autoApplyCustomerCredit($invoice, $request->user());
                 $invoice->refresh();
 
@@ -1340,7 +1248,6 @@ class AppointmentController extends Controller
 
                 if (!empty($linkedPlanItem->tooth_number)) {
                     $existingDentalRecord = DentalRecord::query()
-                        ->where('company_id', $companyId)
                         ->where('treatment_plan_item_id', $linkedPlanItem->id)
                         ->lockForUpdate()
                         ->first();
@@ -1452,11 +1359,9 @@ class AppointmentController extends Controller
 
     public function sendReminder(Request $request, $id)
     {
-        $companyId = $request->user()->company_id;
+        $companyId = Tenant::id();
 
-        $appointment = Appointment::query()
-            ->where('company_id', $companyId)
-            ->findOrFail($id);
+        $appointment = Appointment::query()->findOrFail($id);
 
         $validationError = $this->validateReminderCanBeSent($appointment);
 
@@ -1504,13 +1409,11 @@ class AppointmentController extends Controller
         $companyId = $invoice->company_id;
 
         $totalCustomerCredit = DB::table('customer_credits')
-            ->where('company_id', $companyId)
             ->where('customer_id', $invoice->customer_id)
             ->where('type', 'credit')
             ->sum('amount');
 
         $totalCustomerDebit = DB::table('customer_credits')
-            ->where('company_id', $companyId)
             ->where('customer_id', $invoice->customer_id)
             ->where('type', 'debit')
             ->sum('amount');
@@ -1521,20 +1424,16 @@ class AppointmentController extends Controller
             return;
         }
 
-        $totalApplied = Payment::where('company_id', $companyId)
-            ->where('invoice_id', $invoice->id)
+        $totalApplied = Payment::where('invoice_id', $invoice->id)
             ->sum('applied_amount');
 
         $totalRefunded = DB::table('payment_refunds')
             ->join('payments', 'payments.id', '=', 'payment_refunds.payment_id')
-            ->where('payments.company_id', $companyId)
             ->where('payments.invoice_id', $invoice->id)
-            ->where('payment_refunds.company_id', $companyId)
             ->where('payment_refunds.applies_to', 'invoice')
             ->sum('payment_refunds.amount');
 
         $totalCreditApplied = DB::table('customer_credits')
-            ->where('company_id', $companyId)
             ->where('invoice_id', $invoice->id)
             ->where('type', 'debit')
             ->sum('amount');
@@ -1579,13 +1478,8 @@ class AppointmentController extends Controller
             'description' => 'Customer credit auto-applied to invoice #' . $invoice->number,
         ]);
 
-        $arAccount = \App\Models\Account::where('company_id', $companyId)
-            ->where('code', '1100')
-            ->first();
-
-        $creditAccount = \App\Models\Account::where('company_id', $companyId)
-            ->where('code', '2100')
-            ->first();
+        $arAccount = \App\Models\Account::where('code', '1100')->first();
+        $creditAccount = \App\Models\Account::where('code', '2100')->first();
 
         if ($arAccount && $creditAccount) {
             \App\Services\AccountingService::createEntry(

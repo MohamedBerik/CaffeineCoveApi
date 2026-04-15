@@ -12,6 +12,7 @@ use App\Models\OrderItem;
 use App\Models\Product;
 use App\Models\StockMovement;
 use App\Services\AccountingService;
+use App\Services\Tenant;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
@@ -20,10 +21,7 @@ class OrderController extends Controller
 {
     public function indexErp(Request $request)
     {
-        $companyId = $request->user()->company_id;
-
         $orders = Order::with(['customer', 'items.product', 'invoice'])
-            ->where('company_id', $companyId)
             ->latest()
             ->get();
 
@@ -32,32 +30,28 @@ class OrderController extends Controller
 
     public function showErp(Request $request, $id)
     {
-        $companyId = $request->user()->company_id;
-
         $order = Order::with([
             'customer',
             'items.product',
             'invoice.payments.refunds',
-        ])
-            ->where('company_id', $companyId)
-            ->findOrFail($id);
+        ])->findOrFail($id);
 
         return response()->json($order);
     }
 
     public function storeErp(Request $request)
     {
-        $companyId = $request->user()->company_id;
+        $companyId = Tenant::id();
 
         $data = $request->validate([
             'customer_id' => [
                 'required',
-                Rule::exists('customers', 'id')->where('company_id', $companyId),
+                Rule::exists('customers', 'id'),
             ],
             'items' => ['required', 'array', 'min:1'],
             'items.*.product_id' => [
                 'required',
-                Rule::exists('products', 'id')->where('company_id', $companyId),
+                Rule::exists('products', 'id'),
             ],
             'items.*.quantity' => ['required', 'integer', 'min:1'],
         ]);
@@ -81,8 +75,6 @@ class OrderController extends Controller
 
             foreach ($data['items'] as $row) {
 
-                // داخل storeErp() أثناء loop على items
-
                 $product = Product::lockForUpdate()->findOrFail($row['product_id']);
 
                 $onHand = (int) $product->stock_quantity;
@@ -94,6 +86,7 @@ class OrderController extends Controller
                 $lineTotal = $product->unit_price * $row['quantity'];
 
                 OrderItem::create([
+                    'company_id' => $companyId,
                     'order_id'   => $order->id,
                     'product_id' => $product->id,
                     'quantity'   => $row['quantity'],
@@ -101,10 +94,10 @@ class OrderController extends Controller
                     'total'      => $lineTotal,
                 ]);
 
-                // ✅ خصم من stock_quantity فقط
                 $product->decrement('stock_quantity', (int)$row['quantity']);
 
                 StockMovement::create([
+                    'company_id'     => $companyId,
                     'product_id'     => $product->id,
                     'type'           => 'out',
                     'quantity'       => $row['quantity'],
@@ -127,12 +120,11 @@ class OrderController extends Controller
 
     public function confirm(Request $request, $id)
     {
-        $companyId = $request->user()->company_id;
+        $companyId = Tenant::id();
 
-        return DB::transaction(function () use ($id, $companyId) {
+        return DB::transaction(function () use ($request, $id, $companyId) {
 
-            $order = Order::where('company_id', $companyId)
-                ->lockForUpdate()
+            $order = Order::lockForUpdate()
                 ->with(['items', 'invoice'])
                 ->findOrFail($id);
 
@@ -154,7 +146,6 @@ class OrderController extends Controller
                 ], 422);
             }
 
-            // ✅ هنا السبب اللي بيطلع عندك
             if ($order->items->isEmpty()) {
                 return response()->json([
                     'msg' => 'Order has no items',
@@ -185,11 +176,12 @@ class OrderController extends Controller
                 'entry_date'  => now()->toDateString(),
                 'description' => 'Invoice ' . $invoice->number,
             ]);
-            $arAccount = Account::where('company_id', $companyId)->where('code', '1100')->firstOrFail();
-            $salesAccount = Account::where('company_id', $companyId)->where('code', '4000')->firstOrFail();
+
+            $arAccount = Account::query()->where('code', '1100')->firstOrFail();
+            $salesAccount = Account::query()->where('code', '4000')->firstOrFail();
 
             AccountingService::createEntry(
-                $invoice, // source = invoice
+                $invoice,
                 'Invoice issued #' . $invoice->number,
                 [
                     [
@@ -206,6 +198,7 @@ class OrderController extends Controller
                 $request->user()->id ?? null,
                 now()->toDateString()
             );
+
             foreach ($order->items as $item) {
                 InvoiceItem::create([
                     'company_id' => $companyId,
@@ -217,8 +210,6 @@ class OrderController extends Controller
                 ]);
             }
 
-            activity('order.confirmed', $order, [], $companyId);
-
             return response()->json([
                 'msg' => 'Order confirmed and invoice created',
                 'invoice_id' => $invoice->id,
@@ -228,12 +219,11 @@ class OrderController extends Controller
 
     public function cancel(Request $request, $id)
     {
-        $companyId = $request->user()->company_id;
+        $companyId = Tenant::id();
 
         return DB::transaction(function () use ($request, $id, $companyId) {
 
-            $order = Order::where('company_id', $companyId)
-                ->lockForUpdate()
+            $order = Order::lockForUpdate()
                 ->with('items')
                 ->findOrFail($id);
 
@@ -247,10 +237,10 @@ class OrderController extends Controller
 
                 $product = Product::lockForUpdate()->findOrFail($item->product_id);
 
-                // ✅ رجّع على stock_quantity فقط
                 $product->increment('stock_quantity', (int) $item->quantity);
 
                 StockMovement::create([
+                    'company_id'     => $companyId,
                     'product_id'     => $product->id,
                     'type'           => 'in',
                     'quantity'       => $item->quantity,
@@ -261,8 +251,6 @@ class OrderController extends Controller
             }
 
             $order->update(['status' => 'cancelled']);
-
-            activity('order.cancelled', $order, [], $companyId);
 
             return response()->json([
                 'msg' => 'Order cancelled and stock restored',

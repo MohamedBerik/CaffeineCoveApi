@@ -5,16 +5,16 @@ namespace App\Http\Controllers\API\Erp;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use App\Models\ActivityLog;
+use App\Services\Tenant; // ✅ استخدام Tenant
 
 class ActivityLogController extends Controller
 {
     public function index(Request $request)
     {
-        $companyId = $request->user()->company_id;
-
         $limit = (int) $request->get('limit', 6);
 
-        $logs = ActivityLog::where('company_id', $companyId)
+        // ✅ استخدام Global Scope - إزالة where('company_id')
+        $logs = ActivityLog::query()
             ->when(
                 $request->subject_type,
                 fn($q) => $q->where('subject_type', $request->subject_type)

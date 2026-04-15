@@ -4,20 +4,21 @@ namespace App\Http\Controllers\API\Erp;
 
 use App\Http\Controllers\Controller;
 use App\Models\ClinicSetting;
+use App\Services\Tenant;
 use Illuminate\Http\Request;
 
 class ClinicSettingController extends Controller
 {
     public function show(Request $request)
     {
-        $companyId = $request->user()->company_id;
+        $companyId = Tenant::id();
 
         $settings = ClinicSetting::firstOrCreate(
             ['company_id' => $companyId],
             [
                 'clinic_name' => 'My Clinic',
-                'currency' => 'USD',
-                'timezone' => 'UTC',
+                'currency' => 'EGP',
+                'timezone' => 'Africa/Cairo',
                 'invoice_prefix' => 'INV',
                 'invoice_start_number' => 1,
                 'next_invoice_number' => 1,
@@ -34,14 +35,14 @@ class ClinicSettingController extends Controller
 
     public function update(Request $request)
     {
-        $companyId = $request->user()->company_id;
+        $companyId = Tenant::id();
 
         $settings = ClinicSetting::firstOrCreate(
             ['company_id' => $companyId],
             [
                 'clinic_name' => 'My Clinic',
-                'currency' => 'USD',
-                'timezone' => 'UTC',
+                'currency' => 'EGP',
+                'timezone' => 'Africa/Cairo',
                 'invoice_prefix' => 'INV',
                 'invoice_start_number' => 1,
                 'next_invoice_number' => 1,

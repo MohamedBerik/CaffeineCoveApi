@@ -4,6 +4,7 @@ namespace App\Http\Controllers\API\Erp;
 
 use App\Http\Controllers\Controller;
 use App\Models\PatientRadiology;
+use App\Services\Tenant;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
@@ -13,11 +14,9 @@ class RadiologyController extends Controller
 {
     public function index(Request $request)
     {
-        $companyId = $request->user()->company_id;
         $customerId = $request->customer_id;
 
         $query = PatientRadiology::query()
-            ->where('company_id', $companyId)
             ->where('customer_id', $customerId)
             ->orderByDesc('captured_at')
             ->orderByDesc('id');
@@ -32,7 +31,7 @@ class RadiologyController extends Controller
 
     public function store(Request $request)
     {
-        $companyId = $request->user()->company_id;
+        $companyId = Tenant::id();
 
         $validator = Validator::make($request->all(), [
             'customer_id' => 'required|exists:customers,id',
@@ -60,7 +59,6 @@ class RadiologyController extends Controller
 
         $file = $request->file('file');
 
-        // ✅ تنظيف اسم الملف
         $originalName = pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME);
         $extension = $file->getClientOriginalExtension();
         $fileName = time() . '_' . preg_replace('/[^a-zA-Z0-9]/', '_', $originalName) . '.' . $extension;
@@ -72,13 +70,11 @@ class RadiologyController extends Controller
             'file_name' => $fileName,
         ]);
 
-        // ✅ استخدام Storage::makeDirectory بدل mkdir يدوي
         if (!Storage::disk('public')->exists($directory)) {
             Storage::disk('public')->makeDirectory($directory);
             Log::info('Created directory: ' . $directory);
         }
 
-        // ✅ استخدام storeAs بدل move (الأفضل لـ Laravel)
         $filePath = $file->storeAs($directory, $fileName, 'public');
 
         if (!$filePath) {
@@ -113,10 +109,7 @@ class RadiologyController extends Controller
 
     public function show(Request $request, $id)
     {
-        $companyId = $request->user()->company_id;
-
         $radiology = PatientRadiology::query()
-            ->where('company_id', $companyId)
             ->where('id', $id)
             ->first();
 
@@ -135,10 +128,7 @@ class RadiologyController extends Controller
 
     public function destroy(Request $request, $id)
     {
-        $companyId = $request->user()->company_id;
-
         $radiology = PatientRadiology::query()
-            ->where('company_id', $companyId)
             ->where('id', $id)
             ->first();
 

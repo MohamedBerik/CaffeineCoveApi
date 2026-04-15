@@ -4,16 +4,19 @@ namespace App\Http\Controllers\API\Erp;
 
 use App\Http\Controllers\Controller;
 use App\Models\SystemAlert;
+use App\Services\Tenant;
 use Illuminate\Http\Request;
 
 class AlertController extends Controller
 {
-    // ✅ دالة جلب الإشعارات
+    /**
+     * جلب الإشعارات
+     */
     public function index(Request $request)
     {
-        $query = SystemAlert::where('company_id', auth()->user()->company_id);
+        $query = SystemAlert::query();
 
-        // ✅ Filter
+        // Filter
         if ($request->filter === 'unread') {
             $query->whereNull('acknowledged_at');
         }
@@ -22,7 +25,7 @@ class AlertController extends Controller
             $query->where('priority', 'high');
         }
 
-        // ✅ Pagination (IMPORTANT)
+        // Pagination
         $alerts = $query
             ->latest('triggered_at')
             ->paginate(20);
@@ -47,25 +50,24 @@ class AlertController extends Controller
         ]);
     }
 
-    // ✅ دالة جلب عدد الإشعارات غير المقروءة
+    /**
+     * جلب عدد الإشعارات غير المقروءة
+     */
     public function unreadCount()
     {
-        $count = SystemAlert::where('company_id', auth()->user()->company_id)
-            // ->where(function ($query) {
-            //     $query->where('user_id', auth()->id())
-            //         ->orWhereNull('user_id');
-            // })
+        $count = SystemAlert::query()
             ->whereNull('acknowledged_at')
             ->count();
 
         return response()->json(['count' => $count]);
     }
 
-    // ✅ دالة تحديد كمقروء (موجودة بالفعل)
+    /**
+     * تحديد الإشعار كمقروء
+     */
     public function acknowledge($id)
     {
-        $alert = SystemAlert::where('company_id', auth()->user()->company_id)
-            ->findOrFail($id);
+        $alert = SystemAlert::query()->findOrFail($id);
 
         $alert->update([
             'acknowledged_at' => now()
@@ -74,9 +76,12 @@ class AlertController extends Controller
         return response()->json(['status' => 'ok']);
     }
 
+    /**
+     * تحديد كل الإشعارات كمقروءة
+     */
     public function markAllRead()
     {
-        SystemAlert::where('company_id', auth()->user()->company_id)
+        SystemAlert::query()
             ->whereNull('acknowledged_at')
             ->update([
                 'acknowledged_at' => now()

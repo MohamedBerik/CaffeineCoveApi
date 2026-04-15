@@ -5,6 +5,7 @@ namespace App\Http\Controllers\API\Erp;
 use App\Http\Controllers\Controller;
 use App\Models\Customer;
 use App\Models\CustomerLedgerEntry;
+use App\Services\Tenant;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 
@@ -12,14 +13,12 @@ class CustomerStatementController extends Controller
 {
     public function show(Request $request, $customerId)
     {
-        $companyId = $request->user()->company_id;
+        // Ensure customer belongs to tenant (الـ Scope هيتأكد)
+        $customer = Customer::query()->findOrFail($customerId);
 
-        // Ensure customer belongs to tenant
-        $customer = Customer::where('company_id', $companyId)->findOrFail($customerId);
-
-        // Parse filters safely (date only)
-        $from = $request->query('from'); // YYYY-MM-DD
-        $to   = $request->query('to');   // YYYY-MM-DD
+        // Parse filters safely
+        $from = $request->query('from');
+        $to   = $request->query('to');
 
         $fromDate = $from ? Carbon::parse($from)->toDateString() : null;
         $toDate   = $to   ? Carbon::parse($to)->toDateString()   : null;
@@ -29,7 +28,7 @@ class CustomerStatementController extends Controller
          | Opening balance = all entries BEFORE fromDate
          |---------------------------------------------------------
          */
-        $openingQuery = CustomerLedgerEntry::where('company_id', $companyId)
+        $openingQuery = CustomerLedgerEntry::query()
             ->where('customer_id', $customerId);
 
         if ($fromDate) {
@@ -45,7 +44,7 @@ class CustomerStatementController extends Controller
          | Entries within period
          |---------------------------------------------------------
          */
-        $entriesQuery = CustomerLedgerEntry::where('company_id', $companyId)
+        $entriesQuery = CustomerLedgerEntry::query()
             ->where('customer_id', $customerId);
 
         if ($fromDate) {
@@ -56,10 +55,8 @@ class CustomerStatementController extends Controller
             $entriesQuery->whereDate('entry_date', '<=', $toDate);
         }
 
-        // Stable ordering (oldest -> newest)
         $entries = $entriesQuery
             ->orderBy('created_at', 'asc')
-            // ->orderBy('entry_date', 'asc')
             ->orderBy('id', 'asc')
             ->get();
 
@@ -76,12 +73,10 @@ class CustomerStatementController extends Controller
 
             $running += ($debit - $credit);
 
-            // entry_date => date-only for display/filtering
             $entryDate = $row->entry_date instanceof Carbon
                 ? $row->entry_date->toDateString()
                 : Carbon::parse($row->entry_date)->toDateString();
 
-            // entry_datetime => REAL time ordering/display (use created_at)
             $entryDateTime = $row->created_at
                 ? $row->created_at->toISOString()
                 : null;

@@ -9,6 +9,7 @@ use App\Models\Invoice;
 use App\Models\Payment;
 use App\Models\PaymentRefund;
 use App\Services\AccountingService;
+use App\Services\Tenant;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use App\Events\DashboardUpdated;
@@ -19,7 +20,7 @@ class InvoicePaymentController extends Controller
 {
     public function store(Request $request, $invoiceId)
     {
-        $companyId = $request->user()->company_id;
+        $companyId = Tenant::id();
 
         $data = $request->validate([
             'amount'            => ['required', 'numeric', 'min:0.01'],
@@ -32,31 +33,25 @@ class InvoicePaymentController extends Controller
 
         return DB::transaction(function () use ($request, $invoiceId, $companyId, $data, $allowOverpayment) {
 
-            $invoice = Invoice::where('company_id', $companyId)
-                ->lockForUpdate()
-                ->findOrFail($invoiceId);
+            $invoice = Invoice::lockForUpdate()->findOrFail($invoiceId);
 
             if ($invoice->status === 'cancelled') {
                 return response()->json(['msg' => 'Cannot receive payment for cancelled invoice'], 422);
             }
 
             // 1) total applied (sum payments.applied_amount)
-            $totalApplied = Payment::where('company_id', $companyId)
-                ->where('invoice_id', $invoice->id)
+            $totalApplied = Payment::where('invoice_id', $invoice->id)
                 ->sum('applied_amount');
 
             // 2) total refunded for invoice portion only
             $totalRefunded = DB::table('payment_refunds')
                 ->join('payments', 'payments.id', '=', 'payment_refunds.payment_id')
-                ->where('payments.company_id', $companyId)
                 ->where('payments.invoice_id', $invoice->id)
-                ->where('payment_refunds.company_id', $companyId)
                 ->where('payment_refunds.applies_to', 'invoice')
                 ->sum('payment_refunds.amount');
 
             // 3) total credit applied to this invoice (customer_credits type=debit)
             $totalCreditApplied = DB::table('customer_credits')
-                ->where('company_id', $companyId)
                 ->where('invoice_id', $invoice->id)
                 ->where('type', 'debit')
                 ->sum('amount');
@@ -102,7 +97,6 @@ class InvoicePaymentController extends Controller
             ])->save();
 
             // Customer Ledger (AR ledger):
-            // credit = applied فقط (لأن ده اللي سدد الفاتورة فعلاً)
             if ($applied > 0) {
                 CustomerLedgerEntry::create([
                     'company_id'  => $companyId,
@@ -119,12 +113,11 @@ class InvoicePaymentController extends Controller
             }
 
             // Customer Credit Ledger: credit issued (overpayment)
-            // (ده هو مصدر الحقيقة لرصيد العميل)
             if ($credit > 0) {
                 DB::table('customer_credits')->insert([
                     'company_id'   => $companyId,
                     'customer_id'  => $invoice->customer_id,
-                    'invoice_id'   => null,              // credit مش مربوط بفاتورة
+                    'invoice_id'   => null,
                     'payment_id'   => $payment->id,
                     'type'         => 'credit',
                     'amount'       => $credit,
@@ -137,9 +130,9 @@ class InvoicePaymentController extends Controller
             }
 
             // Accounts
-            $cashAccount = Account::where('company_id', $companyId)->where('code', '1000')->first();
-            $arAccount = Account::where('company_id', $companyId)->where('code', '1100')->first();
-            $creditAccount = Account::where('company_id', $companyId)->where('code', '2100')->first();
+            $cashAccount = Account::where('code', '1000')->first();
+            $arAccount = Account::where('code', '1100')->first();
+            $creditAccount = Account::where('code', '2100')->first();
 
             if (!$cashAccount || !$arAccount || !$creditAccount) {
                 return response()->json([
@@ -152,10 +145,7 @@ class InvoicePaymentController extends Controller
                 ], 422);
             }
 
-            // Accounting entry:
-            // Dr Cash = full amount
-            // Cr AR = applied
-            // Cr Customer Credit = credit (if any)
+            // Accounting entry
             $lines = [
                 ['account_id' => $cashAccount->id, 'debit' => $amount, 'credit' => 0],
             ];
@@ -176,7 +166,6 @@ class InvoicePaymentController extends Controller
                 now()->toDateString()
             );
 
-            // Recalc invoice status based on netPaid + applied (applied only adds to AR settlement)
             $netAfter = $netPaid + $applied;
             $remainingAfter = max(0, (float)$invoice->total - (float)$netAfter);
 
@@ -190,7 +179,6 @@ class InvoicePaymentController extends Controller
 
             $invoice->update(['status' => $status]);
 
-            // ✅ بث حدث تحديث الداشبورد
             event(new DashboardUpdated(
                 $companyId,
                 'payment_created',

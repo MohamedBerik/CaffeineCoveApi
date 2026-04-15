@@ -4,19 +4,17 @@ namespace App\Http\Controllers\API\Erp;
 
 use App\Http\Controllers\Controller;
 use App\Models\DentalRecord;
+use App\Models\TreatmentPlanItem;
+use App\Services\Tenant;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
-use App\Models\TreatmentPlanItem;
 use Illuminate\Support\Facades\DB;
 
 class DentalRecordController extends Controller
 {
     public function index(Request $request)
     {
-        $companyId = $request->user()->company_id;
-
         $query = DentalRecord::query()
-            ->where('company_id', $companyId)
             ->with([
                 'customer:id,name,email,company_id',
                 'appointment:id,company_id,appointment_date,appointment_time,status',
@@ -49,36 +47,28 @@ class DentalRecordController extends Controller
 
     public function store(Request $request)
     {
-        $companyId = $request->user()->company_id;
+        $companyId = Tenant::id();
 
         $data = $request->validate([
             'customer_id' => [
                 'required',
                 'integer',
-                Rule::exists('customers', 'id')->where(
-                    fn($q) => $q->where('company_id', $companyId)
-                ),
+                Rule::exists('customers', 'id'),
             ],
             'appointment_id' => [
                 'nullable',
                 'integer',
-                Rule::exists('appointments', 'id')->where(
-                    fn($q) => $q->where('company_id', $companyId)
-                ),
+                Rule::exists('appointments', 'id'),
             ],
             'doctor_id' => [
                 'nullable',
                 'integer',
-                Rule::exists('doctors', 'id')->where(
-                    fn($q) => $q->where('company_id', $companyId)->where('is_active', true)
-                ),
+                Rule::exists('doctors', 'id')->where('is_active', true),
             ],
             'procedure_id' => [
                 'nullable',
                 'integer',
-                Rule::exists('procedures', 'id')->where(
-                    fn($q) => $q->where('company_id', $companyId)
-                ),
+                Rule::exists('procedures', 'id'),
             ],
             'tooth_number' => ['required', 'string', 'max:10'],
             'surface' => ['nullable', 'string', 'max:50'],
@@ -112,10 +102,7 @@ class DentalRecordController extends Controller
 
     public function show(Request $request, $id)
     {
-        $companyId = $request->user()->company_id;
-
         $record = DentalRecord::query()
-            ->where('company_id', $companyId)
             ->with([
                 'customer:id,name,email,company_id',
                 'appointment:id,company_id,appointment_date,appointment_time,status',
@@ -133,24 +120,20 @@ class DentalRecordController extends Controller
 
     public function update(Request $request, $id)
     {
-        $companyId = $request->user()->company_id;
-
-        $record = DentalRecord::query()
-            ->where('company_id', $companyId)
-            ->findOrFail($id);
+        $record = DentalRecord::query()->findOrFail($id);
 
         $data = $request->validate([
             'appointment_id' => [
                 'sometimes',
                 'nullable',
                 'integer',
-                Rule::exists('appointments', 'id')->where(fn($q) => $q->where('company_id', $companyId)),
+                Rule::exists('appointments', 'id'),
             ],
             'procedure_id' => [
                 'sometimes',
                 'nullable',
                 'integer',
-                Rule::exists('procedures', 'id')->where(fn($q) => $q->where('company_id', $companyId)),
+                Rule::exists('procedures', 'id'),
             ],
             'tooth_number' => ['sometimes', 'required', 'string', 'max:10'],
             'surface' => ['sometimes', 'nullable', 'string', 'max:50'],
@@ -174,12 +157,7 @@ class DentalRecordController extends Controller
 
     public function destroy(Request $request, $id)
     {
-        $companyId = $request->user()->company_id;
-
-        $record = DentalRecord::query()
-            ->where('company_id', $companyId)
-            ->findOrFail($id);
-
+        $record = DentalRecord::query()->findOrFail($id);
         $record->delete();
 
         return response()->json([
@@ -190,10 +168,9 @@ class DentalRecordController extends Controller
 
     public function toTreatmentPlanItem(Request $request, $id)
     {
-        $companyId = $request->user()->company_id;
+        $companyId = Tenant::id();
 
         $record = DentalRecord::query()
-            ->where('company_id', $companyId)
             ->with('procedure')
             ->findOrFail($id);
 
@@ -211,15 +188,12 @@ class DentalRecordController extends Controller
             'treatment_plan_id' => [
                 'required',
                 'integer',
-                Rule::exists('treatment_plans', 'id')->where(
-                    fn($q) => $q->where('company_id', $companyId)
-                ),
+                Rule::exists('treatment_plans', 'id'),
             ],
             'price' => ['nullable', 'numeric', 'min:0'],
         ]);
 
         $plan = \App\Models\TreatmentPlan::query()
-            ->where('company_id', $companyId)
             ->findOrFail($data['treatment_plan_id']);
 
         if ((int) $plan->customer_id !== (int) $record->customer_id) {
@@ -242,8 +216,7 @@ class DentalRecordController extends Controller
             ], 422);
         }
 
-        $duplicate = \App\Models\TreatmentPlanItem::query()
-            ->where('company_id', $companyId)
+        $duplicate = TreatmentPlanItem::query()
             ->where('treatment_plan_id', $plan->id)
             ->where('procedure_id', $record->procedure_id)
             ->where('tooth_number', $record->tooth_number)
@@ -273,7 +246,7 @@ class DentalRecordController extends Controller
         return DB::transaction(function () use ($companyId, $record, $plan, $data) {
             $price = $data['price'] ?? (float) ($record->procedure->default_price ?? 0);
 
-            $item = \App\Models\TreatmentPlanItem::create([
+            $item = TreatmentPlanItem::create([
                 'company_id'         => $companyId,
                 'treatment_plan_id'  => $plan->id,
                 'procedure_id'       => $record->procedure_id,
@@ -292,7 +265,6 @@ class DentalRecordController extends Controller
             ]);
 
             $sum = TreatmentPlanItem::query()
-                ->where('company_id', $companyId)
                 ->where('treatment_plan_id', $plan->id)
                 ->sum('price');
 

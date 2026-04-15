@@ -5,16 +5,14 @@ namespace App\Http\Controllers\API\Erp;
 use App\Http\Controllers\Controller;
 use App\Models\Supplier;
 use App\Models\SupplierLedgerEntry;
+use App\Services\Tenant;
 use Illuminate\Http\Request;
 
 class SupplierStatementController extends Controller
 {
     public function show(Request $request, $supplierId)
     {
-        $companyId = $request->user()->company_id;
-
-        $supplier = Supplier::where('company_id', $companyId)
-            ->findOrFail($supplierId);
+        $supplier = Supplier::query()->findOrFail($supplierId);
 
         $from = $request->query('from');
         $to   = $request->query('to');
@@ -22,11 +20,10 @@ class SupplierStatementController extends Controller
         /*
          |------------------------------------------------
          | Opening balance
-         | كل ما قبل from
          |------------------------------------------------
          */
 
-        $openingQuery = SupplierLedgerEntry::where('company_id', $companyId)
+        $openingQuery = SupplierLedgerEntry::query()
             ->where('supplier_id', $supplierId);
 
         if ($from) {
@@ -44,7 +41,7 @@ class SupplierStatementController extends Controller
          |------------------------------------------------
          */
 
-        $entriesQuery = SupplierLedgerEntry::where('company_id', $companyId)
+        $entriesQuery = SupplierLedgerEntry::query()
             ->where('supplier_id', $supplierId);
 
         if ($from) {
@@ -73,15 +70,15 @@ class SupplierStatementController extends Controller
             $running += ($row->debit - $row->credit);
 
             return [
-                'id'         => $row->id,
-                'entry_date' => $row->entry_date->toDateString(),
+                'id'          => $row->id,
+                'entry_date'  => $row->entry_date->toDateString(),
                 'description' => $row->description,
-                'type'       => $row->type,
+                'type'        => $row->type,
 
-                'debit'      => $row->debit,
-                'credit'     => $row->credit,
+                'debit'       => $row->debit,
+                'credit'      => $row->credit,
 
-                'balance'    => $running,
+                'balance'     => $running,
 
                 'purchase_order_id'   => $row->purchase_order_id,
                 'supplier_payment_id' => $row->supplier_payment_id,

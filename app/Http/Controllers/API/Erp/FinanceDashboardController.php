@@ -9,6 +9,7 @@ use App\Models\PurchaseOrder;
 use App\Models\SupplierPayment;
 use App\Models\PaymentRefund;
 use App\Models\ActivityLog;
+use App\Services\Tenant;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 
@@ -16,21 +17,21 @@ class FinanceDashboardController extends Controller
 {
     public function index(Request $request)
     {
-        $companyId = $request->user()->company_id;
+        $companyId = Tenant::id();
 
         /* ============================================================
          | Old data (KEEP – backward compatible)
          * ============================================================ */
 
-        $totalSales = Invoice::where('company_id', $companyId)->sum('total');
+        $totalSales = Invoice::query()->sum('total');
 
-        $totalCollected = Payment::where('company_id', $companyId)->sum('amount');
+        $totalCollected = Payment::query()->sum('amount');
 
-        $totalPurchases = PurchaseOrder::where('company_id', $companyId)->sum('total');
+        $totalPurchases = PurchaseOrder::query()->sum('total');
 
-        $totalPaidToSuppliers = SupplierPayment::where('company_id', $companyId)->sum('amount');
+        $totalPaidToSuppliers = SupplierPayment::query()->sum('amount');
 
-        $receivables = Invoice::where('company_id', $companyId)
+        $receivables = Invoice::query()
             ->whereIn('status', ['unpaid', 'partially_paid'])
             ->with('payments')
             ->get()
@@ -39,7 +40,7 @@ class FinanceDashboardController extends Controller
                 return max($invoice->total - $paid, 0);
             });
 
-        $payables = PurchaseOrder::where('company_id', $companyId)
+        $payables = PurchaseOrder::query()
             ->whereNotIn('status', ['cancelled'])
             ->with('payments')
             ->get()
@@ -52,9 +53,9 @@ class FinanceDashboardController extends Controller
          | Financial collection breakdown
          * ============================================================ */
 
-        $grossCollected = Payment::where('company_id', $companyId)->sum('amount');
+        $grossCollected = Payment::query()->sum('amount');
 
-        $refundsTotal = PaymentRefund::where('company_id', $companyId)->sum('amount');
+        $refundsTotal = PaymentRefund::query()->sum('amount');
 
         $netCollected = $grossCollected - $refundsTotal;
 
@@ -64,15 +65,15 @@ class FinanceDashboardController extends Controller
 
         $today = Carbon::today();
 
-        $salesToday = Invoice::where('company_id', $companyId)
+        $salesToday = Invoice::query()
             ->whereDate('created_at', $today)
             ->sum('total');
 
-        $paymentsToday = Payment::where('company_id', $companyId)
+        $paymentsToday = Payment::query()
             ->whereDate('created_at', $today)
             ->sum('amount');
 
-        $refundsToday = PaymentRefund::where('company_id', $companyId)
+        $refundsToday = PaymentRefund::query()
             ->whereDate('created_at', $today)
             ->sum('amount');
 
@@ -88,15 +89,15 @@ class FinanceDashboardController extends Controller
 
             $date = Carbon::today()->subDays($i)->toDateString();
 
-            $sales = Invoice::where('company_id', $companyId)
+            $sales = Invoice::query()
                 ->whereDate('created_at', $date)
                 ->sum('total');
 
-            $payments = Payment::where('company_id', $companyId)
+            $payments = Payment::query()
                 ->whereDate('created_at', $date)
                 ->sum('amount');
 
-            $refunds = PaymentRefund::where('company_id', $companyId)
+            $refunds = PaymentRefund::query()
                 ->whereDate('created_at', $date)
                 ->sum('amount');
 
@@ -123,7 +124,7 @@ class FinanceDashboardController extends Controller
          | Latest invoices
          * ============================================================ */
 
-        $latestInvoices = Invoice::where('company_id', $companyId)
+        $latestInvoices = Invoice::query()
             ->with('customer')
             ->latest()
             ->limit(5)
@@ -142,7 +143,7 @@ class FinanceDashboardController extends Controller
          | Recent activity
          * ============================================================ */
 
-        $activities = ActivityLog::where('company_id', $companyId)
+        $activities = ActivityLog::query()
             ->latest()
             ->limit(6)
             ->get()

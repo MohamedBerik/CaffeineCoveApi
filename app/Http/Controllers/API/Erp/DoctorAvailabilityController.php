@@ -4,6 +4,7 @@ namespace App\Http\Controllers\API\Erp;
 
 use App\Http\Controllers\Controller;
 use App\Services\DoctorAvailabilityService;
+use App\Services\Tenant;
 use Illuminate\Http\Request;
 
 class DoctorAvailabilityController extends Controller
@@ -14,7 +15,7 @@ class DoctorAvailabilityController extends Controller
      */
     public function show(Request $request, $doctorId, DoctorAvailabilityService $service)
     {
-        $companyId = (int) $request->user()->company_id;
+        $companyId = Tenant::id();
 
         $data = $request->validate([
             'date' => ['required', 'date_format:Y-m-d'],

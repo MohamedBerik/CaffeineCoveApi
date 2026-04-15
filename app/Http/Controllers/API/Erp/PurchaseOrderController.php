@@ -9,6 +9,7 @@ use App\Models\Product;
 use App\Models\StockMovement;
 use App\Models\SupplierPayment;
 use App\Models\SupplierLedgerEntry;
+use App\Services\Tenant;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -16,14 +17,11 @@ class PurchaseOrderController extends Controller
 {
     public function indexErp(Request $request)
     {
-        $companyId = $request->user()->company_id;
-
         $orders = PurchaseOrder::with([
             'supplier',
             'items.product',
             'payments'
         ])
-            ->where('company_id', $companyId)
             ->orderByDesc('created_at')
             ->get()
             ->map(function ($po) {
@@ -63,16 +61,11 @@ class PurchaseOrderController extends Controller
 
     public function showErp(Request $request, $id)
     {
-        $companyId = $request->user()->company_id;
-
         $po = PurchaseOrder::with([
             'supplier',
             'items.product',
             'payments'
-        ])
-            ->where('company_id', $companyId)
-            ->where('id', $id)
-            ->firstOrFail();
+        ])->findOrFail($id);
 
         $totalPaid = $po->payments->sum('amount');
         $remaining = $po->total - $totalPaid;
@@ -97,18 +90,18 @@ class PurchaseOrderController extends Controller
             'items' => $po->items->map(function ($item) {
                 return [
                     'id'        => $item->id,
-                    'product'  => $item->product,
-                    'quantity' => $item->quantity,
+                    'product'   => $item->product,
+                    'quantity'  => $item->quantity,
                     'unit_cost' => $item->unit_cost,
-                    'total'    => $item->total,
+                    'total'     => $item->total,
                 ];
             }),
 
             'payments' => $po->payments->map(function ($p) {
                 return [
                     'id'      => $p->id,
-                    'amount' => $p->amount,
-                    'method' => $p->method,
+                    'amount'  => $p->amount,
+                    'method'  => $p->method,
                     'paid_at' => $p->paid_at,
                 ];
             }),
@@ -117,8 +110,7 @@ class PurchaseOrderController extends Controller
 
     public function store(Request $request)
     {
-        $user = $request->user();
-        $companyId = $user->company_id;
+        $companyId = Tenant::id();
 
         $data = $request->validate([
             'supplier_id' => ['required'],
@@ -130,8 +122,7 @@ class PurchaseOrderController extends Controller
 
         return DB::transaction(function () use ($data, $companyId) {
 
-            // تأكد أن المورد تابع لنفس الشركة
-            $supplierExists = \App\Models\Supplier::where('company_id', $companyId)
+            $supplierExists = \App\Models\Supplier::query()
                 ->where('id', $data['supplier_id'])
                 ->exists();
 
@@ -153,8 +144,7 @@ class PurchaseOrderController extends Controller
 
             foreach ($data['items'] as $item) {
 
-                // تأكد أن الصنف تابع لنفس الشركة
-                $productExists = Product::where('company_id', $companyId)
+                $productExists = Product::query()
                     ->where('id', $item['product_id'])
                     ->exists();
 
@@ -165,6 +155,7 @@ class PurchaseOrderController extends Controller
                 $line = $item['quantity'] * $item['unit_cost'];
 
                 PurchaseOrderItem::create([
+                    'company_id'        => $companyId,
                     'purchase_order_id' => $po->id,
                     'product_id'        => $item['product_id'],
                     'quantity'          => $item['quantity'],
@@ -192,15 +183,13 @@ class PurchaseOrderController extends Controller
         });
     }
 
-
     public function receive(Request $request, $id)
     {
-        $companyId = $request->user()->company_id;
+        $companyId = Tenant::id();
 
         return DB::transaction(function () use ($request, $id, $companyId) {
 
             $po = PurchaseOrder::with(['items.product'])
-                ->where('company_id', $companyId)
                 ->lockForUpdate()
                 ->findOrFail($id);
 
@@ -216,11 +205,7 @@ class PurchaseOrderController extends Controller
                 ], 422);
             }
 
-            /**
-             * حماية إضافية:
-             * لو حصلت مشكلة قبل كده واتسجلت movements بدون received_at
-             */
-            $alreadyMoved = StockMovement::where('company_id', $companyId)
+            $alreadyMoved = StockMovement::query()
                 ->where('reference_type', PurchaseOrder::class)
                 ->where('reference_id', $po->id)
                 ->where('type', 'in')
@@ -234,7 +219,7 @@ class PurchaseOrderController extends Controller
 
             foreach ($po->items as $item) {
 
-                $product = Product::where('company_id', $companyId)
+                $product = Product::query()
                     ->lockForUpdate()
                     ->find($item->product_id);
 
@@ -256,13 +241,6 @@ class PurchaseOrderController extends Controller
             }
 
             $po->received_at = now();
-
-            /*
-         الحالة لا نغيرها هنا
-         لأنك بالفعل فصلت بين:
-         payment status
-         و receiving
-         */
             $po->save();
 
             return response()->json([
@@ -273,7 +251,7 @@ class PurchaseOrderController extends Controller
 
     public function pay(Request $request, $id)
     {
-        $companyId = $request->user()->company_id;
+        $companyId = Tenant::id();
 
         $request->validate([
             'amount' => ['required', 'numeric', 'min:0.01'],
@@ -283,7 +261,6 @@ class PurchaseOrderController extends Controller
         return DB::transaction(function () use ($request, $id, $companyId) {
 
             $po = PurchaseOrder::with(['payments'])
-                ->where('company_id', $companyId)
                 ->lockForUpdate()
                 ->findOrFail($id);
 
@@ -303,12 +280,7 @@ class PurchaseOrderController extends Controller
                 ], 422);
             }
 
-            /**
-             * تأكد أن المورد من نفس الشركة
-             */
-            $supplier = $po->supplier()
-                ->where('company_id', $companyId)
-                ->first();
+            $supplier = $po->supplier()->first();
 
             if (! $supplier) {
                 return response()->json([
@@ -327,15 +299,15 @@ class PurchaseOrderController extends Controller
             ]);
 
             SupplierLedgerEntry::create([
-                'company_id'         => $companyId,
-                'supplier_id'        => $po->supplier_id,
-                'purchase_order_id'  => $po->id,
+                'company_id'          => $companyId,
+                'supplier_id'         => $po->supplier_id,
+                'purchase_order_id'   => $po->id,
                 'supplier_payment_id' => $payment->id,
-                'type'               => 'payment',
-                'debit'              => 0,
-                'credit'             => $payment->amount,
-                'entry_date'         => now()->toDateString(),
-                'description'        => 'Payment for PO #' . $po->number,
+                'type'                => 'payment',
+                'debit'               => 0,
+                'credit'              => $payment->amount,
+                'entry_date'          => now()->toDateString(),
+                'description'         => 'Payment for PO #' . $po->number,
             ]);
 
             $newPaid = $alreadyPaid + $request->amount;
@@ -348,17 +320,12 @@ class PurchaseOrderController extends Controller
 
             $po->save();
 
-            activity('supplier.paid', $po, [
-                'amount' => $request->amount
-            ]);
-
             return response()->json([
                 'msg' => 'Supplier payment recorded',
                 'payment_id' => $payment->id
             ]);
         });
     }
-
 
     public function returnItems(Request $request, $id)
     {
@@ -367,21 +334,19 @@ class PurchaseOrderController extends Controller
             'quantity'   => ['required', 'numeric', 'min:0.01'],
         ]);
 
+        $companyId = Tenant::id();
         $user = $request->user();
-        $companyId = $user->company_id;
 
         return DB::transaction(function () use ($request, $id, $companyId, $user) {
 
             $po = PurchaseOrder::with('items')
-                ->where('company_id', $companyId)
                 ->lockForUpdate()
                 ->findOrFail($id);
 
             $productId = (int) $request->product_id;
             $qty       = (float) $request->quantity;
 
-            $item = $po->items
-                ->firstWhere('product_id', $productId);
+            $item = $po->items->firstWhere('product_id', $productId);
 
             if (! $item) {
                 return response()->json([
@@ -389,7 +354,7 @@ class PurchaseOrderController extends Controller
                 ], 422);
             }
 
-            $totalIn = StockMovement::where('company_id', $companyId)
+            $totalIn = StockMovement::query()
                 ->where('reference_type', PurchaseOrder::class)
                 ->where('reference_id', $po->id)
                 ->where('product_id', $productId)
@@ -402,7 +367,7 @@ class PurchaseOrderController extends Controller
                 ], 422);
             }
 
-            $totalOut = StockMovement::where('company_id', $companyId)
+            $totalOut = StockMovement::query()
                 ->where('reference_type', PurchaseOrder::class)
                 ->where('reference_id', $po->id)
                 ->where('product_id', $productId)
@@ -424,7 +389,7 @@ class PurchaseOrderController extends Controller
                 ], 422);
             }
 
-            $product = Product::where('company_id', $companyId)
+            $product = Product::query()
                 ->lockForUpdate()
                 ->findOrFail($productId);
 
@@ -459,12 +424,6 @@ class PurchaseOrderController extends Controller
                 'description'       => 'Purchase return for PO #' . $po->number,
             ]);
 
-            /*
-        |--------------------------------------------------------------------------
-        | تعديل الحالة بشكل ذكي
-        |--------------------------------------------------------------------------
-        */
-
             if ($availableToReturn - $qty == 0) {
                 $po->status = 'returned';
             } else {
@@ -480,25 +439,20 @@ class PurchaseOrderController extends Controller
         });
     }
 
-
     public function getReturnableItems(Request $request, $id)
     {
-        $companyId = $request->user()->company_id;
+        $po = PurchaseOrder::with(['items.product'])->findOrFail($id);
 
-        $po = PurchaseOrder::with(['items.product'])
-            ->where('company_id', $companyId)
-            ->findOrFail($id);
+        $items = $po->items->map(function ($item) use ($po) {
 
-        $items = $po->items->map(function ($item) use ($po, $companyId) {
-
-            $totalIn = StockMovement::where('company_id', $companyId)
+            $totalIn = StockMovement::query()
                 ->where('reference_type', PurchaseOrder::class)
                 ->where('reference_id', $po->id)
                 ->where('product_id', $item->product_id)
                 ->where('type', 'in')
                 ->sum('quantity');
 
-            $totalOut = StockMovement::where('company_id', $companyId)
+            $totalOut = StockMovement::query()
                 ->where('reference_type', PurchaseOrder::class)
                 ->where('reference_id', $po->id)
                 ->where('product_id', $item->product_id)
@@ -526,13 +480,9 @@ class PurchaseOrderController extends Controller
 
     public function returnHistory(Request $request, $id)
     {
-        $companyId = $request->user()->company_id;
-
-        $po = PurchaseOrder::where('company_id', $companyId)
-            ->findOrFail($id);
+        $po = PurchaseOrder::query()->findOrFail($id);
 
         $rows = StockMovement::with('product')
-            ->where('company_id', $companyId)
             ->where('reference_type', PurchaseOrder::class)
             ->where('reference_id', $po->id)
             ->where('type', 'out')

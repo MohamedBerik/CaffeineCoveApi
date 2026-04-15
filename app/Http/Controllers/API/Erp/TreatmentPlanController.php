@@ -10,6 +10,7 @@ use App\Models\Procedure;
 use App\Models\TreatmentPlan;
 use App\Models\TreatmentPlanItem;
 use App\Services\ActivityLogger;
+use App\Services\Tenant;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
@@ -23,10 +24,9 @@ class TreatmentPlanController extends Controller
 
     public function index(Request $request)
     {
-        $companyId = $request->user()->company_id;
+        $companyId = Tenant::id();
 
         $plans = TreatmentPlan::query()
-            ->where('company_id', $companyId)
             ->with(['customer:id,name,email,company_id'])
             ->orderByDesc('id')
             ->paginate(20);
@@ -40,19 +40,17 @@ class TreatmentPlanController extends Controller
 
     public function show(Request $request, $id)
     {
-        $companyId = $request->user()->company_id;
+        $companyId = Tenant::id();
 
         $plan = TreatmentPlan::query()
-            ->where('company_id', $companyId)
             ->with([
                 'customer:id,name,email,company_id',
-                'invoices' => function ($q) use ($companyId) {
-                    $q->where('company_id', $companyId)
-                        ->with([
-                            'items.product',
-                            'payments.refunds',
-                            'journalEntries.lines.account',
-                        ])
+                'invoices' => function ($q) {
+                    $q->with([
+                        'items.product',
+                        'payments.refunds',
+                        'journalEntries.lines.account',
+                    ])
                         ->orderByDesc('id');
                 },
             ])
@@ -63,15 +61,13 @@ class TreatmentPlanController extends Controller
 
     public function store(Request $request)
     {
-        $companyId = $request->user()->company_id;
+        $companyId = Tenant::id();
 
         $data = $request->validate([
             'customer_id' => [
                 'required',
                 'integer',
-                Rule::exists('customers', 'id')->where(
-                    fn($q) => $q->where('company_id', $companyId)
-                ),
+                Rule::exists('customers', 'id'),
             ],
             'title' => ['required', 'string', 'max:190'],
             'notes' => ['nullable', 'string'],
@@ -94,11 +90,9 @@ class TreatmentPlanController extends Controller
 
     public function update(Request $request, $id)
     {
-        $companyId = $request->user()->company_id;
+        $companyId = Tenant::id();
 
-        $plan = TreatmentPlan::query()
-            ->where('company_id', $companyId)
-            ->findOrFail($id);
+        $plan = TreatmentPlan::query()->findOrFail($id);
 
         $data = $request->validate([
             'title' => ['nullable', 'string', 'max:190'],
@@ -120,14 +114,11 @@ class TreatmentPlanController extends Controller
 
     public function destroy(Request $request, $id)
     {
-        $companyId = $request->user()->company_id;
+        $companyId = Tenant::id();
 
-        $plan = TreatmentPlan::query()
-            ->where('company_id', $companyId)
-            ->findOrFail($id);
+        $plan = TreatmentPlan::query()->findOrFail($id);
 
         $hasInvoices = Invoice::query()
-            ->where('company_id', $companyId)
             ->where('treatment_plan_id', $plan->id)
             ->exists();
 
@@ -149,7 +140,6 @@ class TreatmentPlanController extends Controller
         $invoiceIds = $withInvoices && $plan->relationLoaded('invoices')
             ? $plan->invoices->pluck('id')->all()
             : Invoice::query()
-            ->where('company_id', $companyId)
             ->where('treatment_plan_id', $plan->id)
             ->pluck('id')
             ->all();
@@ -160,20 +150,16 @@ class TreatmentPlanController extends Controller
 
         if (!empty($invoiceIds)) {
             $totalDirectPaid = (float) DB::table('payments')
-                ->where('company_id', $companyId)
                 ->whereIn('invoice_id', $invoiceIds)
                 ->sum('applied_amount');
 
             $totalRefundedInvoice = (float) DB::table('payment_refunds')
                 ->join('payments', 'payments.id', '=', 'payment_refunds.payment_id')
-                ->where('payments.company_id', $companyId)
                 ->whereIn('payments.invoice_id', $invoiceIds)
-                ->where('payment_refunds.company_id', $companyId)
                 ->where('payment_refunds.applies_to', 'invoice')
                 ->sum('payment_refunds.amount');
 
             $totalCreditApplied = (float) DB::table('customer_credits')
-                ->where('company_id', $companyId)
                 ->where('type', 'debit')
                 ->whereIn('invoice_id', $invoiceIds)
                 ->sum('amount');
@@ -214,14 +200,11 @@ class TreatmentPlanController extends Controller
 
     public function summary(Request $request, $id)
     {
-        $companyId = $request->user()->company_id;
+        $companyId = Tenant::id();
 
-        $plan = TreatmentPlan::query()
-            ->where('company_id', $companyId)
-            ->findOrFail($id);
+        $plan = TreatmentPlan::query()->findOrFail($id);
 
         $invoices = Invoice::query()
-            ->where('company_id', $companyId)
             ->where('treatment_plan_id', $plan->id)
             ->orderBy('issued_at', 'asc')
             ->orderBy('id', 'asc')
@@ -269,14 +252,12 @@ class TreatmentPlanController extends Controller
         }
 
         $paidByInvoice = DB::table('payments')
-            ->where('company_id', $companyId)
             ->whereIn('invoice_id', $invoiceIds)
             ->select('invoice_id', DB::raw('SUM(applied_amount) as total_paid'))
             ->groupBy('invoice_id')
             ->pluck('total_paid', 'invoice_id');
 
         $creditAppliedByInvoice = DB::table('customer_credits')
-            ->where('company_id', $companyId)
             ->where('customer_id', $plan->customer_id)
             ->whereIn('invoice_id', $invoiceIds)
             ->where('type', 'debit')
@@ -286,8 +267,6 @@ class TreatmentPlanController extends Controller
 
         $refundedByInvoice = DB::table('payment_refunds')
             ->join('payments', 'payments.id', '=', 'payment_refunds.payment_id')
-            ->where('payments.company_id', $companyId)
-            ->where('payment_refunds.company_id', $companyId)
             ->whereIn('payments.invoice_id', $invoiceIds)
             ->where('payment_refunds.applies_to', 'invoice')
             ->select('payments.invoice_id as invoice_id', DB::raw('SUM(payment_refunds.amount) as total_refunded'))
@@ -357,25 +336,20 @@ class TreatmentPlanController extends Controller
 
     public function cashSummary(Request $request, $id)
     {
-        $companyId = $request->user()->company_id;
+        $companyId = Tenant::id();
 
-        $plan = TreatmentPlan::query()
-            ->where('company_id', $companyId)
-            ->findOrFail($id);
+        $plan = TreatmentPlan::query()->findOrFail($id);
 
         $invoiceIds = Invoice::query()
-            ->where('company_id', $companyId)
             ->where('treatment_plan_id', $plan->id)
             ->pluck('id');
 
         $creditIssued = (float) DB::table('customer_credits')
-            ->where('company_id', $companyId)
             ->where('customer_id', $plan->customer_id)
             ->where('type', 'credit')
             ->sum('amount');
 
         $creditUsed = (float) DB::table('customer_credits')
-            ->where('company_id', $companyId)
             ->where('customer_id', $plan->customer_id)
             ->where('type', 'debit')
             ->sum('amount');
@@ -402,24 +376,18 @@ class TreatmentPlanController extends Controller
             ]);
         }
 
-        // cash received فعلياً من العميل
         $cashIn = (float) DB::table('payments')
-            ->where('company_id', $companyId)
             ->whereIn('invoice_id', $invoiceIds)
             ->sum('amount');
 
         $cashOutInvoiceRefunds = (float) DB::table('payment_refunds')
             ->join('payments', 'payments.id', '=', 'payment_refunds.payment_id')
-            ->where('payments.company_id', $companyId)
-            ->where('payment_refunds.company_id', $companyId)
             ->whereIn('payments.invoice_id', $invoiceIds)
             ->where('payment_refunds.applies_to', 'invoice')
             ->sum('payment_refunds.amount');
 
         $cashOutCreditRefunds = (float) DB::table('payment_refunds')
             ->join('payments', 'payments.id', '=', 'payment_refunds.payment_id')
-            ->where('payments.company_id', $companyId)
-            ->where('payment_refunds.company_id', $companyId)
             ->whereIn('payments.invoice_id', $invoiceIds)
             ->where('payment_refunds.applies_to', 'credit')
             ->sum('payment_refunds.amount');
@@ -447,15 +415,13 @@ class TreatmentPlanController extends Controller
         ]);
     }
 
-    private function recalculatePlanTotal(int $companyId, int $planId): void
+    private function recalculatePlanTotal(int $planId): void
     {
         $sum = (float) TreatmentPlanItem::query()
-            ->where('company_id', $companyId)
             ->where('treatment_plan_id', $planId)
             ->sum('price');
 
         TreatmentPlan::query()
-            ->where('company_id', $companyId)
             ->where('id', $planId)
             ->update([
                 'total_cost' => $sum,
@@ -465,14 +431,9 @@ class TreatmentPlanController extends Controller
 
     public function items(Request $request, $planId)
     {
-        $companyId = $request->user()->company_id;
-
-        $plan = TreatmentPlan::query()
-            ->where('company_id', $companyId)
-            ->findOrFail($planId);
+        $plan = TreatmentPlan::query()->findOrFail($planId);
 
         $items = TreatmentPlanItem::query()
-            ->where('company_id', $companyId)
             ->where('treatment_plan_id', $plan->id)
             ->with('procedureRef:id,name,default_price')
             ->orderBy('id', 'asc')
@@ -487,11 +448,9 @@ class TreatmentPlanController extends Controller
 
     public function addItem(Request $request, $planId)
     {
-        $companyId = $request->user()->company_id;
+        $companyId = Tenant::id();
 
-        $plan = TreatmentPlan::query()
-            ->where('company_id', $companyId)
-            ->findOrFail($planId);
+        $plan = TreatmentPlan::query()->findOrFail($planId);
 
         $data = $request->validate([
             'procedure_id' => ['required', 'integer'],
@@ -502,9 +461,7 @@ class TreatmentPlanController extends Controller
             'planned_sessions' => ['nullable', 'integer', 'min:1', 'max:20'],
         ]);
 
-        $procedure = Procedure::query()
-            ->where('company_id', $companyId)
-            ->findOrFail($data['procedure_id']);
+        $procedure = Procedure::query()->findOrFail($data['procedure_id']);
 
         $price = $data['price'] ?? $procedure->default_price;
         $plannedSessions = (int) ($data['planned_sessions'] ?? 1);
@@ -523,7 +480,7 @@ class TreatmentPlanController extends Controller
             'status' => 'planned',
         ]);
 
-        $this->recalculatePlanTotal($companyId, $plan->id);
+        $this->recalculatePlanTotal($plan->id);
 
         return response()->json([
             'msg' => 'Item added',
@@ -534,11 +491,9 @@ class TreatmentPlanController extends Controller
 
     public function updateItem(Request $request, $itemId)
     {
-        $companyId = $request->user()->company_id;
+        $companyId = Tenant::id();
 
-        $item = TreatmentPlanItem::query()
-            ->where('company_id', $companyId)
-            ->findOrFail($itemId);
+        $item = TreatmentPlanItem::query()->findOrFail($itemId);
 
         $data = $request->validate([
             'procedure_id' => ['sometimes', 'required', 'integer'],
@@ -550,10 +505,7 @@ class TreatmentPlanController extends Controller
         ]);
 
         if (isset($data['procedure_id'])) {
-            $procedure = Procedure::query()
-                ->where('company_id', $companyId)
-                ->findOrFail($data['procedure_id']);
-
+            $procedure = Procedure::query()->findOrFail($data['procedure_id']);
             $item->procedure_id = $procedure->id;
             $item->procedure = $procedure->name;
 
@@ -569,7 +521,6 @@ class TreatmentPlanController extends Controller
                     'status' => 422,
                 ], 422);
             }
-
             $item->planned_sessions = (int) $data['planned_sessions'];
         }
 
@@ -581,7 +532,7 @@ class TreatmentPlanController extends Controller
             'planned_sessions' => $item->planned_sessions,
         ]);
 
-        $this->recalculatePlanTotal($companyId, $item->treatment_plan_id);
+        $this->recalculatePlanTotal($item->treatment_plan_id);
 
         return response()->json([
             'msg' => 'Item updated',
@@ -592,11 +543,7 @@ class TreatmentPlanController extends Controller
 
     public function deleteItem(Request $request, $itemId)
     {
-        $companyId = $request->user()->company_id;
-
-        $item = TreatmentPlanItem::query()
-            ->where('company_id', $companyId)
-            ->findOrFail($itemId);
+        $item = TreatmentPlanItem::query()->findOrFail($itemId);
 
         if ((int) ($item->completed_sessions ?? 0) > 0 || !empty($item->appointment_id)) {
             return response()->json([
@@ -606,10 +553,8 @@ class TreatmentPlanController extends Controller
         }
 
         $planId = $item->treatment_plan_id;
-
         $item->delete();
-
-        $this->recalculatePlanTotal($companyId, $planId);
+        $this->recalculatePlanTotal($planId);
 
         return response()->json([
             'msg' => 'Item deleted',
@@ -617,10 +562,9 @@ class TreatmentPlanController extends Controller
         ]);
     }
 
-    //reuse with trait
     public function startItem(Request $request, $itemId)
     {
-        $companyId = $request->user()->company_id;
+        $companyId = Tenant::id();
 
         $data = $request->validate([
             'doctor_id' => ['nullable', 'integer'],
@@ -631,7 +575,6 @@ class TreatmentPlanController extends Controller
 
         return DB::transaction(function () use ($request, $companyId, $itemId, $data) {
             $item = TreatmentPlanItem::query()
-                ->where('company_id', $companyId)
                 ->lockForUpdate()
                 ->findOrFail($itemId);
 
@@ -650,18 +593,14 @@ class TreatmentPlanController extends Controller
                 ], 409);
             }
 
-            $plan = TreatmentPlan::query()
-                ->where('company_id', $companyId)
-                ->findOrFail($item->treatment_plan_id);
+            $plan = TreatmentPlan::query()->findOrFail($item->treatment_plan_id);
 
             if (!empty($data['doctor_id'])) {
                 $doctor = Doctor::query()
-                    ->where('company_id', $companyId)
                     ->where('is_active', true)
                     ->findOrFail((int) $data['doctor_id']);
             } else {
                 $doctor = Doctor::query()
-                    ->where('company_id', $companyId)
                     ->where('is_active', true)
                     ->orderBy('id', 'asc')
                     ->first();
@@ -680,7 +619,6 @@ class TreatmentPlanController extends Controller
             $this->validateAppointmentDateTime($doctor, $date, $time);
 
             $existing = Appointment::query()
-                ->where('company_id', $companyId)
                 ->where('doctor_id', $doctor->id)
                 ->whereDate('appointment_date', $date)
                 ->whereTime('appointment_time', $time)
@@ -708,7 +646,6 @@ class TreatmentPlanController extends Controller
                 'status' => 'scheduled',
                 'notes' => $data['notes'] ?? $item->notes,
                 'created_by' => $request->user()->id,
-
                 ...$this->buildPendingReminder($date, $time),
             ]);
 
@@ -771,10 +708,7 @@ class TreatmentPlanController extends Controller
 
     public function attachAppointment(Request $request, $itemId)
     {
-        $companyId = $request->user()->company_id;
-
         $item = TreatmentPlanItem::query()
-            ->where('company_id', $companyId)
             ->with('plan')
             ->findOrFail($itemId);
 
@@ -782,15 +716,11 @@ class TreatmentPlanController extends Controller
             'appointment_id' => [
                 'required',
                 'integer',
-                Rule::exists('appointments', 'id')->where(
-                    fn($q) => $q->where('company_id', $companyId)
-                ),
+                Rule::exists('appointments', 'id'),
             ],
         ]);
 
-        $appointment = Appointment::query()
-            ->where('company_id', $companyId)
-            ->findOrFail($data['appointment_id']);
+        $appointment = Appointment::query()->findOrFail($data['appointment_id']);
 
         if (!$item->plan) {
             return response()->json([
@@ -832,7 +762,6 @@ class TreatmentPlanController extends Controller
         }
 
         $existingInvoice = Invoice::query()
-            ->where('company_id', $companyId)
             ->where('appointment_id', $appointment->id)
             ->exists();
 
@@ -847,7 +776,6 @@ class TreatmentPlanController extends Controller
         }
 
         $appointmentAlreadyLinked = TreatmentPlanItem::query()
-            ->where('company_id', $companyId)
             ->where('appointment_id', $appointment->id)
             ->where('id', '!=', $item->id)
             ->exists();

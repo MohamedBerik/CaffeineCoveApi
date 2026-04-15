@@ -5,6 +5,7 @@ namespace App\Http\Controllers\API\Erp;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\CustomerResource;
 use App\Models\Customer;
+use App\Services\Tenant;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 use Illuminate\Support\Facades\DB;
@@ -13,11 +14,7 @@ class CustomerController extends Controller
 {
     public function index(Request $request)
     {
-        $companyId = $request->user()->company_id;
-
-        $q = Customer::query()
-            ->where('company_id', $companyId)
-            ->orderByDesc('id');
+        $q = Customer::query()->orderByDesc('id');
 
         if ($search = trim((string) $request->get('search', ''))) {
             $q->where(function ($x) use ($search) {
@@ -45,11 +42,7 @@ class CustomerController extends Controller
 
     public function show(Request $request, $id)
     {
-        $companyId = $request->user()->company_id;
-
-        $customer = Customer::query()
-            ->where('company_id', $companyId)
-            ->find($id);
+        $customer = Customer::query()->find($id);
 
         if (!$customer) {
             return response()->json([
@@ -68,7 +61,7 @@ class CustomerController extends Controller
 
     public function store(Request $request)
     {
-        $companyId = $request->user()->company_id;
+        $companyId = Tenant::id();
 
         $data = $request->validate([
             'name' => ['required', 'string', 'min:3', 'max:255'],
@@ -76,7 +69,7 @@ class CustomerController extends Controller
                 'nullable',
                 'email',
                 'max:255',
-                Rule::unique('customers', 'email')->where(fn($q) => $q->where('company_id', $companyId)),
+                Rule::unique('customers', 'email'),
             ],
             'phone' => ['nullable', 'string', 'max:50'],
             'date_of_birth' => ['nullable', 'date'],
@@ -112,11 +105,7 @@ class CustomerController extends Controller
 
     public function update(Request $request, $id)
     {
-        $companyId = $request->user()->company_id;
-
-        $customer = Customer::query()
-            ->where('company_id', $companyId)
-            ->find($id);
+        $customer = Customer::query()->find($id);
 
         if (!$customer) {
             return response()->json([
@@ -133,9 +122,7 @@ class CustomerController extends Controller
                 'nullable',
                 'email',
                 'max:255',
-                Rule::unique('customers', 'email')
-                    ->where(fn($q) => $q->where('company_id', $companyId))
-                    ->ignore($customer->id),
+                Rule::unique('customers', 'email')->ignore($customer->id),
             ],
             'phone' => ['sometimes', 'nullable', 'string', 'max:50'],
             'date_of_birth' => ['sometimes', 'nullable', 'date'],
@@ -173,11 +160,7 @@ class CustomerController extends Controller
 
     public function destroy(Request $request, $id)
     {
-        $companyId = $request->user()->company_id;
-
-        $customer = Customer::query()
-            ->where('company_id', $companyId)
-            ->find($id);
+        $customer = Customer::query()->find($id);
 
         if (!$customer) {
             return response()->json([
@@ -199,7 +182,6 @@ class CustomerController extends Controller
     private function generateNextPatientCode(int $companyId): string
     {
         $lastCustomer = Customer::query()
-            ->where('company_id', $companyId)
             ->whereNotNull('patient_code')
             ->orderByDesc('id')
             ->lockForUpdate()

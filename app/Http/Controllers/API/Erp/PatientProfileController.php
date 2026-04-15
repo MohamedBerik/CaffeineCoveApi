@@ -10,6 +10,7 @@ use App\Models\Invoice;
 use App\Models\Payment;
 use App\Models\Procedure;
 use App\Models\TreatmentPlan;
+use App\Services\Tenant;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -17,14 +18,11 @@ class PatientProfileController extends Controller
 {
     public function show(Request $request, $customerId)
     {
-        $companyId = $request->user()->company_id;
+        $companyId = Tenant::id();
 
-        $customer = Customer::query()
-            ->where('company_id', $companyId)
-            ->findOrFail($customerId);
+        $customer = Customer::query()->findOrFail($customerId);
 
         $appointments = Appointment::query()
-            ->where('company_id', $companyId)
             ->where('patient_id', $customer->id)
             ->with([
                 'doctor:id,name,company_id',
@@ -35,7 +33,6 @@ class PatientProfileController extends Controller
             ->get();
 
         $dentalRecords = DentalRecord::query()
-            ->where('company_id', $companyId)
             ->where('customer_id', $customer->id)
             ->with([
                 'appointment:id,company_id,appointment_date,appointment_time,status',
@@ -46,7 +43,6 @@ class PatientProfileController extends Controller
             ->get();
 
         $treatmentPlans = TreatmentPlan::query()
-            ->where('company_id', $companyId)
             ->where('customer_id', $customer->id)
             ->with([
                 'items:id,company_id,treatment_plan_id,procedure_id,procedure,tooth_number,surface,notes,price',
@@ -56,7 +52,6 @@ class PatientProfileController extends Controller
             ->get();
 
         $invoices = Invoice::query()
-            ->where('company_id', $companyId)
             ->where('customer_id', $customer->id)
             ->orderByDesc('issued_at')
             ->orderByDesc('id')
@@ -76,34 +71,21 @@ class PatientProfileController extends Controller
                 'updated_at',
             ]);
 
-        /*
-        |--------------------------------------------------------------------------
-        | Customer Credit Balance
-        |--------------------------------------------------------------------------
-        | credit  = overpayment / issued credit
-        | debit   = used customer credit on invoices
-        */
+        // Customer Credit Balance
         $creditIssued = (float) DB::table('customer_credits')
-            ->where('company_id', $companyId)
             ->where('customer_id', $customer->id)
             ->where('type', 'credit')
             ->sum('amount');
 
         $creditUsed = (float) DB::table('customer_credits')
-            ->where('company_id', $companyId)
             ->where('customer_id', $customer->id)
             ->where('type', 'debit')
             ->sum('amount');
 
         $netCredit = max(0, $creditIssued - $creditUsed);
 
-        /*
-        |--------------------------------------------------------------------------
-        | Statement Summary
-        |--------------------------------------------------------------------------
-        */
+        // Statement Summary
         $ledger = DB::table('customer_ledger_entries')
-            ->where('company_id', $companyId)
             ->where('customer_id', $customer->id);
 
         $openingBalance = 0.0;
@@ -111,21 +93,12 @@ class PatientProfileController extends Controller
         $totalCredit = (float) (clone $ledger)->sum('credit');
         $closingBalance = $openingBalance + ($totalDebit - $totalCredit);
 
-        /*
-        |--------------------------------------------------------------------------
-        | Accurate Invoice Financial Summary
-        |--------------------------------------------------------------------------
-        | invoices_total      = sum(invoice totals)
-        | invoices_paid       = applied payments - invoice refunds + credit used
-        | invoices_remaining  = invoices_total - invoices_paid
-        */
+        // Accurate Invoice Financial Summary
         $invoiceIds = Invoice::query()
-            ->where('company_id', $companyId)
             ->where('customer_id', $customer->id)
             ->pluck('id');
 
         $invoicesTotal = (float) Invoice::query()
-            ->where('company_id', $companyId)
             ->where('customer_id', $customer->id)
             ->sum('total');
 
@@ -135,20 +108,16 @@ class PatientProfileController extends Controller
 
         if ($invoiceIds->isNotEmpty()) {
             $totalAppliedPayments = (float) Payment::query()
-                ->where('company_id', $companyId)
                 ->whereIn('invoice_id', $invoiceIds)
                 ->sum('applied_amount');
 
             $totalInvoiceRefunds = (float) DB::table('payment_refunds')
                 ->join('payments', 'payments.id', '=', 'payment_refunds.payment_id')
-                ->where('payments.company_id', $companyId)
                 ->whereIn('payments.invoice_id', $invoiceIds)
-                ->where('payment_refunds.company_id', $companyId)
                 ->where('payment_refunds.applies_to', 'invoice')
                 ->sum('payment_refunds.amount');
 
             $totalCreditAppliedToInvoices = (float) DB::table('customer_credits')
-                ->where('company_id', $companyId)
                 ->where('customer_id', $customer->id)
                 ->whereNotNull('invoice_id')
                 ->whereIn('invoice_id', $invoiceIds)
@@ -164,7 +133,6 @@ class PatientProfileController extends Controller
         $invoicesRemaining = max(0, $invoicesTotal - $invoicesPaid);
 
         $procedures = Procedure::query()
-            ->where('company_id', $companyId)
             ->orderBy('name', 'asc')
             ->get(['id', 'company_id', 'name', 'default_price']);
 
@@ -194,33 +162,19 @@ class PatientProfileController extends Controller
                 'treatment_plans' => $treatmentPlans,
                 'invoices' => $invoices,
 
-                /*
-                |--------------------------------------------------------------------------
-                | Frontend Friendly Fields
-                |--------------------------------------------------------------------------
-                */
                 'customer_credit_balance' => (float) $netCredit,
                 'invoices_total' => (float) $invoicesTotal,
                 'invoices_direct_paid' => (float) $totalAppliedPayments,
                 'invoices_credit_applied' => (float) $totalCreditAppliedToInvoices,
                 'invoices_paid' => (float) $invoicesPaid,
                 'invoices_remaining' => (float) $invoicesRemaining,
-                /*
-                |--------------------------------------------------------------------------
-                | Detailed Credit Summary
-                |--------------------------------------------------------------------------
-                */
+
                 'credit_balance' => [
                     'credit_issued' => (float) $creditIssued,
                     'credit_used' => (float) $creditUsed,
                     'net_credit' => (float) $netCredit,
                 ],
 
-                /*
-                |--------------------------------------------------------------------------
-                | Detailed Statement Summary
-                |--------------------------------------------------------------------------
-                */
                 'statement_summary' => [
                     'opening_balance' => (float) $openingBalance,
                     'total_debit' => (float) $totalDebit,
