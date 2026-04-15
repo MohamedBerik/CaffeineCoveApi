@@ -2,39 +2,63 @@
 
 namespace App\Events;
 
-use Illuminate\Broadcasting\Channel;
-use Illuminate\Broadcasting\InteractsWithSockets;
+use Illuminate\Broadcasting\PrivateChannel;
 use Illuminate\Contracts\Broadcasting\ShouldBroadcast;
 use Illuminate\Foundation\Events\Dispatchable;
 use Illuminate\Queue\SerializesModels;
 
 class InsightGenerated implements ShouldBroadcast
 {
-    use Dispatchable, InteractsWithSockets, SerializesModels;
+    use Dispatchable, SerializesModels;
 
-    public $companyId;
-    public $insight;
+    public int $companyId;
+    public array $insight;
 
-    public function __construct($companyId, $insight)
+    /**
+     * Create a new event instance.
+     */
+    public function __construct(int $companyId, array $insight)
     {
         $this->companyId = $companyId;
         $this->insight = $insight;
     }
 
-    public function broadcastOn()
+    /**
+     * Get the channels the event should broadcast on.
+     * ✅ استخدام PrivateChannel للأمان (يتطلب صلاحية)
+     */
+    public function broadcastOn(): array
     {
-        return new Channel('company.' . $this->companyId);
+        return [
+            new PrivateChannel('company.' . $this->companyId . '.insights')
+        ];
     }
 
-    public function broadcastAs()
+    /**
+     * The event's broadcast name.
+     */
+    public function broadcastAs(): string
     {
         return 'insight.generated';
     }
 
-    public function broadcastWith()
+    /**
+     * Get the data to broadcast.
+     * ✅ إرسال البيانات الضرورية فقط مع timestamp
+     */
+    public function broadcastWith(): array
     {
         return [
             'insight' => $this->insight,
+            'timestamp' => now()->toISOString(),
         ];
+    }
+
+    /**
+     * ✅ تحديد اسم الـ Queue
+     */
+    public function broadcastQueue(): string
+    {
+        return 'broadcasts';
     }
 }

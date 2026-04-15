@@ -15,34 +15,62 @@ class AlertCreated implements ShouldBroadcast
 
     public $alert;
 
+    /**
+     * Create a new event instance.
+     */
     public function __construct(SystemAlert $alert)
     {
         $this->alert = $alert;
     }
 
-    // ✅ تغيير القناة إلى PrivateChannel خاصة بالشركة
-    public function broadcastOn()
+    /**
+     * Get the channels the event should broadcast on.
+     * ✅ قناة خاصة بالشركة: company.{companyId}
+     */
+    public function broadcastOn(): array
     {
-        return new PrivateChannel('company.' . $this->alert->company_id);
+        return [
+            new PrivateChannel('company.' . $this->alert->company_id)
+        ];
     }
 
-    public function broadcastAs()
+    /**
+     * The event's broadcast name.
+     * ✅ اسم موحد يسهل التعامل معه في الـ Frontend
+     */
+    public function broadcastAs(): string
     {
         return 'alert.created';
     }
 
-    public function broadcastWith()
+    /**
+     * Get the data to broadcast.
+     * ✅ إرسال البيانات الضرورية فقط (تقليل الـ Payload)
+     */
+    public function broadcastWith(): array
     {
         return [
-            'alert' => [
-                'id' => $this->alert->id,
-                'code' => $this->alert->code,
-                'message' => $this->alert->message,
-                'priority' => $this->alert->priority,
-                'type' => $this->alert->type,
-                'time' => $this->alert->triggered_at,
-                'read' => $this->alert->acknowledged_at !== null,
-            ]
+            'id'       => $this->alert->id,
+            'code'     => $this->alert->code,
+            'type'     => $this->alert->type,
+            'priority' => $this->alert->priority,
+            'message'  => $this->alert->message,
+            'meta'     => $this->alert->meta, // ✅ إضافة meta لو فيه بيانات إضافية
+            'time'     => $this->alert->triggered_at->toISOString(),
+            'read'     => !is_null($this->alert->acknowledged_at),
         ];
     }
+
+    /**
+     * ✅ (اختياري) تحديد اسم الـ Queue لتنفيذ الحدث
+     */
+    public function broadcastQueue(): string
+    {
+        return 'broadcasts'; // يفصل أحداث البث عن باقي الـ Jobs
+    }
+
+    /**
+     * ✅ (اختياري) إذا أردت إرسال الحدث فورًا بدون Queue
+     * استخدم implements ShouldBroadcastNow بدل ShouldBroadcast
+     */
 }
