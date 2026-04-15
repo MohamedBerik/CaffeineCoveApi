@@ -8,6 +8,7 @@ use Illuminate\Auth\AuthenticationException;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Foundation\Exceptions\Handler as ExceptionHandler;
 use Illuminate\Http\Exceptions\ThrottleRequestsException;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 use Throwable;
@@ -42,7 +43,7 @@ class Handler extends ExceptionHandler
         $this->reportable(function (Throwable $e) {
             // ✅ تسجيل الأخطاء مع Tenant Context
             if (Tenant::hasTenant() && app()->environment('production')) {
-                \Log::error('Exception in tenant context', [
+                Log::error('Exception in tenant context', [
                     'company_id' => Tenant::id(),
                     'exception' => get_class($e),
                     'message' => $e->getMessage(),
