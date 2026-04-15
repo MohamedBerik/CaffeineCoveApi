@@ -22,7 +22,9 @@ class CompanyScope implements Scope
         }
 
         // ✅ Performance fix: التحقق من وجود العمود عن طريق property
-        if (!property_exists($model, 'hasCompanyColumn') || !$model::$hasCompanyColumn) {
+        // if (!property_exists($model, 'hasCompanyColumn') || !$model::$hasCompanyColumn) {
+        if (!method_exists($model, 'hasCompanyColumnCheck') || !$model->hasCompanyColumnCheck()) {
+            //مؤقت وارجع تاني للي فوقه
             return;
         }
 

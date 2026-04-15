@@ -12,6 +12,11 @@ trait BelongsToCompanyTrait
      * ✅ Performance fix
      */
     protected static $hasCompanyColumn = true;
+    //دالة مؤقته وتتحذف
+    public function hasCompanyColumnCheck(): bool
+    {
+        return static::$hasCompanyColumn;
+    }
 
     protected static function bootBelongsToCompanyTrait()
     {
