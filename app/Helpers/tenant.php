@@ -1,5 +1,4 @@
 <?php
-// app/Helpers/tenant.php
 
 if (!function_exists('tenant_cache_key')) {
     function tenant_cache_key(string $key): string

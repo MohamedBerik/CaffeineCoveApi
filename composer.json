@@ -38,7 +38,8 @@
         },
         "files": [
             "app/Helpers/activity.php",
-            "app/Helpers/tenant.php"
+            "app/Helpers/tenant.php",
+            "app/Helpers/formatting.php"
         ]
     },
     "autoload-dev": {
