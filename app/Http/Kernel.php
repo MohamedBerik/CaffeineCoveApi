@@ -1,4 +1,5 @@
 <?php
+// app/Http/Kernel.php
 
 namespace App\Http;
 
@@ -14,7 +15,7 @@ class Kernel extends HttpKernel
         \Illuminate\Foundation\Http\Middleware\ValidatePostSize::class,
         \App\Http\Middleware\TrimStrings::class,
         \Illuminate\Foundation\Http\Middleware\ConvertEmptyStringsToNull::class,
-        \App\Http\Middleware\ResetTenantContext::class, // ✅ أول حاجة تتنفذ
+        \App\Http\Middleware\ResetTenantContext::class, // ✅ First - reset any old context
     ];
 
     protected $middlewareGroups = [
@@ -22,7 +23,6 @@ class Kernel extends HttpKernel
             \App\Http\Middleware\EncryptCookies::class,
             \Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse::class,
             \Illuminate\Session\Middleware\StartSession::class,
-            // \Illuminate\Session\Middleware\AuthenticateSession::class,
             \Illuminate\View\Middleware\ShareErrorsFromSession::class,
             \App\Http\Middleware\VerifyCsrfToken::class,
             \Illuminate\Routing\Middleware\SubstituteBindings::class,
@@ -32,12 +32,13 @@ class Kernel extends HttpKernel
             \Fruitcake\Cors\HandleCors::class,
             'throttle:api',
             \Illuminate\Routing\Middleware\SubstituteBindings::class,
+            \App\Http\Middleware\SetTenant::class, // ✅ Set tenant context after auth
         ],
     ];
 
     protected $routeMiddleware = [
+        // Laravel defaults
         'auth' => \App\Http\Middleware\Authenticate::class,
-        'CheckAdmin' => \App\Http\Middleware\CheckAdmin::class,
         'auth.basic' => \Illuminate\Auth\Middleware\AuthenticateWithBasicAuth::class,
         'cache.headers' => \Illuminate\Http\Middleware\SetCacheHeaders::class,
         'can' => \Illuminate\Auth\Middleware\Authorize::class,
@@ -46,18 +47,23 @@ class Kernel extends HttpKernel
         'signed' => \Illuminate\Routing\Middleware\ValidateSignature::class,
         'throttle' => \Illuminate\Routing\Middleware\ThrottleRequests::class,
         'verified' => \Illuminate\Auth\Middleware\EnsureEmailIsVerified::class,
-        'admin' => \App\Http\Middleware\AdminMiddleware::class,
-        'permission' => \App\Http\Middleware\CheckPermission::class,
-        'super.admin' => \App\Http\Middleware\SuperAdminMiddleware::class,
-        'company.user' => \App\Http\Middleware\CompanyUser::class,
-        // 'company.access' => \App\Http\Middleware\EnsureCompanyAccess::class,
-        // 'super.admin' => \App\Http\Middleware\EnsureSuperAdmin::class,
 
-        /**** OTHER MIDDLEWARE ****/
-        'localize'                => \Mcamara\LaravelLocalization\Middleware\LaravelLocalizationRoutes::class,
-        'localizationRedirect'    => \Mcamara\LaravelLocalization\Middleware\LaravelLocalizationRedirectFilter::class,
-        'localeSessionRedirect'   => \Mcamara\LaravelLocalization\Middleware\LocaleSessionRedirect::class,
-        'localeCookieRedirect'    => \Mcamara\LaravelLocalization\Middleware\LocaleCookieRedirect::class,
-        'localeViewPath'          => \Mcamara\LaravelLocalization\Middleware\LaravelLocalizationViewPath::class
+        // ✅ New Clean Middleware (API)
+        'admin' => \App\Http\Middleware\EnsureAdmin::class,
+        'super.admin' => \App\Http\Middleware\EnsureSuperAdmin::class,
+        'company.user' => \App\Http\Middleware\EnsureCompanyUser::class,
+
+        // ✅ Web Middleware
+        'web.admin' => \App\Http\Middleware\EnsureWebAdmin::class,
+
+        // ✅ Permission (if needed)
+        'permission' => \App\Http\Middleware\CheckPermission::class,
+
+        // ✅ Localization
+        'localize' => \Mcamara\LaravelLocalization\Middleware\LaravelLocalizationRoutes::class,
+        'localizationRedirect' => \Mcamara\LaravelLocalization\Middleware\LaravelLocalizationRedirectFilter::class,
+        'localeSessionRedirect' => \Mcamara\LaravelLocalization\Middleware\LocaleSessionRedirect::class,
+        'localeCookieRedirect' => \Mcamara\LaravelLocalization\Middleware\LocaleCookieRedirect::class,
+        'localeViewPath' => \Mcamara\LaravelLocalization\Middleware\LaravelLocalizationViewPath::class,
     ];
 }

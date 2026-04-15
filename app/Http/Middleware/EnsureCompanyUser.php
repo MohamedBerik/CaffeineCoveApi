@@ -1,28 +1,27 @@
 <?php
+// app/Http/Middleware/EnsureCompanyUser.php
 
 namespace App\Http\Middleware;
 
 use Closure;
 use Illuminate\Http\Request;
 
-class CompanyUser
+class EnsureCompanyUser
 {
     public function handle(Request $request, Closure $next)
     {
         $user = $request->user();
 
         if (!$user) {
-            abort(401);
+            return response()->json(['message' => 'Unauthenticated'], 401);
         }
 
-        // super admin لا يدخل ERP
+        // ✅ Super admin allowed (but will see all data via scope)
         if ($user->is_super_admin) {
-            return response()->json([
-                'message' => 'Super admin cannot access company resources'
-            ], 403);
+            return $next($request);
         }
 
-        // لازم يكون مرتبط بشركة
+        // ✅ Regular user must have company
         if (!$user->company_id) {
             return response()->json([
                 'message' => 'User is not assigned to any company'
