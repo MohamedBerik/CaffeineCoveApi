@@ -23,12 +23,10 @@ class Tenant
      */
     public static function id(): ?int
     {
-        // ✅ Manual override (for CLI/Jobs)
         if (static::$currentId !== null) {
             return static::$currentId;
         }
 
-        // ✅ From Auth (for Web/API)
         if (Auth::check()) {
             return Auth::user()->company_id;
         }
@@ -49,12 +47,10 @@ class Tenant
      */
     public static function isSuperAdmin(): bool
     {
-        // ✅ Manual override
         if (static::$isSuperAdmin !== null) {
             return static::$isSuperAdmin;
         }
 
-        // ✅ From Auth
         if (Auth::check()) {
             return Auth::user()->isSuperAdmin() ?? false;
         }
@@ -72,6 +68,7 @@ class Tenant
 
     /**
      * Reset all manual overrides
+     * ✅ MUST be called after every job/queue execution
      */
     public static function reset(): void
     {
@@ -93,8 +90,7 @@ class Tenant
         try {
             return $callback();
         } finally {
-            static::$currentId = $previousId;
-            static::$isSuperAdmin = $previousSuperAdmin;
+            static::reset(); // ✅ استخدام reset بدل restore
         }
     }
 
@@ -112,8 +108,7 @@ class Tenant
         try {
             return $callback();
         } finally {
-            static::$currentId = $previousId;
-            static::$isSuperAdmin = $previousSuperAdmin;
+            static::reset(); // ✅ استخدام reset بدل restore
         }
     }
 }

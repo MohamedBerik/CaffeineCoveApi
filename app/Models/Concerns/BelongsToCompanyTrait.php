@@ -5,86 +5,67 @@ namespace App\Models\Concerns;
 
 use App\Models\Concerns\CompanyScope;
 use App\Services\Tenant;
-use Illuminate\Database\Eloquent\Builder;
 
 trait BelongsToCompanyTrait
 {
     /**
-     * ✅ Performance fix: static property بدل Schema::hasColumn
+     * ✅ Performance fix
      */
     protected static $hasCompanyColumn = true;
 
-    /**
-     * ✅ Guard ضد withoutGlobalScopes
-     */
-    protected static $preventScopeRemoval = true;
-
     protected static function bootBelongsToCompanyTrait()
     {
-        /*
-         | Global scope (company filter)
-         */
         static::addGlobalScope(new CompanyScope);
 
-        /*
-         | ✅ Guard: منع إزالة الـ scope بدون إذن صريح
-         */
-        static::macro('withoutCompanyScope', function () {
-            static::$preventScopeRemoval = false;
-            return static::withoutGlobalScope(CompanyScope::class);
-        });
-
-        /*
-         | Auto assign company_id on create
-         */
         static::creating(function ($model) {
-            // ✅ استخدام Tenant بدل Auth
             $companyId = Tenant::id();
             $isSuperAdmin = Tenant::isSuperAdmin();
 
-            // Super admin لا نربطه تلقائيًا بشركة
-            if ($isSuperAdmin) {
-                return;
+            // ✅ إصلاح المشكلة 1: منع override غير مصرح به
+            // Super admin ممنوع يدخل company_id إلا لو explicitly using Tenant::forCompany()
+            if ($isSuperAdmin && !Tenant::hasTenant()) {
+                // لو Super Admin وعايز ينشئ حاجة - لازم يحدد الشركة explicitly
+                if (empty($model->company_id)) {
+                    throw new \Exception('Super admin must explicitly set company_id when creating records');
+                }
+                return; // ✅ استخدام company_id اللي هو حطه manually
             }
 
-            // ✅ Performance fix: استخدام property بدل Schema::hasColumn
+            // ✅ Performance fix
             if (!static::$hasCompanyColumn) {
                 return;
             }
 
-            // ✅ Protection ضد manual override: تجاهل أي قيمة مدخلة
+            // ✅ إصلاح المشكلة 1: منع override - نستخدم company_id من Tenant فقط
+            // لو المستخدم مش Super Admin - دايمًا نستخدم company_id بتاعه
             if ($companyId) {
                 $model->company_id = $companyId;
             }
         });
-
-        /*
-         | ✅ Guard: منع إزالة الـ scope
-         */
-        static::addGlobalScope('prevent_scope_removal', function (Builder $builder) {
-            if (static::$preventScopeRemoval && !Tenant::isSuperAdmin()) {
-                // ده مجرد علامة - المنطق الفعلي في CompanyScope
-            }
-        });
     }
 
     /**
-     * ✅ Allow controlled scope removal for super admin
+     * ✅ إصلاح المشكلة 2: withoutCompanyScope للـ Super Admin فقط
      */
-    public static function allCompanies()
+    public static function withoutCompanyScope()
     {
-        static::$preventScopeRemoval = false;
+        if (!Tenant::isSuperAdmin()) {
+            throw new \Exception('Only super admin can remove company scope');
+        }
+
         return static::withoutGlobalScope(CompanyScope::class);
     }
 
     /**
-     * ✅ Reset scope prevention after query
+     * ✅ إصلاح المشكلة 2: allCompanies للـ Super Admin فقط
      */
-    public static function booted()
+    public static function allCompanies()
     {
-        static::retrieved(function () {
-            static::$preventScopeRemoval = true;
-        });
+        if (!Tenant::isSuperAdmin()) {
+            throw new \Exception('Only super admin can query all companies');
+        }
+
+        return static::withoutGlobalScope(CompanyScope::class);
     }
 
     /*
@@ -96,7 +77,7 @@ trait BelongsToCompanyTrait
     }
 
     /*
-     | Scope: فلترة حسب الشركة
+     | Scope: فلترة حسب الشركة الحالية
      */
     public function scopeForCurrentCompany($query)
     {
