@@ -15,7 +15,7 @@ class User extends Authenticatable
     use BelongsToCompanyTrait;
 
     // protected static $hasCompanyColumn = true;
-    public static bool $hasCompanyColumn = true;  // الجديد
+    // public static bool $hasCompanyColumn = true; 
 
 
     protected $fillable = [
