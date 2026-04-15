@@ -2,6 +2,7 @@
 
 namespace App\Services\Whatsapp;
 
+use App\Services\ActivityLogger;
 use App\Services\Tenant;
 use Illuminate\Support\Facades\Log;
 use Twilio\Rest\Client;
