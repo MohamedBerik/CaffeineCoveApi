@@ -6,47 +6,52 @@ use App\Models\Appointment;
 use App\Models\Customer;
 use App\Models\Payment;
 use App\Models\Invoice;
+use App\Services\Tenant;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 
 class InsightService
 {
-
-    public function getAllInsights($companyId): array
+    /**
+     * Get all insights for current company
+     */
+    public function getAllInsights(?int $companyId = null): array
     {
+        $companyId = $companyId ?? Tenant::id();
+
+        if (!$companyId) {
+            return [];
+        }
+
         $insights = array_filter([
             $this->revenueInsight($companyId),
             $this->missedAppointmentsInsight($companyId),
             $this->unpaidInvoicesInsight($companyId),
-            $this->revenueGrowthTrendInsight($companyId), // ✅ أضف هنا
-            $this->revenueForecastInsight($companyId), // ✅ أضف هنا
-            $this->topDoctorInsight($companyId), // ✅ أضف هنا
-            $this->highCancellationRateInsight($companyId), // ✅ أضف هنا
+            $this->revenueGrowthTrendInsight($companyId),
+            $this->revenueForecastInsight($companyId),
+            $this->topDoctorInsight($companyId),
+            $this->highCancellationRateInsight($companyId),
             ...$this->getNoShowInsights($companyId),
             ...$this->getPatientInsights($companyId),
-
-
-
-
         ]);
 
         return array_values($insights);
     }
+
     /**
      * Generate revenue insight based on day-over-day change.
      */
-    public function revenueInsight($companyId): ?array
+    public function revenueInsight(int $companyId): ?array
     {
         $today = Carbon::today();
         $yesterday = Carbon::yesterday();
 
+        // ✅ بدون where('company_id') - الـ Scope هيضيفه
         $todayRevenue = (float) Payment::query()
-            ->where('company_id', $companyId)
             ->whereDate('paid_at', $today)
             ->sum('applied_amount');
 
         $yesterdayRevenue = (float) Payment::query()
-            ->where('company_id', $companyId)
             ->whereDate('paid_at', $yesterday)
             ->sum('applied_amount');
 
@@ -56,29 +61,28 @@ class InsightService
 
         $change = (($todayRevenue - $yesterdayRevenue) / $yesterdayRevenue) * 100;
 
-        // Drop > 20% → insight
         if ($change < -20) {
+            // ✅ بدون where('company_id')
             $cancelledToday = Appointment::query()
-                ->where('company_id', $companyId)
                 ->whereDate('appointment_date', $today)
                 ->where('status', 'cancelled')
                 ->count();
 
             $noShowToday = Appointment::query()
-                ->where('company_id', $companyId)
                 ->whereDate('appointment_date', $today)
                 ->where('status', 'no_show')
                 ->count();
+
             return [
                 'type' => 'insight',
                 'category' => 'revenue',
                 'priority' => 'high',
                 'message' => "Revenue dropped by " . round(abs($change)) . "%",
-                'point' => [  // ✅ Anomaly Point
+                'point' => [
                     'date' => $today->toDateString(),
                     'value' => $todayRevenue,
                 ],
-                'action' => [  // ✅ أضف هذا
+                'action' => [
                     'type' => 'navigate',
                     'url' => '/admin/erp/reports?type=revenue&period=week',
                     'label' => 'Analyze revenue drop'
@@ -107,19 +111,18 @@ class InsightService
     /**
      * Generate missed appointments insight based on day-over-day change.
      */
-    public function missedAppointmentsInsight($companyId): ?array
+    public function missedAppointmentsInsight(int $companyId): ?array
     {
         $today = Carbon::today();
         $yesterday = Carbon::yesterday();
 
+        // ✅ بدون where('company_id')
         $todayMissed = Appointment::query()
-            ->where('company_id', $companyId)
             ->whereDate('appointment_date', $today)
             ->where('status', 'no_show')
             ->count();
 
         $yesterdayMissed = Appointment::query()
-            ->where('company_id', $companyId)
             ->whereDate('appointment_date', $yesterday)
             ->where('status', 'no_show')
             ->count();
@@ -130,23 +133,23 @@ class InsightService
 
         $change = (($todayMissed - $yesterdayMissed) / $yesterdayMissed) * 100;
 
-        // Increase > 30% → insight
         if ($change > 30) {
+            // ✅ بدون where('company_id')
             $weekMissed = Appointment::query()
-                ->where('company_id', $companyId)
                 ->whereBetween('appointment_date', [Carbon::today()->subDays(7), $today])
                 ->where('status', 'no_show')
                 ->count();
+
             return [
                 'type' => 'insight',
                 'category' => 'appointments',
                 'priority' => 'medium',
                 'message' => "Missed appointments increased by " . round($change) . "%",
-                'point' => [  // ✅ أضف
+                'point' => [
                     'date' => $today->toDateString(),
                     'value' => $todayMissed,
                 ],
-                'action' => [  // ✅ أضف هذا
+                'action' => [
                     'type' => 'navigate',
                     'url' => '/admin/erp/appointments?status=no_show',
                     'label' => 'View no-show appointments'
@@ -174,15 +177,14 @@ class InsightService
     /**
      * Generate unpaid invoices insight.
      */
-    public function unpaidInvoicesInsight($companyId): ?array
+    public function unpaidInvoicesInsight(int $companyId): ?array
     {
-        $unpaidCount = \App\Models\Invoice::query()
-            ->where('company_id', $companyId)
+        // ✅ بدون where('company_id')
+        $unpaidCount = Invoice::query()
             ->where('status', 'unpaid')
             ->count();
 
-        $overdueCount = \App\Models\Invoice::query()
-            ->where('company_id', $companyId)
+        $overdueCount = Invoice::query()
             ->where('status', 'unpaid')
             ->where('issued_at', '<', Carbon::now()->subDays(30))
             ->count();
@@ -193,11 +195,11 @@ class InsightService
                 'category' => 'invoices',
                 'priority' => 'medium',
                 'message' => "You have {$unpaidCount} unpaid invoices ({$overdueCount} overdue)",
-                'point' => [  // ✅ أضف
+                'point' => [
                     'date' => Carbon::today()->toDateString(),
                     'value' => $unpaidCount,
                 ],
-                'action' => [  // ✅ أضف هذا
+                'action' => [
                     'type' => 'navigate',
                     'url' => '/admin/erp/invoices?status=unpaid',
                     'label' => 'View unpaid invoices'
@@ -208,13 +210,11 @@ class InsightService
                         ['label' => 'Total Unpaid', 'value' => $unpaidCount],
                         ['label' => 'Overdue (>30 days)', 'value' => $overdueCount],
                         ['label' => 'Overdue (>60 days)', 'value' => Invoice::query()
-                            ->where('company_id', $companyId)
                             ->where('status', 'unpaid')
                             ->whereDate('issued_at', '<=', Carbon::now()->subDays(60))
                             ->count()],
                     ]
                 ],
-
                 'meta' => [
                     'unpaid_count' => $unpaidCount,
                     'overdue_count' => $overdueCount,
@@ -225,30 +225,26 @@ class InsightService
         return null;
     }
 
-
     /**
      * Detect revenue growing trend (3 consecutive days of growth)
      */
-    public function revenueGrowthTrendInsight($companyId): ?array
+    public function revenueGrowthTrendInsight(int $companyId): ?array
     {
         $dates = [];
         $revenues = [];
 
-        // جمع إيرادات آخر 4 أيام
         for ($i = 0; $i < 4; $i++) {
             $date = Carbon::today()->subDays($i);
             $dates[] = $date->toDateString();
+            // ✅ بدون where('company_id')
             $revenues[] = (float) Payment::query()
-                ->where('company_id', $companyId)
                 ->whereDate('paid_at', $date)
                 ->sum('applied_amount');
         }
 
-        // عكس الترتيب عشان يبقى من الأقدم للأحدث
         $revenues = array_reverse($revenues);
         $dates = array_reverse($dates);
 
-        // هل آخر 3 أيام (اليوم، أمس، قبل أمس) في تزايد؟
         $growing = true;
         for ($i = 1; $i < 3; $i++) {
             if ($revenues[$i] <= $revenues[$i - 1]) {
@@ -265,11 +261,11 @@ class InsightService
                 'category' => 'revenue',
                 'priority' => 'low',
                 'message' => "Revenue growing for 3 consecutive days (+" . round($growthPercent) . "%)",
-                'point' => [  // ✅ Anomaly Point
+                'point' => [
                     'date' => $dates[2],
                     'value' => $revenues[2],
                 ],
-                'action' => [  // ✅ أضف هذا
+                'action' => [
                     'type' => 'navigate',
                     'url' => '/admin/erp/reports?type=revenue&trend=growth',
                     'label' => 'View revenue trend'
@@ -298,25 +294,21 @@ class InsightService
     /**
      * Forecast today's revenue based on historical average
      */
-    public function revenueForecastInsight($companyId): ?array
+    public function revenueForecastInsight(int $companyId): ?array
     {
-        // متوسط إيرادات آخر 7 أيام (ما عدا اليوم)
+        // ✅ بدون where('company_id')
         $avgRevenue = (float) Payment::query()
-            ->where('company_id', $companyId)
             ->whereDate('paid_at', '>=', Carbon::today()->subDays(7))
             ->whereDate('paid_at', '<', Carbon::today())
             ->sum('applied_amount') / 7;
 
-        // إيرادات اليوم حتى الآن
         $todayRevenue = (float) Payment::query()
-            ->where('company_id', $companyId)
             ->whereDate('paid_at', Carbon::today())
             ->sum('applied_amount');
 
         $expectedToday = max($avgRevenue, $todayRevenue);
 
         $maxDayRevenue = Payment::query()
-            ->where('company_id', $companyId)
             ->whereDate('paid_at', '>=', Carbon::today()->subDays(7))
             ->whereDate('paid_at', '<', Carbon::today())
             ->selectRaw('DATE(paid_at) as date, SUM(applied_amount) as total')
@@ -324,17 +316,17 @@ class InsightService
             ->orderByDesc('total')
             ->first();
 
-        if ($expectedToday > 1000) { // لو المتوقع > 1000 جنيه
+        if ($expectedToday > 1000) {
             return [
                 'type' => 'insight',
                 'category' => 'revenue',
                 'priority' => 'low',
                 'message' => "Expected revenue today: " . number_format($expectedToday) . " EGP",
-                'point' => [  // ✅ أضف
+                'point' => [
                     'date' => Carbon::today()->toDateString(),
                     'value' => $expectedToday,
                 ],
-                'action' => [  // ✅ أضف هذا
+                'action' => [
                     'type' => 'navigate',
                     'url' => '/admin/erp/reports?type=revenue&view=forecast',
                     'label' => 'View forecast details'
@@ -362,12 +354,12 @@ class InsightService
     /**
      * Highlight top performing doctor today
      */
-    public function topDoctorInsight($companyId): ?array
+    public function topDoctorInsight(int $companyId): ?array
     {
         $today = Carbon::today();
 
+        // ✅ بدون where('company_id')
         $topDoctor = Appointment::query()
-            ->where('company_id', $companyId)
             ->whereDate('appointment_date', $today)
             ->where('status', 'completed')
             ->select('doctor_id', 'doctor_name', DB::raw('COUNT(*) as completed_count'))
@@ -377,7 +369,6 @@ class InsightService
 
         if ($topDoctor && $topDoctor->completed_count >= 3) {
             $totalAppointments = Appointment::query()
-                ->where('company_id', $companyId)
                 ->whereDate('appointment_date', $today)
                 ->where('doctor_id', $topDoctor->doctor_id)
                 ->count();
@@ -389,11 +380,11 @@ class InsightService
                 'category' => 'doctors',
                 'priority' => 'low',
                 'message' => "Dr. {$topDoctor->doctor_name} has highest completion rate today ({$topDoctor->completed_count} appointments)",
-                'point' => [  // ✅ أضف
+                'point' => [
                     'date' => $today->toDateString(),
                     'value' => $topDoctor->completed_count,
                 ],
-                'action' => [  // ✅ أضف هذا
+                'action' => [
                     'type' => 'navigate',
                     'url' => "/admin/erp/doctors/{$topDoctor->doctor_id}/performance",
                     'label' => 'View doctor performance'
@@ -421,17 +412,16 @@ class InsightService
     /**
      * Alert on high cancellation rate today
      */
-    public function highCancellationRateInsight($companyId): ?array
+    public function highCancellationRateInsight(int $companyId): ?array
     {
         $today = Carbon::today();
 
+        // ✅ بدون where('company_id')
         $totalToday = Appointment::query()
-            ->where('company_id', $companyId)
             ->whereDate('appointment_date', $today)
             ->count();
 
         $cancelledToday = Appointment::query()
-            ->where('company_id', $companyId)
             ->whereDate('appointment_date', $today)
             ->where('status', 'cancelled')
             ->count();
@@ -441,23 +431,23 @@ class InsightService
 
             if ($cancellationRate > 30) {
                 $topCancellingDoctor = Appointment::query()
-                    ->where('company_id', $companyId)
                     ->whereDate('appointment_date', $today)
                     ->where('status', 'cancelled')
                     ->select('doctor_name', DB::raw('COUNT(*) as cancelled_count'))
                     ->groupBy('doctor_name')
                     ->orderByDesc('cancelled_count')
                     ->first();
+
                 return [
                     'type' => 'insight',
                     'category' => 'appointments',
                     'priority' => 'medium',
                     'message' => "High cancellation rate today: " . round($cancellationRate) . "% ({$cancelledToday}/{$totalToday})",
-                    'point' => [  // ✅ Anomaly Point
+                    'point' => [
                         'date' => $today->toDateString(),
                         'value' => $cancelledToday,
                     ],
-                    'action' => [  // ✅ أضف هذا
+                    'action' => [
                         'type' => 'navigate',
                         'url' => '/admin/erp/appointments?status=cancelled',
                         'label' => 'View cancelled appointments'
@@ -483,20 +473,18 @@ class InsightService
         return null;
     }
 
-    private function getNoShowInsights($companyId): array
+    private function getNoShowInsights(int $companyId): array
     {
         $insights = [];
         $monthStart = Carbon::now()->startOfMonth();
 
+        // ✅ بدون where('company_id')
         $noShows = Appointment::query()
-            ->where('company_id', $companyId)
             ->whereBetween('appointment_date', [$monthStart, Carbon::now()])
             ->where('status', 'no_show')
             ->count();
 
-        // جلب أكثر دكتور عنده no-shows
         $topNoShowDoctor = Appointment::query()
-            ->where('company_id', $companyId)
             ->whereBetween('appointment_date', [$monthStart, Carbon::now()])
             ->where('status', 'no_show')
             ->select('doctor_name', DB::raw('COUNT(*) as no_show_count'))
@@ -506,6 +494,7 @@ class InsightService
 
         if ($noShows > 3) {
             $insights[] = [
+                'type' => 'insight',
                 'category' => 'appointments',
                 'priority' => 'high',
                 'message' => "High no-show rate: {$noShows} patients didn't show up this month",
@@ -531,23 +520,21 @@ class InsightService
         return $insights;
     }
 
-    private function getPatientInsights($companyId): array
+    private function getPatientInsights(int $companyId): array
     {
         $insights = [];
         $lastMonth = Carbon::now()->subMonth();
 
+        // ✅ بدون where('company_id')
         $newPatients = Customer::query()
-            ->where('company_id', $companyId)
             ->whereBetween('created_at', [$lastMonth, Carbon::now()])
             ->count();
 
-        // جلب إجمالي المرضى
-        $totalPatients = Customer::query()
-            ->where('company_id', $companyId)
-            ->count();
+        $totalPatients = Customer::query()->count();
 
         if ($newPatients > 10) {
             $insights[] = [
+                'type' => 'insight',
                 'category' => 'patients',
                 'priority' => 'positive',
                 'message' => "Great! {$newPatients} new patients joined this month",
@@ -568,5 +555,37 @@ class InsightService
         }
 
         return $insights;
+    }
+
+    /**
+     * ✅ Generate insights for all companies (Super Admin only)
+     */
+    public function getAllCompaniesInsights(): array
+    {
+        if (!Tenant::isSuperAdmin()) {
+            return [];
+        }
+
+        return Tenant::asSuperAdmin(function () {
+            $companies = \App\Models\Company::query()
+                ->whereIn('status', ['active', 'trial'])
+                ->get();
+
+            $allInsights = [];
+
+            foreach ($companies as $company) {
+                $companyInsights = $this->getAllInsights($company->id);
+
+                if (!empty($companyInsights)) {
+                    $allInsights[] = [
+                        'company_id' => $company->id,
+                        'company_name' => $company->name,
+                        'insights' => $companyInsights,
+                    ];
+                }
+            }
+
+            return $allInsights;
+        });
     }
 }
