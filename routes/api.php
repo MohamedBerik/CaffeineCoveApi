@@ -40,8 +40,6 @@ use App\Http\Controllers\API\Erp\PatientProfileController;
 use App\Http\Controllers\API\Erp\PatientTimelineController;
 use App\Http\Controllers\API\Erp\ProcedureController;
 use App\Http\Controllers\API\Erp\RadiologyController;
-use App\Http\Controllers\API\SaaS\ClinicOnboardingController;
-use App\Http\Controllers\API\SaaS\TenantController;
 use App\Services\Tenant;
 
 /*
@@ -269,14 +267,3 @@ Route::prefix('erp')
         Route::get('/clinic-settings', [ClinicSettingController::class, 'show']);
         Route::put('/clinic-settings', [ClinicSettingController::class, 'update']);
     });
-
-/*
-|--------------------------------------------------------------------------
-| SaaS routes (tenant onboarding)
-|--------------------------------------------------------------------------
-*/
-
-Route::middleware(['auth:sanctum', 'company.user'])->prefix('saas')->group(function () {
-    Route::get('/me', [TenantController::class, 'me']);
-    Route::post('/register-clinic', [ClinicOnboardingController::class, 'register']);
-});
