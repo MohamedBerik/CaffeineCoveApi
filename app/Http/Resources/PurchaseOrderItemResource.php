@@ -4,7 +4,7 @@ namespace App\Http\Resources;
 
 use Illuminate\Http\Resources\Json\JsonResource;
 
-class InvoiceItemResource extends JsonResource
+class PurchaseOrderItemResource extends JsonResource
 {
     /**
      * Transform the resource into an array.
@@ -18,19 +18,25 @@ class InvoiceItemResource extends JsonResource
             // Basic Info
             'id' => $this->id,
             'company_id' => $this->company_id,
-            'invoice_id' => $this->invoice_id,
+            'purchase_order_id' => $this->purchase_order_id,
             'product_id' => $this->product_id,
 
             // Item Details
             'quantity' => (int) $this->quantity,
-            'unit_price' => (float) $this->unit_price,
-            'unit_price_formatted' => number_format($this->unit_price, 2) . ' EGP',
+            'unit_cost' => (float) $this->unit_cost,
+            'unit_cost_formatted' => number_format($this->unit_cost, 2) . ' EGP',
 
             // Computed Values
             'total' => (float) $this->total,
             'total_formatted' => number_format($this->total, 2) . ' EGP',
-            'subtotal' => (float) $this->subtotal,
-            'subtotal_formatted' => number_format($this->subtotal, 2) . ' EGP',
+            'subtotal' => (float) ($this->quantity * $this->unit_cost),
+            'subtotal_formatted' => number_format($this->quantity * $this->unit_cost, 2) . ' EGP',
+
+            // Receiving Info
+            'received_quantity' => (float) ($this->received_quantity ?? 0),
+            'returned_quantity' => (float) ($this->returned_quantity ?? 0),
+            'remaining_quantity' => (float) ($this->remaining_quantity ?? 0),
+            'is_fully_received' => $this->isFullyReceived(),
 
             // Dates
             'created_at' => $this->created_at?->toISOString(),
@@ -41,16 +47,17 @@ class InvoiceItemResource extends JsonResource
                 'id' => $this->product->id,
                 'title' => $this->product->title_en,
                 'title_ar' => $this->product->title_ar,
-                'unit_price' => $this->product->unit_price,
+                'stock_quantity' => $this->product->stock_quantity,
                 'image_url' => $this->product->product_image
                     ? asset('img/product/' . $this->product->product_image)
                     : null,
             ]),
 
-            'invoice' => $this->whenLoaded('invoice', fn() => [
-                'id' => $this->invoice->id,
-                'number' => $this->invoice->number,
-                'status' => $this->invoice->status,
+            'purchase_order' => $this->whenLoaded('purchaseOrder', fn() => [
+                'id' => $this->purchaseOrder->id,
+                'number' => $this->purchaseOrder->number,
+                'status' => $this->purchaseOrder->status,
+                'supplier_id' => $this->purchaseOrder->supplier_id,
             ]),
         ];
     }
