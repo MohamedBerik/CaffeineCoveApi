@@ -2,113 +2,97 @@
 
 namespace Database\Seeders;
 
-use Illuminate\Database\Seeder;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Carbon;
-use App\Models\Company;
-use App\Models\User;
-use App\Models\Customer;
-use App\Models\Doctor;
-use App\Models\Procedure;
 use App\Models\Appointment;
+use App\Models\Company;
+use App\Models\Customer;
 use App\Models\DentalRecord;
+use App\Models\Doctor;
+use App\Models\Invoice;
+use App\Models\Order;
+use App\Models\Payment;
+use App\Models\Procedure;
 use App\Models\TreatmentPlan;
 use App\Models\TreatmentPlanItem;
-use App\Models\Order;
-use App\Models\Invoice;
-use App\Models\Payment;
+use App\Models\User;
+use App\Services\Tenant;
+use Illuminate\Database\Seeder;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
 
 class QaDemoErpSeeder extends Seeder
 {
+    /**
+     * Run the database seeds.
+     */
     public function run(): void
     {
-        DB::transaction(function () {
-            $company = Company::query()->first();
+        $this->command->info('🧪 Creating QA demo data...');
 
-            if (!$company) {
-                throw new \RuntimeException('No company found. Create a company first.');
-            }
+        $company = Company::query()->first();
 
-            $admin = User::query()
-                ->where('company_id', $company->id)
-                ->where(function ($q) {
-                    $q->where('role', 'admin')
-                        ->orWhere('is_super_admin', 1);
-                })
-                ->first();
+        if (!$company) {
+            $this->command->error('No company found. Run CompanySeeder first.');
+            return;
+        }
 
-            if (!$admin) {
-                throw new \RuntimeException('No admin user found for the selected company.');
-            }
+        // ✅ تشغيل كل حاجة في Tenant Context
+        Tenant::forCompany($company->id, function () use ($company) {
+            $this->seedQaData($company);
+        });
 
-            $companyId = $company->id;
-            $adminId = $admin->id;
+        $this->displayQaSummary($company);
+    }
 
-            /*
-            |--------------------------------------------------------------------------
-            | Clean previous QA demo data by naming pattern
-            |--------------------------------------------------------------------------
-            */
+    /**
+     * Seed QA data for the company.
+     */
+    private function seedQaData(Company $company): void
+    {
+        // 1. Clean old QA data
+        $this->cleanOldQaData($company->id);
 
-            $demoPatientEmails = [
-                'ahmed1@test.com',
-                'mona2@test.com',
-                'youssef3@test.com',
-            ];
+        // 2. Get or create admin
+        $admin = $this->getOrCreateAdmin($company);
 
-            $demoDoctorEmails = [
-                'dr.ahmed@test.com',
-                'dr.sara@test.com',
-            ];
+        // 3. Create doctors
+        $doctors = $this->createQaDoctors($company->id);
 
-            $customers = Customer::query()
-                ->where('company_id', $companyId)
-                ->whereIn('email', $demoPatientEmails)
-                ->get();
+        // 4. Create patients
+        $patients = $this->createQaPatients($company->id);
 
-            $customerIds = $customers->pluck('id')->all();
+        // 5. Create procedures
+        $procedures = $this->createQaProcedures($company->id);
 
-            $doctors = Doctor::query()
-                ->where('company_id', $companyId)
-                ->whereIn('email', $demoDoctorEmails)
-                ->get();
+        // 6. Create appointments
+        $appointments = $this->createQaAppointments($company->id, $patients, $doctors, $admin->id);
 
-            $doctorIds = $doctors->pluck('id')->all();
+        // 7. Create dental records
+        $this->createQaDentalRecords($company->id, $patients, $appointments, $procedures);
 
-            $invoiceIds = Invoice::query()
-                ->where('company_id', $companyId)
-                ->whereIn('customer_id', $customerIds)
-                ->pluck('id')
-                ->all();
+        // 8. Create treatment plans
+        $plans = $this->createQaTreatmentPlans($company->id, $patients, $procedures);
 
-            $paymentIds = Payment::query()
-                ->where('company_id', $companyId)
-                ->whereIn('invoice_id', $invoiceIds)
-                ->pluck('id')
-                ->all();
+        // 9. Create orders, invoices, payments
+        $this->createQaFinancials($company->id, $patients, $appointments, $plans, $admin->id);
+    }
 
-            DB::table('payment_refunds')
-                ->where('company_id', $companyId)
-                ->whereIn('payment_id', $paymentIds)
-                ->delete();
+    /**
+     * Clean old QA demo data.
+     */
+    private function cleanOldQaData(int $companyId): void
+    {
+        $qaPatientEmails = ['ahmed1@test.com', 'mona2@test.com', 'youssef3@test.com'];
+        $qaDoctorEmails = ['dr.ahmed@test.com', 'dr.sara@test.com'];
 
-            DB::table('customer_credits')
-                ->where('company_id', $companyId)
-                ->whereIn('customer_id', $customerIds)
-                ->delete();
+        $customerIds = Customer::query()
+            ->where('company_id', $companyId)
+            ->whereIn('email', $qaPatientEmails)
+            ->pluck('id')
+            ->all();
 
-            Payment::query()
-                ->where('company_id', $companyId)
-                ->whereIn('id', $paymentIds)
-                ->delete();
-
-            Invoice::query()
-                ->where('company_id', $companyId)
-                ->whereIn('id', $invoiceIds)
-                ->delete();
-
+        if (!empty($customerIds)) {
+            // Delete related records in order
             TreatmentPlanItem::query()
-                ->where('company_id', $companyId)
                 ->whereIn('treatment_plan_id', TreatmentPlan::query()
                     ->where('company_id', $companyId)
                     ->whereIn('customer_id', $customerIds)
@@ -135,442 +119,369 @@ class QaDemoErpSeeder extends Seeder
                 ->whereIn('customer_id', $customerIds)
                 ->delete();
 
+            $invoiceIds = Invoice::query()
+                ->where('company_id', $companyId)
+                ->whereIn('customer_id', $customerIds)
+                ->pluck('id')
+                ->all();
+
+            if (!empty($invoiceIds)) {
+                Payment::query()
+                    ->where('company_id', $companyId)
+                    ->whereIn('invoice_id', $invoiceIds)
+                    ->delete();
+
+                Invoice::query()
+                    ->where('company_id', $companyId)
+                    ->whereIn('id', $invoiceIds)
+                    ->delete();
+            }
+
             Customer::query()
                 ->where('company_id', $companyId)
-                ->whereIn('email', $demoPatientEmails)
+                ->whereIn('id', $customerIds)
                 ->delete();
+        }
 
-            Doctor::query()
-                ->where('company_id', $companyId)
-                ->whereIn('email', $demoDoctorEmails)
-                ->delete();
+        Doctor::query()
+            ->where('company_id', $companyId)
+            ->whereIn('email', $qaDoctorEmails)
+            ->delete();
 
-            Procedure::query()
-                ->where('company_id', $companyId)
-                ->whereIn('name', ['Filling', 'Scaling', 'Root Canal'])
-                ->delete();
+        Procedure::query()
+            ->where('company_id', $companyId)
+            ->whereIn('name', ['Filling', 'Scaling', 'Root Canal'])
+            ->delete();
+    }
 
-            /*
-            |--------------------------------------------------------------------------
-            | Doctors
-            |--------------------------------------------------------------------------
-            */
+    /**
+     * Get or create admin user.
+     */
+    private function getOrCreateAdmin(Company $company): User
+    {
+        $admin = User::query()
+            ->where('company_id', $company->id)
+            ->where(function ($q) {
+                $q->where('role', 'admin')
+                    ->orWhere('is_super_admin', true);
+            })
+            ->first();
 
-            $doctor1 = Doctor::create([
+        if (!$admin) {
+            $admin = User::factory()->admin()->create([
+                'company_id' => $company->id,
+                'name' => 'QA Admin',
+                'email' => 'qa-admin@test.com',
+                'password' => Hash::make('123456'),
+            ]);
+        }
+
+        return $admin;
+    }
+
+    /**
+     * Create QA doctors.
+     */
+    private function createQaDoctors(int $companyId): array
+    {
+        return [
+            Doctor::factory()->create([
                 'company_id' => $companyId,
                 'name' => 'Dr. Ahmed Hassan',
                 'email' => 'dr.ahmed@test.com',
-                'phone' => '01010000001',
                 'work_start' => '09:00',
                 'work_end' => '17:00',
-                'slot_minutes' => 30,
-                'is_active' => 1,
-            ]);
-
-            $doctor2 = Doctor::create([
+            ]),
+            Doctor::factory()->create([
                 'company_id' => $companyId,
                 'name' => 'Dr. Sara Ali',
                 'email' => 'dr.sara@test.com',
-                'phone' => '01010000002',
                 'work_start' => '10:00',
                 'work_end' => '18:00',
-                'slot_minutes' => 30,
-                'is_active' => 1,
-            ]);
+            ]),
+        ];
+    }
 
-            /*
-            |--------------------------------------------------------------------------
-            | Patients
-            |--------------------------------------------------------------------------
-            */
-
-            $patient1 = Customer::create([
+    /**
+     * Create QA patients.
+     */
+    private function createQaPatients(int $companyId): array
+    {
+        return [
+            Customer::factory()->create([
                 'company_id' => $companyId,
                 'name' => 'Ahmed Ali',
                 'email' => 'ahmed1@test.com',
-                'phone' => '0100000001',
-                'gender' => 'male',
                 'patient_code' => 'PT-QA-0001',
-                'status' => '1',
-                'notes' => 'QA demo patient 1',
-            ]);
-
-            $patient2 = Customer::create([
+                'gender' => 'male',
+            ]),
+            Customer::factory()->create([
                 'company_id' => $companyId,
                 'name' => 'Mona Hassan',
                 'email' => 'mona2@test.com',
-                'phone' => '0100000002',
-                'gender' => 'female',
                 'patient_code' => 'PT-QA-0002',
-                'status' => '1',
-                'notes' => 'QA demo patient 2',
-            ]);
-
-            $patient3 = Customer::create([
+                'gender' => 'female',
+            ]),
+            Customer::factory()->create([
                 'company_id' => $companyId,
                 'name' => 'Youssef Emad',
                 'email' => 'youssef3@test.com',
-                'phone' => '0100000003',
-                'gender' => 'male',
                 'patient_code' => 'PT-QA-0003',
-                'status' => '1',
-                'notes' => 'QA demo patient 3',
-            ]);
+                'gender' => 'male',
+            ]),
+        ];
+    }
 
-            /*
-            |--------------------------------------------------------------------------
-            | Procedures
-            |--------------------------------------------------------------------------
-            */
-
-            $procedure1 = Procedure::create([
+    /**
+     * Create QA procedures.
+     */
+    private function createQaProcedures(int $companyId): array
+    {
+        return [
+            Procedure::factory()->create([
                 'company_id' => $companyId,
                 'name' => 'Filling',
                 'default_price' => 250,
-            ]);
-
-            $procedure2 = Procedure::create([
+            ]),
+            Procedure::factory()->create([
                 'company_id' => $companyId,
                 'name' => 'Scaling',
                 'default_price' => 400,
-            ]);
-
-            $procedure3 = Procedure::create([
+            ]),
+            Procedure::factory()->create([
                 'company_id' => $companyId,
                 'name' => 'Root Canal',
                 'default_price' => 1200,
-            ]);
+            ]),
+        ];
+    }
 
-            /*
-            |--------------------------------------------------------------------------
-            | Appointments
-            |--------------------------------------------------------------------------
-            */
-
-            $today = Carbon::today();
-            $yesterday = Carbon::yesterday();
-            $tomorrow = Carbon::tomorrow();
-
-            $appointment1 = Appointment::create([
+    /**
+     * Create QA appointments.
+     */
+    private function createQaAppointments(int $companyId, array $patients, array $doctors, int $adminId): array
+    {
+        return [
+            Appointment::factory()->create([
                 'company_id' => $companyId,
-                'patient_id' => $patient1->id,
-                'doctor_id' => $doctor1->id,
-                'doctor_name' => $doctor1->name,
-                'appointment_date' => $today->toDateString(),
+                'patient_id' => $patients[0]->id,
+                'doctor_id' => $doctors[0]->id,
+                'appointment_date' => now()->toDateString(),
                 'appointment_time' => '10:00',
                 'status' => 'scheduled',
-                'notes' => 'QA scheduled appointment',
                 'created_by' => $adminId,
-            ]);
-
-            $appointment2 = Appointment::create([
+            ]),
+            Appointment::factory()->completed()->create([
                 'company_id' => $companyId,
-                'patient_id' => $patient2->id,
-                'doctor_id' => $doctor1->id,
-                'doctor_name' => $doctor1->name,
-                'appointment_date' => $today->toDateString(),
+                'patient_id' => $patients[1]->id,
+                'doctor_id' => $doctors[0]->id,
+                'appointment_date' => now()->toDateString(),
                 'appointment_time' => '11:00',
-                'status' => 'completed',
-                'notes' => 'QA completed appointment',
                 'created_by' => $adminId,
-            ]);
-
-            $appointment3 = Appointment::create([
+            ]),
+            Appointment::factory()->cancelled()->create([
                 'company_id' => $companyId,
-                'patient_id' => $patient3->id,
-                'doctor_id' => $doctor2->id,
-                'doctor_name' => $doctor2->name,
-                'appointment_date' => $today->toDateString(),
+                'patient_id' => $patients[2]->id,
+                'doctor_id' => $doctors[1]->id,
+                'appointment_date' => now()->toDateString(),
                 'appointment_time' => '12:00',
-                'status' => 'cancelled',
-                'notes' => 'QA cancelled appointment',
                 'created_by' => $adminId,
-            ]);
-
-            $appointment4 = Appointment::create([
+            ]),
+            Appointment::factory()->noShow()->create([
                 'company_id' => $companyId,
-                'patient_id' => $patient1->id,
-                'doctor_id' => $doctor2->id,
-                'doctor_name' => $doctor2->name,
-                'appointment_date' => $yesterday->toDateString(),
+                'patient_id' => $patients[0]->id,
+                'doctor_id' => $doctors[1]->id,
+                'appointment_date' => now()->subDay()->toDateString(),
                 'appointment_time' => '13:00',
-                'status' => 'no_show',
-                'notes' => 'QA no-show appointment',
                 'created_by' => $adminId,
-            ]);
-
-            $appointment5 = Appointment::create([
+            ]),
+            Appointment::factory()->future()->create([
                 'company_id' => $companyId,
-                'patient_id' => $patient2->id,
-                'doctor_id' => $doctor2->id,
-                'doctor_name' => $doctor2->name,
-                'appointment_date' => $tomorrow->toDateString(),
+                'patient_id' => $patients[1]->id,
+                'doctor_id' => $doctors[1]->id,
                 'appointment_time' => '14:00',
-                'status' => 'scheduled',
-                'notes' => 'QA scheduled appointment',
                 'created_by' => $adminId,
-            ]);
+            ]),
+        ];
+    }
 
-            /*
-            |--------------------------------------------------------------------------
-            | Dental Records
-            |--------------------------------------------------------------------------
-            */
+    /**
+     * Create QA dental records.
+     */
+    private function createQaDentalRecords(int $companyId, array $patients, array $appointments, array $procedures): void
+    {
+        DentalRecord::factory()->create([
+            'company_id' => $companyId,
+            'customer_id' => $patients[0]->id,
+            'appointment_id' => $appointments[0]->id,
+            'procedure_id' => $procedures[0]->id,
+            'tooth_number' => '16',
+            'surface' => 'occlusal',
+            'status' => 'planned',
+        ]);
 
-            DentalRecord::create([
-                'company_id' => $companyId,
-                'customer_id' => $patient1->id,
-                'appointment_id' => $appointment1->id,
-                'procedure_id' => $procedure1->id,
-                'tooth_number' => '16',
-                'surface' => 'occlusal',
-                'status' => 'planned',
-                'notes' => 'Needs filling',
-            ]);
+        DentalRecord::factory()->completed()->create([
+            'company_id' => $companyId,
+            'customer_id' => $patients[1]->id,
+            'appointment_id' => $appointments[1]->id,
+            'procedure_id' => $procedures[1]->id,
+            'tooth_number' => '11',
+            'surface' => 'full',
+        ]);
 
-            DentalRecord::create([
-                'company_id' => $companyId,
-                'customer_id' => $patient2->id,
-                'appointment_id' => $appointment2->id,
-                'procedure_id' => $procedure2->id,
-                'tooth_number' => '11',
-                'surface' => 'full',
-                'status' => 'completed',
-                'notes' => 'Scaling completed',
-            ]);
+        DentalRecord::factory()->inProgress()->create([
+            'company_id' => $companyId,
+            'customer_id' => $patients[0]->id,
+            'appointment_id' => $appointments[3]->id,
+            'procedure_id' => $procedures[2]->id,
+            'tooth_number' => '26',
+            'surface' => 'mesial',
+        ]);
+    }
 
-            DentalRecord::create([
-                'company_id' => $companyId,
-                'customer_id' => $patient1->id,
-                'appointment_id' => $appointment4->id,
-                'procedure_id' => $procedure3->id,
-                'tooth_number' => '26',
-                'surface' => 'mesial',
-                'status' => 'in_progress',
-                'notes' => 'Root canal in progress',
-            ]);
+    /**
+     * Create QA treatment plans.
+     */
+    private function createQaTreatmentPlans(int $companyId, array $patients, array $procedures): array
+    {
+        $plan1 = TreatmentPlan::factory()->create([
+            'company_id' => $companyId,
+            'customer_id' => $patients[0]->id,
+            'title' => 'Restorative Plan',
+            'total_cost' => 1450,
+        ]);
 
-            /*
-            |--------------------------------------------------------------------------
-            | Treatment Plans
-            |--------------------------------------------------------------------------
-            */
+        TreatmentPlanItem::factory()->create([
+            'company_id' => $companyId,
+            'treatment_plan_id' => $plan1->id,
+            'procedure_id' => $procedures[0]->id,
+            'procedure' => 'Filling',
+            'tooth_number' => '16',
+            'price' => 250,
+        ]);
 
-            $plan1 = TreatmentPlan::create([
-                'company_id' => $companyId,
-                'customer_id' => $patient1->id,
-                'title' => 'Restorative Plan',
-                'notes' => 'QA restorative plan',
-                'total_cost' => 1450,
-                'status' => 'active',
-            ]);
+        TreatmentPlanItem::factory()->create([
+            'company_id' => $companyId,
+            'treatment_plan_id' => $plan1->id,
+            'procedure_id' => $procedures[2]->id,
+            'procedure' => 'Root Canal',
+            'tooth_number' => '26',
+            'price' => 1200,
+        ]);
 
-            TreatmentPlanItem::create([
-                'company_id' => $companyId,
-                'treatment_plan_id' => $plan1->id,
-                'procedure_id' => $procedure1->id,
-                'procedure' => 'Filling',
-                'tooth_number' => '16',
-                'surface' => 'occlusal',
-                'notes' => 'Plan item filling',
-                'price' => 250,
-            ]);
+        $plan2 = TreatmentPlan::factory()->create([
+            'company_id' => $companyId,
+            'customer_id' => $patients[1]->id,
+            'title' => 'Cleaning & Follow-up',
+            'total_cost' => 400,
+        ]);
 
-            TreatmentPlanItem::create([
-                'company_id' => $companyId,
-                'treatment_plan_id' => $plan1->id,
-                'procedure_id' => $procedure3->id,
-                'procedure' => 'Root Canal',
-                'tooth_number' => '26',
-                'surface' => 'mesial',
-                'notes' => 'Plan item root canal',
-                'price' => 1200,
-            ]);
+        TreatmentPlanItem::factory()->create([
+            'company_id' => $companyId,
+            'treatment_plan_id' => $plan2->id,
+            'procedure_id' => $procedures[1]->id,
+            'procedure' => 'Scaling',
+            'tooth_number' => '11',
+            'price' => 400,
+        ]);
 
-            $plan2 = TreatmentPlan::create([
-                'company_id' => $companyId,
-                'customer_id' => $patient2->id,
-                'title' => 'Cleaning & Follow-up',
-                'notes' => 'QA cleaning plan',
-                'total_cost' => 400,
-                'status' => 'active',
-            ]);
+        return [$plan1, $plan2];
+    }
 
-            TreatmentPlanItem::create([
-                'company_id' => $companyId,
-                'treatment_plan_id' => $plan2->id,
-                'procedure_id' => $procedure2->id,
-                'procedure' => 'Scaling',
-                'tooth_number' => '11',
-                'surface' => 'full',
-                'notes' => 'Plan item scaling',
-                'price' => 400,
-            ]);
+    /**
+     * Create QA financial data.
+     */
+    private function createQaFinancials(int $companyId, array $patients, array $appointments, array $plans, int $adminId): void
+    {
+        // Order 1 & Invoice 1 (unpaid)
+        $order1 = Order::factory()->create([
+            'company_id' => $companyId,
+            'customer_id' => $patients[0]->id,
+            'status' => 'confirmed',
+            'total' => 1000,
+            'created_by' => $adminId,
+        ]);
 
-            /*
-            |--------------------------------------------------------------------------
-            | Orders
-            |--------------------------------------------------------------------------
-            */
+        Invoice::factory()->create([
+            'company_id' => $companyId,
+            'number' => 'INV-QA-1001',
+            'order_id' => $order1->id,
+            'appointment_id' => $appointments[0]->id,
+            'treatment_plan_id' => $plans[0]->id,
+            'customer_id' => $patients[0]->id,
+            'total' => 1000,
+            'status' => 'unpaid',
+        ]);
 
-            $order1 = Order::create([
-                'company_id' => $companyId,
-                'customer_id' => $patient1->id,
-                'title_en' => 'Dental Services',
-                'title_ar' => 'خدمات أسنان',
-                'description_en' => 'QA order 1',
-                'description_ar' => 'طلب اختبار 1',
-                'status' => 'confirmed',
-                'total' => 1000,
-                'created_by' => $adminId,
-            ]);
+        // Order 2 & Invoice 2 (partially_paid)
+        $order2 = Order::factory()->create([
+            'company_id' => $companyId,
+            'customer_id' => $patients[1]->id,
+            'status' => 'confirmed',
+            'total' => 500,
+            'created_by' => $adminId,
+        ]);
 
-            $order2 = Order::create([
-                'company_id' => $companyId,
-                'customer_id' => $patient2->id,
-                'title_en' => 'Dental Services',
-                'title_ar' => 'خدمات أسنان',
-                'description_en' => 'QA order 2',
-                'description_ar' => 'طلب اختبار 2',
-                'status' => 'confirmed',
-                'total' => 500,
-                'created_by' => $adminId,
-            ]);
+        $invoice2 = Invoice::factory()->create([
+            'company_id' => $companyId,
+            'number' => 'INV-QA-1002',
+            'order_id' => $order2->id,
+            'appointment_id' => $appointments[1]->id,
+            'treatment_plan_id' => $plans[1]->id,
+            'customer_id' => $patients[1]->id,
+            'total' => 500,
+            'status' => 'partially_paid',
+        ]);
 
-            $order3 = Order::create([
-                'company_id' => $companyId,
-                'customer_id' => $patient1->id,
-                'title_en' => 'Dental Services',
-                'title_ar' => 'خدمات أسنان',
-                'description_en' => 'QA order 3',
-                'description_ar' => 'طلب اختبار 3',
-                'status' => 'confirmed',
-                'total' => 300,
-                'created_by' => $adminId,
-            ]);
+        Payment::factory()->create([
+            'company_id' => $companyId,
+            'invoice_id' => $invoice2->id,
+            'amount' => 200,
+            'applied_amount' => 200,
+            'method' => 'cash',
+            'received_by' => $adminId,
+        ]);
 
-            /*
-            |--------------------------------------------------------------------------
-            | Invoices
-            |--------------------------------------------------------------------------
-            */
+        // Order 3 & Invoice 3 (paid)
+        $order3 = Order::factory()->create([
+            'company_id' => $companyId,
+            'customer_id' => $patients[0]->id,
+            'status' => 'confirmed',
+            'total' => 300,
+            'created_by' => $adminId,
+        ]);
 
-            $invoice1 = Invoice::create([
-                'company_id' => $companyId,
-                'number' => 'INV-QA-1001',
-                'order_id' => $order1->id,
-                'appointment_id' => $appointment1->id,
-                'treatment_plan_id' => $plan1->id,
-                'customer_id' => $patient1->id,
-                'total' => 1000,
-                'status' => 'unpaid',
-                'issued_at' => $today->copy()->setTime(10, 30, 0),
-            ]);
+        $invoice3 = Invoice::factory()->create([
+            'company_id' => $companyId,
+            'number' => 'INV-QA-1003',
+            'order_id' => $order3->id,
+            'treatment_plan_id' => $plans[0]->id,
+            'customer_id' => $patients[0]->id,
+            'total' => 300,
+            'status' => 'paid',
+        ]);
 
-            $invoice2 = Invoice::create([
-                'company_id' => $companyId,
-                'number' => 'INV-QA-1002',
-                'order_id' => $order2->id,
-                'appointment_id' => $appointment2->id,
-                'treatment_plan_id' => $plan2->id,
-                'customer_id' => $patient2->id,
-                'total' => 500,
-                'status' => 'partially_paid',
-                'issued_at' => $today->copy()->setTime(11, 30, 0),
-            ]);
+        Payment::factory()->create([
+            'company_id' => $companyId,
+            'invoice_id' => $invoice3->id,
+            'amount' => 300,
+            'applied_amount' => 300,
+            'method' => 'card',
+            'received_by' => $adminId,
+        ]);
+    }
 
-            $invoice3 = Invoice::create([
-                'company_id' => $companyId,
-                'number' => 'INV-QA-1003',
-                'order_id' => $order3->id,
-                'appointment_id' => null,
-                'treatment_plan_id' => $plan1->id,
-                'customer_id' => $patient1->id,
-                'total' => 300,
-                'status' => 'paid',
-                'issued_at' => $today->copy()->setTime(12, 30, 0),
-            ]);
-
-            /*
-            |--------------------------------------------------------------------------
-            | Payments
-            |--------------------------------------------------------------------------
-            */
-
-            $payment1 = Payment::create([
-                'company_id' => $companyId,
-                'invoice_id' => $invoice2->id,
-                'amount' => 200,
-                'applied_amount' => 200,
-                'credit_amount' => 0,
-                'method' => 'cash',
-                'paid_at' => $today->copy()->setTime(13, 0, 0),
-                'received_by' => $adminId,
-            ]);
-
-            $payment2 = Payment::create([
-                'company_id' => $companyId,
-                'invoice_id' => $invoice3->id,
-                'amount' => 300,
-                'applied_amount' => 300,
-                'credit_amount' => 0,
-                'method' => 'card',
-                'paid_at' => $today->copy()->setTime(14, 0, 0),
-                'received_by' => $adminId,
-            ]);
-
-            /*
-            |--------------------------------------------------------------------------
-            | Refunds
-            |--------------------------------------------------------------------------
-            */
-
-            DB::table('payment_refunds')->insert([
-                'company_id' => $companyId,
-                'payment_id' => $payment2->id,
-                'applies_to' => 'invoice',
-                'amount' => 50,
-                'refunded_at' => $today->copy()->setTime(15, 0, 0),
-                'created_at' => now(),
-                'updated_at' => now(),
-            ]);
-
-            /*
-            |--------------------------------------------------------------------------
-            | Customer Credits
-            |--------------------------------------------------------------------------
-            */
-
-            DB::table('customer_credits')->insert([
-                'company_id' => $companyId,
-                'customer_id' => $patient1->id,
-                'invoice_id' => null,
-                'payment_id' => $payment2->id,
-                'refund_id' => null,
-                'type' => 'credit',
-                'amount' => 75,
-                'entry_date' => $today->toDateString(),
-                'description' => 'QA demo credit balance',
-                'created_by' => $adminId,
-                'created_at' => now(),
-                'updated_at' => now(),
-            ]);
-            DB::table('clinic_settings')->updateOrInsert(
-                ['company_id' => $companyId],
-                [
-                    'clinic_name' => 'QA Clinic',
-                    'phone' => '01000000000',
-                    'email' => 'qa@clinic.test',
-                    'currency' => 'USD',
-                    'timezone' => 'UTC',
-                    'invoice_prefix' => 'INV-QA',
-                    'invoice_start_number' => 1001,
-                    'next_invoice_number' => 1004,
-                    'language' => 'en',
-                    'created_at' => now(),
-                    'updated_at' => now(),
-                ]
-            );
-        });
+    /**
+     * Display QA summary.
+     */
+    private function displayQaSummary(Company $company): void
+    {
+        $this->command->newLine();
+        $this->command->info('✅ QA Demo Data Created Successfully!');
+        $this->command->line("   Company: {$company->name} (ID: {$company->id})");
+        $this->command->line('   Patients: 3 (Ahmed, Mona, Youssef)');
+        $this->command->line('   Doctors: 2 (Dr. Ahmed, Dr. Sara)');
+        $this->command->line('   Appointments: 5 (scheduled, completed, cancelled, no-show, future)');
+        $this->command->line('   Invoices: 3 (unpaid, partially_paid, paid)');
     }
 }
