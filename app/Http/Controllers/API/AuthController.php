@@ -70,7 +70,10 @@ class AuthController extends Controller
             'password' => 'required|string',
         ]);
 
-        $user = User::where('email', $request->email)->first();
+        // ✅ تجاوز الـ Global Scope عشان نقدر ندور على المستخدم
+        $user = User::withoutGlobalScope(\App\Models\Concerns\CompanyScope::class)
+            ->where('email', $request->email)
+            ->first();
 
         if (!$user || !Hash::check($request->password, $user->password)) {
             return response()->json([
@@ -78,24 +81,20 @@ class AuthController extends Controller
             ], 401);
         }
 
-        // ✅ التحقق من حالة المستخدم والشركة
-        if (!$user->is_super_admin && !$user->company_id) {
-            return response()->json([
-                'message' => 'User is not assigned to any company'
-            ], 403);
+        // ✅ بعد ما لاقينا المستخدم، نضبط Tenant Context
+        if (!$user->is_super_admin) {
+            Tenant::setId($user->company_id);
+            Tenant::setIsSuperAdmin(false);
+        } else {
+            Tenant::setId(null);
+            Tenant::setIsSuperAdmin(true);
         }
 
         // ✅ التحقق من حالة الشركة
         if (!$user->is_super_admin && $user->company) {
-            if ($user->company->status === 'suspended') {
+            if (in_array($user->company->status, ['suspended', 'cancelled'])) {
                 return response()->json([
-                    'message' => 'Your clinic account has been suspended. Please contact support.'
-                ], 403);
-            }
-
-            if ($user->company->status === 'cancelled') {
-                return response()->json([
-                    'message' => 'Your clinic account has been cancelled.'
+                    'message' => 'Your clinic account has been ' . $user->company->status
                 ], 403);
             }
         }
