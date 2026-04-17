@@ -78,7 +78,7 @@ class Tenant
         if (Auth::check()) {
             $user = Auth::user();
             // ✅ استخدم property بدل method
-            return $user ? (bool) ($user->is_super_admin ?? false) : false;
+            return $user?->isSuperAdmin() ?? false;
         }
 
         return false;

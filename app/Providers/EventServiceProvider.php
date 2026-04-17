@@ -2,9 +2,12 @@
 
 namespace App\Providers;
 
+use App\Services\Tenant;
 use Illuminate\Auth\Events\Registered;
 use Illuminate\Auth\Listeners\SendEmailVerificationNotification;
+use Illuminate\Console\Scheduling\Event;
 use Illuminate\Foundation\Support\Providers\EventServiceProvider as ServiceProvider;
+use Illuminate\Queue\Events\JobProcessed;
 
 class EventServiceProvider extends ServiceProvider
 {
@@ -25,7 +28,11 @@ class EventServiceProvider extends ServiceProvider
     public function boot(): void
     {
         parent::boot();
+        Event::listen(JobProcessed::class, function () {
+            Tenant::reset();
+        });
     }
+
 
     /**
      * Determine if events and listeners should be automatically discovered.

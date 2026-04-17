@@ -5,7 +5,7 @@ namespace App\Http\Controllers\API\Erp;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use App\Models\ActivityLog;
-use App\Services\Tenant; // ✅ استخدام Tenant
+use App\Services\Tenant;
 
 class ActivityLogController extends Controller
 {
@@ -13,8 +13,14 @@ class ActivityLogController extends Controller
     {
         $limit = (int) $request->get('limit', 6);
 
-        // ✅ استخدام Global Scope - إزالة where('company_id')
-        $logs = ActivityLog::query()
+        $query = ActivityLog::query();
+
+        // ✅ [إصلاح] طبقة حماية ثانية: فلترة حسب company_id إذا لم يكن المستخدم Super Admin
+        if (!Tenant::isSuperAdmin()) {
+            $query->where('company_id', Tenant::id());
+        }
+
+        $logs = $query
             ->when(
                 $request->subject_type,
                 fn($q) => $q->where('subject_type', $request->subject_type)

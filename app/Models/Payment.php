@@ -153,20 +153,19 @@ class Payment extends Model
         });
 
         static::created(function ($payment) {
-            if (auth()->check()) {
-                ActivityLog::create([
-                    'company_id' => $payment->company_id,
-                    'user_id' => auth()->id(),
-                    'action' => 'payment.created',
-                    'subject_type' => Payment::class,
-                    'subject_id' => $payment->id,
-                    'properties' => [
-                        'invoice_id' => $payment->invoice_id,
-                        'amount' => $payment->amount,
-                        'method' => $payment->method,
-                    ]
-                ]);
-            }
+            $userId = auth()->id() ?? null;
+            ActivityLog::create([
+                'company_id' => $payment->company_id,
+                'user_id' => $userId,
+                'action' => 'payment.created',
+                'subject_type' => Payment::class,
+                'subject_id' => $payment->id,
+                'properties' => [
+                    'invoice_id' => $payment->invoice_id,
+                    'amount' => $payment->amount,
+                    'method' => $payment->method,
+                ]
+            ]);
         });
 
         static::updated(function ($payment) {
