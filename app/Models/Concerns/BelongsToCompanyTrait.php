@@ -21,24 +21,21 @@ trait BelongsToCompanyTrait
             $companyId = Tenant::id();
             $isSuperAdmin = Tenant::isSuperAdmin();
 
-            // ✅ إصلاح المشكلة 1: منع override غير مصرح به
-            // Super admin ممنوع يدخل company_id إلا لو explicitly using Tenant::forCompany()
+            // ✅ إصلاح: منع الـ Exception لو Super Admin بدون شركة
             if ($isSuperAdmin && !Tenant::hasTenant()) {
-                // لو Super Admin وعايز ينشئ حاجة - لازم يحدد الشركة explicitly
+                // ✅ بدل ما نرمي Exception، نستخدم company_id من الـ Model لو موجود
                 if (empty($model->company_id)) {
-                    throw new \Exception('Super admin must explicitly set company_id when creating records');
+                    // ✅ السماح بإنشاء السجل بدون company_id (لـ Super Admin فقط)
+                    return;
                 }
-                return; // ✅ استخدام company_id اللي هو حطه manually
+                return;
             }
 
-            // ✅ Performance fix
             if (!static::$hasCompanyColumn) {
                 return;
             }
 
-            // ✅ إصلاح المشكلة 1: منع override - نستخدم company_id من Tenant فقط
-            // لو المستخدم مش Super Admin - دايمًا نستخدم company_id بتاعه
-            if ($companyId) {
+            if ($companyId && empty($model->company_id)) {
                 $model->company_id = $companyId;
             }
         });

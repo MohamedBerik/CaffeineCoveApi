@@ -61,11 +61,19 @@ class Handler extends ExceptionHandler
     public function render($request, Throwable $e)
     {
         // ✅ توحيد استجابات API
-        if ($request->expectsJson() || $request->is('api/*')) {
-            return $this->handleApiException($request, $e);
-        }
+        // if ($request->expectsJson() || $request->is('api/*')) {
+        //     return $this->handleApiException($request, $e);
+        // }
 
-        return parent::render($request, $e);
+        // return parent::render($request, $e);
+
+        // ✅ إظهار الخطأ الحقيقي مؤقتًا
+        return response()->json([
+            'error' => $e->getMessage(),
+            'file' => $e->getFile(),
+            'line' => $e->getLine(),
+            'trace' => $e->getTraceAsString(),
+        ], 500);
     }
 
     /**

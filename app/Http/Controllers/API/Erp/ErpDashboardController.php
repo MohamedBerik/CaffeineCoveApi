@@ -20,7 +20,16 @@ class ErpDashboardController extends Controller
 {
     public function index(Request $request)
     {
-        $companyId = Tenant::id(); // ✅ استخدام Tenant
+        $companyId = Tenant::id();
+
+        if (!$companyId && !Tenant::isSuperAdmin()) {
+            return response()->json([
+                'msg' => 'No company context',
+                'status' => 200,
+                'data' => [],
+            ]);
+        }
+
         $range = $request->get('range', 'day');
         $compare = $request->get('compare', false);
 
