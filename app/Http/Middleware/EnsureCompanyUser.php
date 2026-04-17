@@ -1,15 +1,13 @@
 <?php
-// app/Http/Middleware/EnsureCompanyUser.php
 
 namespace App\Http\Middleware;
 
-use App\Services\Tenant;
 use Closure;
 use Illuminate\Http\Request;
 
 class EnsureCompanyUser
 {
-    public function handle($request, $next)
+    public function handle(Request $request, Closure $next)
     {
         $user = $request->user();
 
@@ -24,7 +22,9 @@ class EnsureCompanyUser
 
         // ❌ مستخدم عادي بدون شركة - ممنوع
         if (!$user->company_id) {
-            return response()->json(['message' => 'User is not assigned to any company'], 403);
+            return response()->json([
+                'message' => 'User is not assigned to any company'
+            ], 403);
         }
 
         return $next($request);
