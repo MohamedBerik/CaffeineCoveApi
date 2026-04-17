@@ -8,9 +8,30 @@ use Illuminate\Foundation\Support\Providers\EventServiceProvider as ServiceProvi
 
 class EventServiceProvider extends ServiceProvider
 {
-    // app/Providers/EventServiceProvider.php
-
+    /**
+     * The event listener mappings for the application.
+     *
+     * @var array<class-string, array<int, class-string>>
+     */
     protected $listen = [
-        // ✅ علّق كل الـ Listeners مؤقتًا
+        Registered::class => [
+            SendEmailVerificationNotification::class,
+        ],
     ];
+
+    /**
+     * Register any events for your application.
+     */
+    public function boot(): void
+    {
+        parent::boot();
+    }
+
+    /**
+     * Determine if events and listeners should be automatically discovered.
+     */
+    public function shouldDiscoverEvents(): bool
+    {
+        return false;
+    }
 }
