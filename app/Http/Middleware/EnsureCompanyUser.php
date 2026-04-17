@@ -3,6 +3,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Services\Tenant;
 use Closure;
 use Illuminate\Http\Request;
 
