@@ -8,7 +8,7 @@ use Illuminate\Http\Request;
 
 class EnsureCompanyUser
 {
-    public function handle(Request $request, Closure $next)
+    public function handle($request, $next)
     {
         $user = $request->user();
 
@@ -16,17 +16,21 @@ class EnsureCompanyUser
             return response()->json(['message' => 'Unauthenticated'], 401);
         }
 
-        // ✅ Super admin allowed (but will see all data via scope)
+        // ✅ Super admin يعدي
         if ($user->is_super_admin) {
+            Tenant::setId(null); // ✅ مهم
+            Tenant::setIsSuperAdmin(true);
             return $next($request);
         }
 
-        // ✅ Regular user must have company
+        // ❌ مستخدم عادي بدون شركة
         if (!$user->company_id) {
-            return response()->json([
-                'message' => 'User is not assigned to any company'
-            ], 403);
+            return response()->json(['message' => 'User is not assigned to any company'], 403);
         }
+
+        // ✅ تعيين Tenant Context
+        Tenant::setId($user->company_id);
+        Tenant::setIsSuperAdmin(false);
 
         return $next($request);
     }
