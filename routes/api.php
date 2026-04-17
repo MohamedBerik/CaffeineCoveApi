@@ -41,6 +41,8 @@ use App\Http\Controllers\API\Erp\ProcedureController;
 use App\Http\Controllers\API\Erp\RadiologyController;
 use App\Services\Tenant;
 
+use App\Http\Controllers\API\SaaS\TenantController;
+use App\Http\Controllers\API\SaaS\ClinicOnboardingController;
 
 /*
 |--------------------------------------------------------------------------
@@ -350,4 +352,32 @@ Route::prefix('erp')
         // ==================== CLINIC SETTINGS ====================
         Route::get('/clinic-settings', [ClinicSettingController::class, 'show']);
         Route::put('/clinic-settings', [ClinicSettingController::class, 'update']);
+    });
+
+
+
+/*
+|--------------------------------------------------------------------------
+| SaaS Routes (Super Admin Only)
+|--------------------------------------------------------------------------
+*/
+
+Route::prefix('saas')
+    ->middleware(['auth:sanctum', 'super.admin'])
+    ->group(function () {
+
+        // Tenant management
+        Route::get('/me', [TenantController::class, 'me']);
+        Route::post('/switch-company', [TenantController::class, 'switch']);
+        Route::post('/exit-company', [TenantController::class, 'exitCompany']);
+
+        // Clinic onboarding (public - no auth required for register)
+        Route::post('/register-clinic', [ClinicOnboardingController::class, 'register'])
+            ->withoutMiddleware(['auth:sanctum', 'super.admin']);
+
+        Route::get('/check-slug', [ClinicOnboardingController::class, 'checkSlug'])
+            ->withoutMiddleware(['auth:sanctum', 'super.admin']);
+
+        Route::get('/onboarding-progress', [ClinicOnboardingController::class, 'progress'])
+            ->withoutMiddleware(['auth:sanctum', 'super.admin']);
     });
