@@ -5,9 +5,11 @@ namespace App\Http\Middleware;
 
 use Closure;
 use Illuminate\Http\Request;
+use App\Services\Tenant;
 
 class EnsureAdmin
 {
+    // app/Http/Middleware/EnsureAdmin.php
     public function handle(Request $request, Closure $next)
     {
         $user = $request->user();
@@ -16,8 +18,8 @@ class EnsureAdmin
             return response()->json(['message' => 'Unauthenticated'], 401);
         }
 
-        // ✅ Super admin or company admin
-        if (!$user->is_super_admin && $user->role !== 'admin') {
+        // ✅ [إصلاح] استخدام Tenant للتحقق من الصلاحية
+        if (!Tenant::isSuperAdmin() && $user->role !== 'admin') {
             return response()->json(['message' => 'Unauthorized. Admin access required.'], 403);
         }
 

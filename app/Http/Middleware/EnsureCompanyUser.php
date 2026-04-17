@@ -5,9 +5,13 @@ namespace App\Http\Middleware;
 
 use Closure;
 use Illuminate\Http\Request;
+use App\Services\Tenant;
 
 class EnsureCompanyUser
 {
+    // app/Http/Middleware/EnsureCompanyUser.php
+
+
     public function handle(Request $request, Closure $next)
     {
         $user = $request->user();
@@ -16,13 +20,13 @@ class EnsureCompanyUser
             return response()->json(['message' => 'Unauthenticated'], 401);
         }
 
-        // ✅ Super admin allowed (but will see all data via scope)
-        if ($user->is_super_admin) {
+        // ✅ [إصلاح] السماح لـ Super Admin بالمرور فقط إذا لم يكن في سياق شركة
+        if (Tenant::isSuperAdmin() && !Tenant::hasTenant()) {
             return $next($request);
         }
 
-        // ✅ Regular user must have company
-        if (!$user->company_id) {
+        // ✅ مستخدم عادي - يجب أن يكون لديه company_id
+        if (!Tenant::hasTenant()) {
             return response()->json([
                 'message' => 'User is not assigned to any company'
             ], 403);

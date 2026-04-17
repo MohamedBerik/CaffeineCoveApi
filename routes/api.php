@@ -159,8 +159,8 @@ Route::middleware(['auth:sanctum', 'admin', 'company.user', 'throttle:120,1'])
 Route::prefix('erp')
     ->middleware([
         'auth:sanctum',
-        'company.user',
         \App\Http\Middleware\SetTenant::class,
+        'company.user',
     ])
     ->group(function () {
 

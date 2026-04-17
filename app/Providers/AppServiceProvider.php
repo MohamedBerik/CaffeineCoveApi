@@ -16,6 +16,7 @@ use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Queue;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -55,6 +56,9 @@ class AppServiceProvider extends ServiceProvider
 
         $this->app['queue']->createPayloadUsing(function ($connection, $queue, $payload) {
             return ['tenant_middleware' => true];
+        });
+        Queue::after(function () {
+            Tenant::reset();
         });
     }
 

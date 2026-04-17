@@ -5,14 +5,17 @@ namespace App\Http\Middleware;
 
 use Closure;
 use Illuminate\Http\Request;
+use App\Services\Tenant;
 
 class EnsureSuperAdmin
 {
+    // app/Http/Middleware/EnsureSuperAdmin.php
+
+
     public function handle(Request $request, Closure $next)
     {
-        $user = $request->user();
-
-        if (!$user || !$user->is_super_admin) {
+        // ✅ [إصلاح] استخدام Tenant للتحقق من الصلاحية
+        if (!Tenant::isSuperAdmin()) {
             return response()->json([
                 'message' => 'Only super admin can access this resource'
             ], 403);
