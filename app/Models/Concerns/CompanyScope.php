@@ -10,24 +10,23 @@ use App\Services\Tenant;
 
 class CompanyScope implements Scope
 {
+    // app/Models/Concerns/CompanyScope.php
+
     public function apply(Builder $builder, Model $model)
     {
-        // ✅ استخدام Tenant بدل Auth (يدعم CLI/Jobs)
         $companyId = Tenant::id();
         $isSuperAdmin = Tenant::isSuperAdmin();
 
-        // Super admin يرى كل الشركات
-        if ($isSuperAdmin) {
+        // ✅ [إصلاح] لا نلغي الفلترة إلا إذا كان Super Admin خارج سياق أي شركة
+        if ($isSuperAdmin && !Tenant::hasTenant()) {
             return;
         }
 
-        // ✅ Performance fix: التحقق من وجود العمود عن طريق property
-        // if (!property_exists($model, 'hasCompanyColumn') || !$model::$hasCompanyColumn) {
-        if (!property_exists($model, 'hasCompanyColumn') || !$model::$hasCompanyColumn) {
+        // ✅ [إصلاح] التحقق من وجود الخاصية بشكل صحيح
+        if (!property_exists(get_class($model), 'hasCompanyColumn') || !$model::$hasCompanyColumn) {
             return;
         }
 
-        // مستخدم بدون شركة - يرجع فاضي
         if (!$companyId) {
             $builder->whereRaw('1 = 0');
             return;

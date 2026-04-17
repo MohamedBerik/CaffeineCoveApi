@@ -52,6 +52,10 @@ class AppServiceProvider extends ServiceProvider
 
         // ✅ Configure cache for multi-tenant
         $this->configureTenantCache();
+
+        $this->app['queue']->createPayloadUsing(function ($connection, $queue, $payload) {
+            return ['tenant_middleware' => true];
+        });
     }
 
     /**

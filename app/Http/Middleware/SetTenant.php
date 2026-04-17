@@ -9,22 +9,29 @@ use App\Services\Tenant;
 
 class SetTenant
 {
+    // app/Http/Middleware/SetTenant.php
+
     public function handle(Request $request, Closure $next)
     {
         $user = $request->user();
 
         if ($user) {
-            // ✅ Super admin - no tenant context
+            // ✅ [إصلاح] تعيين صلاحية Super Admin مع الاحتفاظ بـ company_id إن وجد
             if ($user->is_super_admin) {
-                Tenant::setId(null);
                 Tenant::setIsSuperAdmin(true);
+                // إذا كان لديه company_id (يعمل داخل شركة)، نضبط السياق عليها
+                if ($user->company_id) {
+                    Tenant::setId($user->company_id);
+                } else {
+                    Tenant::setId(null);
+                }
             }
-            // ✅ Regular user - set company context
+            // ✅ مستخدم عادي - نضبط سياق الشركة
             elseif ($user->company_id) {
                 Tenant::setId($user->company_id);
                 Tenant::setIsSuperAdmin(false);
             }
-            // ❌ User without company - should not happen
+            // ❌ مستخدم بدون شركة (لا يجب أن يحدث)
             else {
                 Tenant::setId(null);
                 Tenant::setIsSuperAdmin(false);

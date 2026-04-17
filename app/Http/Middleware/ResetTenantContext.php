@@ -1,18 +1,17 @@
 <?php
-// app/Http/Middleware/ResetTenantContext.php
 
 namespace App\Http\Middleware;
 
-use Closure;
 use App\Services\Tenant;
 
 class ResetTenantContext
 {
-    public function handle($request, Closure $next)
+    public function handle($job, $next)
     {
-        // ✅ Reset أي context قديم قبل كل request
-        Tenant::reset();
-
-        return $next($request);
+        try {
+            return $next($job);
+        } finally {
+            Tenant::reset();
+        }
     }
 }
