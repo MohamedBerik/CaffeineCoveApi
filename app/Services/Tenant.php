@@ -69,12 +69,16 @@ class Tenant
      */
     public static function isSuperAdmin(): bool
     {
+        // ✅ Manual override
         if (static::$isSuperAdmin !== null) {
             return static::$isSuperAdmin;
         }
 
+        // ✅ From Auth (مع فحص وجود المستخدم أولاً)
         if (Auth::check()) {
-            return Auth::user()->is_super_admin ?? false;
+            $user = Auth::user();
+            // ✅ استخدم property بدل method
+            return $user ? (bool) ($user->is_super_admin ?? false) : false;
         }
 
         return false;
