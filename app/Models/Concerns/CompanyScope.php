@@ -12,31 +12,25 @@ class CompanyScope implements Scope
 {
     public function apply(Builder $builder, Model $model)
     {
-        // ✅ استخدام Tenant بدل Auth (يدعم CLI/Jobs)
+        // ✅ تجاوز الـ Scope لـ Sanctum Guard (Token Authentication)
+        if (request()->is('api/*') && auth()->guard('sanctum')->check() === false) {
+            // لو المستخدم لسه موثوقش، متضفش الـ Scope
+            return;
+        }
+
         $companyId = Tenant::id();
         $isSuperAdmin = Tenant::isSuperAdmin();
 
-        // Super admin يرى كل الشركات
         if ($isSuperAdmin) {
             return;
         }
 
-        // ✅ Performance fix: التحقق من وجود العمود عن طريق property
-        // if (!property_exists($model, 'hasCompanyColumn') || !$model::$hasCompanyColumn) {
-        if (!method_exists($model, 'hasCompanyColumnCheck') || !$model->hasCompanyColumnCheck()) {
-            //مؤقت وارجع تاني للي فوقه
-            return;
-        }
-
-        // مستخدم بدون شركة - يرجع فاضي
         if (!$companyId) {
-            $builder->whereRaw('1 = 0');
+            // ✅ بدل ما نضيف WHERE 1=0، نرجع فاضي بدون Crash
+            // $builder->whereRaw('1 = 0');
             return;
         }
 
-        $builder->where(
-            $model->getTable() . '.company_id',
-            $companyId
-        );
+        $builder->where($model->getTable() . '.company_id', $companyId);
     }
 }
