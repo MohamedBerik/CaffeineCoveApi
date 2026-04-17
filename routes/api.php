@@ -42,12 +42,12 @@ use App\Http\Controllers\API\Erp\RadiologyController;
 use App\Services\Tenant;
 
 
-Route::get('/test-token', function (Request $request) {
-    return response()->json([
-        'user' => $request->user(),
-        'token_works' => true
-    ]);
-})->middleware('auth:sanctum');
+// Route::get('/test-token', function (Request $request) {
+//     return response()->json([
+//         'user' => $request->user(),
+//         'token_works' => true
+//     ]);
+// })->middleware('auth:sanctum');
 /*
 |--------------------------------------------------------------------------
 | Public Routes (No Authentication Required)
