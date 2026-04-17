@@ -33,13 +33,13 @@ class Kernel extends HttpKernel
             \Fruitcake\Cors\HandleCors::class,
             'throttle:api',
             \Illuminate\Routing\Middleware\SubstituteBindings::class,
-            \App\Http\Middleware\SetTenant::class, // ✅ Set tenant context after auth
         ],
     ];
 
     protected $routeMiddleware = [
         // Laravel defaults
         'auth' => \App\Http\Middleware\Authenticate::class,
+        \App\Http\Middleware\SetTenant::class,
         'auth.basic' => \Illuminate\Auth\Middleware\AuthenticateWithBasicAuth::class,
         'cache.headers' => \Illuminate\Http\Middleware\SetCacheHeaders::class,
         'can' => \Illuminate\Auth\Middleware\Authorize::class,

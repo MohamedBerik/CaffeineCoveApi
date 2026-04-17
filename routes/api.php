@@ -42,12 +42,6 @@ use App\Http\Controllers\API\Erp\RadiologyController;
 use App\Services\Tenant;
 
 
-// Route::get('/test-token', function (Request $request) {
-//     return response()->json([
-//         'user' => $request->user(),
-//         'token_works' => true
-//     ]);
-// })->middleware('auth:sanctum');
 /*
 |--------------------------------------------------------------------------
 | Public Routes (No Authentication Required)
@@ -163,7 +157,11 @@ Route::middleware(['auth:sanctum', 'admin', 'company.user', 'throttle:120,1'])
 */
 
 Route::prefix('erp')
-    ->middleware(['auth:sanctum', 'company.user'])
+    ->middleware([
+        'auth:sanctum',
+        'company.user',
+        \App\Http\Middleware\SetTenant::class,
+    ])
     ->group(function () {
 
         // ==================== DASHBOARD & REPORTS ====================
