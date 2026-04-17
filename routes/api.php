@@ -131,24 +131,24 @@ Route::middleware(['auth:sanctum', 'super.admin'])->prefix('admin')->group(funct
 |--------------------------------------------------------------------------
 */
 
-Route::middleware(['auth:sanctum', 'admin', 'company.user', 'throttle:120,1'])
-    ->prefix('admin')
-    ->group(function () {
-        Route::apiResource('categories', CategoryController::class);
-        Route::apiResource('suppliers', SupplierController::class);
-        Route::apiResource('employees', EmployeeController::class);
-        Route::apiResource('users', UserController::class);
-        Route::apiResource('products', ProductController::class);
-        Route::apiResource('sales', SaleController::class);
-        Route::apiResource('appointments', AppointmentController::class);
+// Route::middleware(['auth:sanctum', 'admin', 'company.user', 'throttle:120,1'])
+//     ->prefix('admin')
+//     ->group(function () {
+//         Route::apiResource('categories', CategoryController::class);
+//         Route::apiResource('suppliers', SupplierController::class);
+//         Route::apiResource('employees', EmployeeController::class);
+//         Route::apiResource('users', UserController::class);
+//         Route::apiResource('products', ProductController::class);
+//         Route::apiResource('sales', SaleController::class);
+//         Route::apiResource('appointments', AppointmentController::class);
 
-        // Reservations
-        Route::get('/reservations', [ReservationController::class, 'index']);
-        Route::post('/reservations', [ReservationController::class, 'store']);
-        Route::post('/reservations/{id}/confirm', [ReservationController::class, 'confirm']);
-        Route::post('/reservations/{id}/cancel', [ReservationController::class, 'cancel']);
-        Route::delete('/reservations/{id}', [ReservationController::class, 'destroy']);
-    });
+//         // Reservations
+//         Route::get('/reservations', [ReservationController::class, 'index']);
+//         Route::post('/reservations', [ReservationController::class, 'store']);
+//         Route::post('/reservations/{id}/confirm', [ReservationController::class, 'confirm']);
+//         Route::post('/reservations/{id}/cancel', [ReservationController::class, 'cancel']);
+//         Route::delete('/reservations/{id}', [ReservationController::class, 'destroy']);
+//     });
 
 /*
 |--------------------------------------------------------------------------
