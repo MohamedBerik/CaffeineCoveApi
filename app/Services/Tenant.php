@@ -74,7 +74,7 @@ class Tenant
         }
 
         if (Auth::check()) {
-            return Auth::user()->isSuperAdmin() ?? false;
+            return Auth::user()->is_super_admin ?? false;
         }
 
         return false;
