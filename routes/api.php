@@ -131,24 +131,66 @@ Route::middleware(['auth:sanctum', 'super.admin'])->prefix('admin')->group(funct
 |--------------------------------------------------------------------------
 */
 
-// Route::middleware(['auth:sanctum', 'admin', 'company.user', 'throttle:120,1'])
-//     ->prefix('admin')
-//     ->group(function () {
-//         Route::apiResource('categories', CategoryController::class);
-//         Route::apiResource('suppliers', SupplierController::class);
-//         Route::apiResource('employees', EmployeeController::class);
-//         Route::apiResource('users', UserController::class);
-//         Route::apiResource('products', ProductController::class);
-//         Route::apiResource('sales', SaleController::class);
-//         Route::apiResource('appointments', AppointmentController::class);
+Route::middleware(['auth:sanctum', 'admin', 'company.user', 'throttle:120,1'])
+    ->prefix('admin')
+    ->group(function () {
 
-//         // Reservations
-//         Route::get('/reservations', [ReservationController::class, 'index']);
-//         Route::post('/reservations', [ReservationController::class, 'store']);
-//         Route::post('/reservations/{id}/confirm', [ReservationController::class, 'confirm']);
-//         Route::post('/reservations/{id}/cancel', [ReservationController::class, 'cancel']);
-//         Route::delete('/reservations/{id}', [ReservationController::class, 'destroy']);
-//     });
+        // Categories
+        Route::get('/categories', [CategoryController::class, 'index']);
+        Route::post('/categories', [CategoryController::class, 'store']);
+        Route::get('/categories/{id}', [CategoryController::class, 'show']);
+        Route::put('/categories/{id}', [CategoryController::class, 'update']);
+        Route::delete('/categories/{id}', [CategoryController::class, 'destroy']);
+
+        // Suppliers
+        Route::get('/suppliers', [SupplierController::class, 'index']);
+        Route::post('/suppliers', [SupplierController::class, 'store']);
+        Route::get('/suppliers/{id}', [SupplierController::class, 'show']);
+        Route::put('/suppliers/{id}', [SupplierController::class, 'update']);
+        Route::delete('/suppliers/{id}', [SupplierController::class, 'destroy']);
+
+        // Employees
+        Route::get('/employees', [EmployeeController::class, 'index']);
+        Route::post('/employees', [EmployeeController::class, 'store']);
+        Route::get('/employees/{id}', [EmployeeController::class, 'show']);
+        Route::put('/employees/{id}', [EmployeeController::class, 'update']);
+        Route::delete('/employees/{id}', [EmployeeController::class, 'destroy']);
+
+        // Users
+        Route::get('/users', [UserController::class, 'index']);
+        Route::post('/users', [UserController::class, 'store']);
+        Route::get('/users/{id}', [UserController::class, 'show']);
+        Route::put('/users/{id}', [UserController::class, 'update']);
+        Route::delete('/users/{id}', [UserController::class, 'destroy']);
+
+        // Products
+        Route::get('/products', [ProductController::class, 'index']);
+        Route::post('/products', [ProductController::class, 'store']);
+        Route::get('/products/{id}', [ProductController::class, 'show']);
+        Route::put('/products/{id}', [ProductController::class, 'update']);
+        Route::delete('/products/{id}', [ProductController::class, 'destroy']);
+
+        // Sales
+        Route::get('/sales', [SaleController::class, 'index']);
+        Route::post('/sales', [SaleController::class, 'store']);
+        Route::get('/sales/{id}', [SaleController::class, 'show']);
+        Route::put('/sales/{id}', [SaleController::class, 'update']);
+        Route::delete('/sales/{id}', [SaleController::class, 'destroy']);
+
+        // Appointments
+        Route::get('/appointments', [AppointmentController::class, 'index']);
+        Route::post('/appointments', [AppointmentController::class, 'store']);
+        Route::get('/appointments/{id}', [AppointmentController::class, 'show']);
+        Route::put('/appointments/{id}', [AppointmentController::class, 'update']);
+        Route::delete('/appointments/{id}', [AppointmentController::class, 'destroy']);
+
+        // Reservations
+        Route::get('/reservations', [ReservationController::class, 'index']);
+        Route::post('/reservations', [ReservationController::class, 'store']);
+        Route::post('/reservations/{id}/confirm', [ReservationController::class, 'confirm']);
+        Route::post('/reservations/{id}/cancel', [ReservationController::class, 'cancel']);
+        Route::delete('/reservations/{id}', [ReservationController::class, 'destroy']);
+    });
 
 /*
 |--------------------------------------------------------------------------
