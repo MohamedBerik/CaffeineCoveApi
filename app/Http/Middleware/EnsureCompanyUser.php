@@ -7,26 +7,11 @@ use Illuminate\Http\Request;
 
 class EnsureCompanyUser
 {
+    // app/Http/Middleware/EnsureCompanyUser.php
+
     public function handle(Request $request, Closure $next)
     {
-        $user = $request->user();
-
-        if (!$user) {
-            return response()->json(['message' => 'Unauthenticated'], 401);
-        }
-
-        // ✅ Super admin يعدي (حتى لو company_id = null)
-        if ($user->is_super_admin) {
-            return $next($request);
-        }
-
-        // ❌ مستخدم عادي بدون شركة - ممنوع
-        if (!$user->company_id) {
-            return response()->json([
-                'message' => 'User is not assigned to any company'
-            ], 403);
-        }
-
+        // ✅ علّق كل حاجة مؤقتًا
         return $next($request);
     }
 }
