@@ -14,7 +14,7 @@ class Category extends Model
     /**
      * ✅ Performance fix
      */
-    protected static $hasCompanyColumn = true;
+    // protected static $hasCompanyColumn = true;
 
     protected $fillable = [
         'company_id',

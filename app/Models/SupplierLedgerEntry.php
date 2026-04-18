@@ -12,7 +12,7 @@ class SupplierLedgerEntry extends Model
     use BelongsToCompanyTrait;
 
     // ✅ Performance fix
-    protected static $hasCompanyColumn = true;
+    // protected static $hasCompanyColumn = true;
 
     // ✅ الثوابت
     const TYPE_PURCHASE = 'purchase';

@@ -16,8 +16,6 @@ class User extends Authenticatable
 
     // ✅ Performance fix - تفعيل
     // protected static $hasCompanyColumn = true;
-    // public static bool $hasCompanyColumn = true;
-
 
     // ✅ الثوابت
     const ROLE_SUPER_ADMIN = 'super_admin';
