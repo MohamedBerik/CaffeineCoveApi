@@ -204,7 +204,7 @@ Route::prefix('erp')
     ->middleware([
         'auth:sanctum',
         \App\Http\Middleware\SetTenant::class,
-        'company.user',
+        // 'company.user',
     ])
     ->group(function () {
 
