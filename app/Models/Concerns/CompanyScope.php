@@ -50,17 +50,16 @@ class CompanyScope implements Scope
             return;
         }
 
-        // ✅ حل مؤقت: تجاهل hasCompanyColumn لو الموديل هو User
         if ($model instanceof \App\Models\User) {
-            // متعملش حاجة
-        } else {
-            if (!property_exists(get_class($model), 'hasCompanyColumn') || !$model::$hasCompanyColumn) {
-                return;
-            }
+            return; // مهم جدًا
+        }
+
+        if (!property_exists(get_class($model), 'hasCompanyColumn') || !$model::$hasCompanyColumn) {
+            return;
         }
 
         if (!$companyId) {
-            $companyId = 1;
+            return; // ✅ الحل هنا
         }
 
         $builder->where($model->getTable() . '.company_id', $companyId);
