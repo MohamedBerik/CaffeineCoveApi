@@ -20,8 +20,6 @@ class ErpDashboardController extends Controller
 {
     public function index(Request $request)
     {
-        //مؤقت
-        dd(auth()->user());
 
         $companyId = Tenant::id();
 
