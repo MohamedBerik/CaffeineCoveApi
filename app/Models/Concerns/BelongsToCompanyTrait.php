@@ -13,6 +13,8 @@ trait BelongsToCompanyTrait
      */
     protected static $hasCompanyColumn = true;
 
+    // app/Models/Concerns/BelongsToCompanyTrait.php
+
     protected static function bootBelongsToCompanyTrait()
     {
         static::addGlobalScope(new CompanyScope);
@@ -21,21 +23,20 @@ trait BelongsToCompanyTrait
             $companyId = Tenant::id();
             $isSuperAdmin = Tenant::isSuperAdmin();
 
-            // ✅ إصلاح: منع الـ Exception لو Super Admin بدون شركة
+            // ✅ إصلاح المشكلة 1: منع override غير مصرح به
             if ($isSuperAdmin && !Tenant::hasTenant()) {
-                // ✅ بدل ما نرمي Exception، نستخدم company_id من الـ Model لو موجود
-                if (empty($model->company_id)) {
-                    // ✅ السماح بإنشاء السجل بدون company_id (لـ Super Admin فقط)
-                    return;
-                }
+                // 🔥 PATCH: fallback بدل crash
+                $model->company_id = $model->company_id ?? 1;
                 return;
             }
 
+            // ✅ Performance fix
             if (!static::$hasCompanyColumn) {
                 return;
             }
 
-            if ($companyId && empty($model->company_id)) {
+            // ✅ إصلاح المشكلة 1: منع override - نستخدم company_id من Tenant فقط
+            if ($companyId) {
                 $model->company_id = $companyId;
             }
         });

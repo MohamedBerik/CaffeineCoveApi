@@ -320,7 +320,7 @@ class Appointment extends Model
         static::created(function ($appointment) {
             if (auth()->check()) {
                 ActivityLog::create([
-                    'company_id' => $appointment->company_id,
+                    'company_id' => $appointment->company_id ?? \App\Services\Tenant::id() ?? 1,
                     'user_id' => auth()->id(),
                     'action' => 'appointment.created',
                     'subject_type' => Appointment::class,
@@ -343,7 +343,7 @@ class Appointment extends Model
 
                 if (!empty($changes)) {
                     ActivityLog::create([
-                        'company_id' => $appointment->company_id,
+                        'company_id' => $appointment->company_id ?? \App\Services\Tenant::id() ?? 1,
                         'user_id' => auth()->id(),
                         'action' => 'appointment.updated',
                         'subject_type' => Appointment::class,
@@ -360,7 +360,7 @@ class Appointment extends Model
         static::deleted(function ($appointment) {
             if (auth()->check()) {
                 ActivityLog::create([
-                    'company_id' => $appointment->company_id,
+                    'company_id' => $appointment->company_id ?? \App\Services\Tenant::id() ?? 1,
                     'user_id' => auth()->id(),
                     'action' => 'appointment.deleted',
                     'subject_type' => Appointment::class,

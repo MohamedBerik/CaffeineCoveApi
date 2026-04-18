@@ -129,7 +129,7 @@ class Customer extends Model
         static::created(function ($customer) {
             if (auth()->check()) {
                 ActivityLog::create([
-                    'company_id' => $customer->company_id,
+                    'company_id' => $customer->company_id ?? \App\Services\Tenant::id() ?? 1,
                     'user_id' => auth()->id(),
                     'action' => 'customer.created',
                     'subject_type' => Customer::class,
@@ -150,7 +150,7 @@ class Customer extends Model
 
                 if (!empty($changes)) {
                     ActivityLog::create([
-                        'company_id' => $customer->company_id,
+                        'company_id' => $customer->company_id ?? \App\Services\Tenant::id() ?? 1,
                         'user_id' => auth()->id(),
                         'action' => 'customer.updated',
                         'subject_type' => Customer::class,
@@ -166,7 +166,7 @@ class Customer extends Model
         static::deleted(function ($customer) {
             if (auth()->check()) {
                 ActivityLog::create([
-                    'company_id' => $customer->company_id,
+                    'company_id' => $customer->company_id ?? \App\Services\Tenant::id() ?? 1,
                     'user_id' => auth()->id(),
                     'action' => 'customer.deleted',
                     'subject_type' => Customer::class,

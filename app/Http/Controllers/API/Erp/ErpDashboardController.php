@@ -233,10 +233,10 @@ class ErpDashboardController extends Controller
         $current = $start->copy();
 
         while ($current <= $end) {
-            // ✅ بدون where('company_id')
+            // ✅ بدون where('company_id') + Quick Fix
             $revenue = (float) Payment::query()
                 ->whereDate('paid_at', $current)
-                ->sum('applied_amount');
+                ->sum('applied_amount') ?: 0;
 
             $data[] = [
                 'label' => $this->getLabelForDate($current, $dateRanges),
@@ -260,20 +260,20 @@ class ErpDashboardController extends Controller
         $current = $start->copy();
 
         while ($current <= $end) {
-            // ✅ بدون where('company_id')
+            // ✅ بدون where('company_id') + Quick Fix
             $total = Appointment::query()
                 ->whereDate('appointment_date', $current)
-                ->count();
+                ->count() ?: 0;
 
             $completed = Appointment::query()
                 ->whereDate('appointment_date', $current)
                 ->where('status', 'completed')
-                ->count();
+                ->count() ?: 0;
 
             $cancelled = Appointment::query()
                 ->whereDate('appointment_date', $current)
                 ->where('status', 'cancelled')
-                ->count();
+                ->count() ?: 0;
 
             $data[] = [
                 'label' => $this->getLabelForDate($current, $dateRanges),
@@ -463,10 +463,10 @@ class ErpDashboardController extends Controller
      */
     private function sumRevenue($companyId, Carbon $start, Carbon $end): float
     {
-        // ✅ بدون where('company_id')
+        // ✅ بدون where('company_id') + Quick Fix
         return (float) Payment::query()
             ->whereBetween('paid_at', [$start, $end])
-            ->sum('applied_amount');
+            ->sum('applied_amount') ?: 0;
     }
 
     /**
@@ -474,10 +474,10 @@ class ErpDashboardController extends Controller
      */
     private function countAppointments($companyId, Carbon $start, Carbon $end): int
     {
-        // ✅ بدون where('company_id')
+        // ✅ بدون where('company_id') + Quick Fix
         return Appointment::query()
             ->whereBetween('appointment_date', [$start, $end])
-            ->count();
+            ->count() ?: 0;
     }
 
     /**
@@ -485,21 +485,22 @@ class ErpDashboardController extends Controller
      */
     private function countAppointmentsByStatus($companyId, Carbon $start, Carbon $end, string $status): int
     {
-        // ✅ بدون where('company_id')
+        // ✅ بدون where('company_id') + Quick Fix
         return Appointment::query()
             ->whereBetween('appointment_date', [$start, $end])
             ->where('status', $status)
-            ->count();
+            ->count() ?: 0;
     }
+
     /**
      * Count customers (patients)
      */
     private function countCustomers($companyId, Carbon $start, Carbon $end): int
     {
-        // ✅ بدون where('company_id')
+        // ✅ بدون where('company_id') + Quick Fix
         return Customer::query()
             ->whereBetween('created_at', [$start, $end])
-            ->count();
+            ->count() ?: 0;
     }
 
     /**
@@ -507,11 +508,11 @@ class ErpDashboardController extends Controller
      */
     private function countInvoicesByStatus($companyId, Carbon $start, Carbon $end, string $status): int
     {
-        // ✅ بدون where('company_id')
+        // ✅ بدون where('company_id') + Quick Fix
         return Invoice::query()
             ->where('status', $status)
             ->whereBetween('issued_at', [$start, $end])
-            ->count();
+            ->count() ?: 0;
     }
 
     /**

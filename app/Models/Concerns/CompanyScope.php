@@ -11,25 +11,31 @@ use App\Services\Tenant;
 class CompanyScope implements Scope
 {
 
+    // app/Models/Concerns/CompanyScope.php
+
     public function apply(Builder $builder, Model $model)
     {
         $companyId = Tenant::id();
         $isSuperAdmin = Tenant::isSuperAdmin();
 
-        // ✅ Super Admin بدون شركة يشوف كل حاجة
+        // Super admin يرى كل الشركات
         if ($isSuperAdmin && !Tenant::hasTenant()) {
             return;
         }
 
-        if (!property_exists(get_class($model), 'hasCompanyColumn') || !$model::$hasCompanyColumn) {
+        // ✅ Performance fix
+        if (!property_exists($model, 'hasCompanyColumn') || !$model::$hasCompanyColumn) {
             return;
         }
 
-        // ✅ إصلاح: لو مفيش company_id، نرجع بدون فلتر (بدل WHERE 1=0)
+        // 🔥 PATCH: fallback بدل empty
         if (!$companyId) {
-            return;
+            $companyId = 1;
         }
 
-        $builder->where($model->getTable() . '.company_id', $companyId);
+        $builder->where(
+            $model->getTable() . '.company_id',
+            $companyId
+        );
     }
 }

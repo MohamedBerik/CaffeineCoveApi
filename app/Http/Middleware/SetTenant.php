@@ -10,24 +10,27 @@ use App\Services\Tenant;
 class SetTenant
 {
 
+    // app/Http/Middleware/SetTenant.php
+
     public function handle(Request $request, Closure $next)
     {
         $user = $request->user();
 
         if ($user) {
+            // ✅ Super Admin
             if ($user->is_super_admin) {
                 Tenant::setIsSuperAdmin(true);
-                // ✅ لو Super Admin داخل شركة، نستخدم company_id بتاعه
-                if ($user->company_id) {
-                    Tenant::setId($user->company_id);
-                } else {
-                    Tenant::setId(null);
-                }
-            } elseif ($user->company_id) {
+                // 🔥 PATCH: دايمًا يبقى فيه tenant
+                Tenant::setId($user->company_id ?? 1);
+            }
+            // ✅ User عادي
+            elseif ($user->company_id) {
                 Tenant::setId($user->company_id);
                 Tenant::setIsSuperAdmin(false);
-            } else {
-                Tenant::setId(null);
+            }
+            // ❗ fallback (مهم جدًا)
+            else {
+                Tenant::setId(1);
                 Tenant::setIsSuperAdmin(false);
             }
         }

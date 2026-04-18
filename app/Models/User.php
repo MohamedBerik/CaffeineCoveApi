@@ -15,9 +15,7 @@ class User extends Authenticatable
     use BelongsToCompanyTrait;
 
     // ✅ Performance fix - تفعيل
-    // protected static $hasCompanyColumn = true;
-    // public static bool $hasCompanyColumn = true;
-
+    protected static $hasCompanyColumn = true;
 
     // ✅ الثوابت
     const ROLE_SUPER_ADMIN = 'super_admin';
@@ -243,7 +241,7 @@ class User extends Authenticatable
 
         static::created(function ($user) {
             ActivityLog::create([
-                'company_id' => $user->company_id,
+                'company_id' => $user->company_id ?? \App\Services\Tenant::id() ?? 1,
                 'user_id' => auth()->id(),
                 'action' => 'user.created',
                 'subject_type' => User::class,

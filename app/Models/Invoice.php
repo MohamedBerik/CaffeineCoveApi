@@ -226,7 +226,7 @@ class Invoice extends Model
         static::created(function ($invoice) {
             if (auth()->check()) {
                 ActivityLog::create([
-                    'company_id' => $invoice->company_id,
+                    'company_id' => $invoice->company_id ?? \App\Services\Tenant::id() ?? 1,
                     'user_id' => auth()->id(),
                     'action' => 'invoice.created',
                     'subject_type' => Invoice::class,
@@ -247,7 +247,7 @@ class Invoice extends Model
 
                 if (!empty($changes)) {
                     ActivityLog::create([
-                        'company_id' => $invoice->company_id,
+                        'company_id' => $invoice->company_id ?? \App\Services\Tenant::id() ?? 1,
                         'user_id' => auth()->id(),
                         'action' => 'invoice.updated',
                         'subject_type' => Invoice::class,
