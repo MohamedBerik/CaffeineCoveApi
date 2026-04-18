@@ -381,3 +381,8 @@ Route::prefix('saas')
         Route::get('/onboarding-progress', [ClinicOnboardingController::class, 'progress'])
             ->withoutMiddleware(['auth:sanctum', 'super.admin']);
     });
+
+//testing route
+Route::middleware('auth:sanctum')->get('/test-auth', function (Request $request) {
+    return $request->user();
+});
