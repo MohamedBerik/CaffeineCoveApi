@@ -20,6 +20,8 @@ class ErpDashboardController extends Controller
 {
     public function index(Request $request)
     {
+        dd(auth()->user());
+
         $companyId = Tenant::id();
 
         if (!$companyId && !Tenant::isSuperAdmin()) {
