@@ -6,6 +6,7 @@ namespace App\Http\Controllers\API;
 use App\Http\Controllers\Controller;
 use App\Models\User;
 use App\Models\Company;
+use App\Models\Concerns\CompanyScope;
 use App\Services\Tenant;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -74,7 +75,7 @@ class AuthController extends Controller
         ]);
 
         // ✅ تجاوز الـ Global Scope عشان نقدر ندور على المستخدم
-        $user = User::withoutGlobalScope(\App\Models\Concerns\CompanyScope::class)
+        $user = User::withoutGlobalScope(CompanyScope::class)
             ->where('email', $request->email)
             ->first();
 
