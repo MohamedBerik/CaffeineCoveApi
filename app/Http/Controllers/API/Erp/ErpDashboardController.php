@@ -21,18 +21,18 @@ class ErpDashboardController extends Controller
     public function index(Request $request)
     {
 
-        Log::info('Tenant Debug', [
+        Log::info('Tenant Context', [
             'tenant_id' => Tenant::id(),
             'is_super_admin' => Tenant::isSuperAdmin(),
+            'has_tenant' => Tenant::hasTenant(),
             'user_id' => auth()->id(),
         ]);
 
         $companyId = Tenant::id();
 
-        if (!$companyId) {
+        if (!$companyId && !Tenant::isSuperAdmin()) {
             return response()->json([
                 'msg' => 'Please select a company to view the dashboard',
-                'status' => 403
             ], 403);
         }
 
