@@ -14,21 +14,26 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
 use App\Services\Tenant; // ✅ استخدام Tenant
-
+use Illuminate\Support\Facades\Log;
 
 class ErpDashboardController extends Controller
 {
     public function index(Request $request)
     {
 
+        Log::info('Tenant Debug', [
+            'tenant_id' => Tenant::id(),
+            'is_super_admin' => Tenant::isSuperAdmin(),
+            'user_id' => auth()->id(),
+        ]);
+
         $companyId = Tenant::id();
 
-        if (!$companyId && !Tenant::isSuperAdmin()) {
+        if (!$companyId) {
             return response()->json([
-                'msg' => 'No company context',
-                'status' => 200,
-                'data' => [],
-            ]);
+                'msg' => 'Please select a company to view the dashboard',
+                'status' => 403
+            ], 403);
         }
 
         $range = $request->get('range', 'day');
