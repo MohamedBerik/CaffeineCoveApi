@@ -12,7 +12,6 @@ class Employee extends Model
     use BelongsToCompanyTrait;
 
     // ✅ Performance fix
-    public static $hasCompanyColumn = true;
 
     protected $fillable = [
         'company_id',

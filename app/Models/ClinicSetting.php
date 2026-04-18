@@ -11,7 +11,6 @@ class ClinicSetting extends Model
     use BelongsToCompanyTrait;
 
     // ✅ Performance fix - ضروري
-    public static $hasCompanyColumn = true;
 
     protected $fillable = [
         'company_id',

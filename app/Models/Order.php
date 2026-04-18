@@ -12,7 +12,6 @@ class Order extends Model
     use BelongsToCompanyTrait;
 
     // ✅ Performance fix
-    public static $hasCompanyColumn = true;
 
     // ✅ الثوابت
     const STATUS_PENDING = 'pending';
