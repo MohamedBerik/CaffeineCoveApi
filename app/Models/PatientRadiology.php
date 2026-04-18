@@ -14,7 +14,7 @@ class PatientRadiology extends Model
     use BelongsToCompanyTrait;
 
     // ✅ Performance fix
-    protected static $hasCompanyColumn = true;
+    public static $hasCompanyColumn = true;
 
     // ✅ الثوابت
     const TYPE_XRAY = 'xray';

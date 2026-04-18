@@ -17,7 +17,7 @@ class Company extends Model
     const STATUS_CANCELLED = 'cancelled';
 
     // ✅ Performance fix - الجدول ده مش بيحتوي company_id
-    protected static $hasCompanyColumn = false;
+    public static $hasCompanyColumn = false;
 
     protected $fillable = [
         'name',

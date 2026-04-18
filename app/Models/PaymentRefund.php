@@ -12,7 +12,7 @@ class PaymentRefund extends Model
     use BelongsToCompanyTrait;
 
     // ✅ Performance fix
-    protected static $hasCompanyColumn = true;
+    public static $hasCompanyColumn = true;
 
     // ✅ الثوابت
     const APPLIES_TO_INVOICE = 'invoice';
