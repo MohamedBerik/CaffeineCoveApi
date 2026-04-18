@@ -10,7 +10,6 @@ class ActivityLog extends Model
 {
     use HasFactory;
     use BelongsToCompanyTrait;
-    public static $hasCompanyColumn = true;
 
     protected $fillable = [
         'company_id',
