@@ -58,13 +58,14 @@ class Handler extends ExceptionHandler
     /**
      * Render an exception into an HTTP response.
      */
-    // app/Exceptions/Handler.php
-
     public function render($request, Throwable $e)
     {
-        return response()->json([
-            'error' => $e->getMessage(),
-        ], 500);
+        // ✅ توحيد استجابات API
+        if ($request->expectsJson() || $request->is('api/*')) {
+            return $this->handleApiException($request, $e);
+        }
+
+        return parent::render($request, $e);
     }
 
     /**

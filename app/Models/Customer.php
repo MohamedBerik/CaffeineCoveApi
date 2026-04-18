@@ -12,6 +12,7 @@ class Customer extends Model
     use BelongsToCompanyTrait;
 
     // ✅ Performance fix
+    protected static $hasCompanyColumn = true;
 
     // ✅ الثوابت
     const STATUS_ACTIVE = '1';
@@ -128,7 +129,7 @@ class Customer extends Model
         static::created(function ($customer) {
             if (auth()->check()) {
                 ActivityLog::create([
-                    'company_id' => $customer->company_id ?? \App\Services\Tenant::id() ?? 1,
+                    'company_id' => $customer->company_id,
                     'user_id' => auth()->id(),
                     'action' => 'customer.created',
                     'subject_type' => Customer::class,
@@ -149,7 +150,7 @@ class Customer extends Model
 
                 if (!empty($changes)) {
                     ActivityLog::create([
-                        'company_id' => $customer->company_id ?? \App\Services\Tenant::id() ?? 1,
+                        'company_id' => $customer->company_id,
                         'user_id' => auth()->id(),
                         'action' => 'customer.updated',
                         'subject_type' => Customer::class,
@@ -165,7 +166,7 @@ class Customer extends Model
         static::deleted(function ($customer) {
             if (auth()->check()) {
                 ActivityLog::create([
-                    'company_id' => $customer->company_id ?? \App\Services\Tenant::id() ?? 1,
+                    'company_id' => $customer->company_id,
                     'user_id' => auth()->id(),
                     'action' => 'customer.deleted',
                     'subject_type' => Customer::class,

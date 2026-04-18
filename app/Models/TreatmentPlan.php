@@ -12,6 +12,7 @@ class TreatmentPlan extends Model
     use BelongsToCompanyTrait;
 
     // ✅ Performance fix
+    protected static $hasCompanyColumn = true;
 
     // ✅ الثوابت
     const STATUS_ACTIVE = 'active';

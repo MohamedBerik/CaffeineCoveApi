@@ -12,6 +12,7 @@ class Payment extends Model
     use BelongsToCompanyTrait;
 
     // ✅ Performance fix
+    protected static $hasCompanyColumn = true;
 
     // ✅ الثوابت
     const METHOD_CASH = 'cash';
@@ -154,7 +155,7 @@ class Payment extends Model
         static::created(function ($payment) {
             $userId = auth()->id() ?? null;
             ActivityLog::create([
-                'company_id' => $payment->company_id ?? \App\Services\Tenant::id() ?? 1,
+                'company_id' => $payment->company_id,
                 'user_id' => $userId,
                 'action' => 'payment.created',
                 'subject_type' => Payment::class,
@@ -174,7 +175,7 @@ class Payment extends Model
 
                 if (!empty($changes)) {
                     ActivityLog::create([
-                        'company_id' => $payment->company_id ?? \App\Services\Tenant::id() ?? 1,
+                        'company_id' => $payment->company_id,
                         'user_id' => auth()->id(),
                         'action' => 'payment.updated',
                         'subject_type' => Payment::class,
@@ -190,7 +191,7 @@ class Payment extends Model
         static::deleted(function ($payment) {
             if (auth()->check()) {
                 ActivityLog::create([
-                    'company_id' => $payment->company_id ?? \App\Services\Tenant::id() ?? 1,
+                    'company_id' => $payment->company_id,
                     'user_id' => auth()->id(),
                     'action' => 'payment.deleted',
                     'subject_type' => Payment::class,

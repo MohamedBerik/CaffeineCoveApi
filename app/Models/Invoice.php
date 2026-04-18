@@ -13,6 +13,7 @@ class Invoice extends Model
     use BelongsToCompanyTrait;
 
     // ✅ Performance fix
+    protected static $hasCompanyColumn = true;
 
     // ✅ الثوابت
     const STATUS_UNPAID = 'unpaid';
@@ -225,7 +226,7 @@ class Invoice extends Model
         static::created(function ($invoice) {
             if (auth()->check()) {
                 ActivityLog::create([
-                    'company_id' => $invoice->company_id ?? \App\Services\Tenant::id() ?? 1,
+                    'company_id' => $invoice->company_id,
                     'user_id' => auth()->id(),
                     'action' => 'invoice.created',
                     'subject_type' => Invoice::class,
@@ -246,7 +247,7 @@ class Invoice extends Model
 
                 if (!empty($changes)) {
                     ActivityLog::create([
-                        'company_id' => $invoice->company_id ?? \App\Services\Tenant::id() ?? 1,
+                        'company_id' => $invoice->company_id,
                         'user_id' => auth()->id(),
                         'action' => 'invoice.updated',
                         'subject_type' => Invoice::class,

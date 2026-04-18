@@ -12,6 +12,7 @@ class JournalLine extends Model
     use BelongsToCompanyTrait;
 
     // ✅ Performance fix
+    protected static $hasCompanyColumn = true;
 
     protected $fillable = [
         'company_id',

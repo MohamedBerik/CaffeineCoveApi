@@ -13,6 +13,7 @@ class SystemAlert extends Model
     use BelongsToCompanyTrait;
 
     // ✅ Performance fix
+    protected static $hasCompanyColumn = true;
 
     // ✅ الثوابت
     const TYPE_STOCK = 'stock';
