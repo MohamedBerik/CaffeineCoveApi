@@ -40,7 +40,7 @@ class CompanyScope implements Scope
     // }
 
 
-    //for testing
+    //for testing only
     public function apply(Builder $builder, Model $model)
     {
         $companyId = Tenant::id();

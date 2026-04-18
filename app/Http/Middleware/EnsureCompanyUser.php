@@ -20,7 +20,7 @@ class EnsureCompanyUser
         //     return response()->json(['message' => 'Unauthenticated'], 401);
         // }
 
-        // 🔥 مؤقت
+        // 🔥 مؤقت للتجربة فقط
         if (!$user) {
             return $next($request);
         }
