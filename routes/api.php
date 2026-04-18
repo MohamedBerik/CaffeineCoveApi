@@ -43,6 +43,7 @@ use App\Services\Tenant;
 
 use App\Http\Controllers\API\SaaS\TenantController;
 use App\Http\Controllers\API\SaaS\ClinicOnboardingController;
+use App\Http\Middleware\SetTenant;
 
 /*
 |--------------------------------------------------------------------------
@@ -203,8 +204,8 @@ Route::middleware(['auth:sanctum', 'admin', 'company.user', 'throttle:120,1'])
 Route::prefix('erp')
     ->middleware([
         'auth:sanctum',
+        SetTenant::class,
         'company.user',
-        \App\Http\Middleware\SetTenant::class,
     ])
     ->group(function () {
 

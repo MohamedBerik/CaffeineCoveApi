@@ -16,14 +16,14 @@ class EnsureCompanyUser
     {
         $user = $request->user();
 
-        // if (!$user) {
-        //     return response()->json(['message' => 'Unauthenticated'], 401);
-        // }
+        if (!$user) {
+            return response()->json(['message' => 'Unauthenticated'], 401);
+        }
 
         // 🔥 مؤقت للتجربة فقط
-        if (!$user) {
-            return $next($request);
-        }
+        // if (!$user) {
+        //     return $next($request);
+        // }
 
         // ✅ [إصلاح] السماح لـ Super Admin بالمرور فقط إذا لم يكن في سياق شركة
         if (Tenant::isSuperAdmin() && !Tenant::hasTenant()) {
