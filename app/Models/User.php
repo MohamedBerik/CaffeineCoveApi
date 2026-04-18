@@ -6,6 +6,7 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
 use App\Models\Concerns\BelongsToCompanyTrait;
+use App\Services\Tenant;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 
 class User extends Authenticatable
@@ -233,6 +234,18 @@ class User extends Authenticatable
 
     protected static function booted()
     {
+        static::addGlobalScope('exclude_auth_routes', function ($builder) {
+            // ✅ استثناء Routes المصادقة من الـ Tenant Scope
+            if (request()->is('api/login') || request()->is('api/register') || request()->is('api/logout')) {
+                return;
+            }
+
+            // ✅ استثناء Sanctum نفسه أثناء التحقق من التوكن
+            if (auth()->guest() && !Tenant::hasTenant()) {
+                return;
+            }
+        });
+
         static::creating(function ($user) {
             if (!$user->status) {
                 $user->status = self::STATUS_ACTIVE;

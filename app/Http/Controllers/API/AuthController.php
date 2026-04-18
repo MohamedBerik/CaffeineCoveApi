@@ -9,6 +9,7 @@ use App\Models\Company;
 use App\Services\Tenant;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 
 class AuthController extends Controller
@@ -65,6 +66,8 @@ class AuthController extends Controller
      */
     public function login(Request $request)
     {
+        Log::info('Authorization Header:', ['header' => $request->header('Authorization')]);
+
         $request->validate([
             'email' => 'required|email',
             'password' => 'required|string',
