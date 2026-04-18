@@ -32,6 +32,8 @@ class Kernel extends HttpKernel
             \Fruitcake\Cors\HandleCors::class,
             'throttle:api',
             \Illuminate\Routing\Middleware\SubstituteBindings::class,
+            \App\Http\Middleware\SetTenant::class, // ✅ تأكد من وجوده
+
         ],
     ];
 
