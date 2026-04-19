@@ -24,7 +24,10 @@ use App\Policies\CustomerPolicy;
 use App\Policies\DentalRecordPolicy;
 use App\Policies\DoctorPolicy;
 use App\Policies\InvoicePolicy;
+use App\Policies\OrderPolicy;
 use App\Policies\PatientRadiologyPolicy;
+use App\Policies\ProcedurePolicy;
+use App\Policies\PurchaseOrderPolicy;
 use App\Policies\SupplierPolicy;
 use App\Policies\SystemAlertPolicy;
 use App\Policies\TreatmentPlanPolicy;
@@ -41,15 +44,15 @@ class AuthServiceProvider extends ServiceProvider
      */
     protected $policies = [
         Appointment::class => AppointmentPolicy::class,
-        Invoice::class => InvoicePolicy::class, // ✅ أضف السطر ده
-        Customer::class => CustomerPolicy::class, // ✅ أضف السطر ده
-        SystemAlert::class => SystemAlertPolicy::class, // ✅ أضف السطر ده
-        ActivityLog::class => ActivityLogPolicy::class, // ✅ أضف السطر ده
-        DentalRecord::class => DentalRecordPolicy::class, // ✅ أضف السطر ده
-        Doctor::class => DoctorPolicy::class, // ✅ أضف السطر ده
-        \App\Models\Order::class => \App\Policies\OrderPolicy::class,
-        \App\Models\Procedure::class => \App\Policies\ProcedurePolicy::class,
-        \App\Models\PurchaseOrder::class => \App\Policies\PurchaseOrderPolicy::class,
+        Invoice::class => InvoicePolicy::class,
+        Customer::class => CustomerPolicy::class,
+        SystemAlert::class => SystemAlertPolicy::class,
+        ActivityLog::class => ActivityLogPolicy::class,
+        DentalRecord::class => DentalRecordPolicy::class,
+        Doctor::class => DoctorPolicy::class,
+        Order::class => OrderPolicy::class,
+        Procedure::class => ProcedurePolicy::class,
+        PurchaseOrder::class => PurchaseOrderPolicy::class,
         PatientRadiology::class => PatientRadiologyPolicy::class,
         Supplier::class => SupplierPolicy::class,
         TreatmentPlan::class => TreatmentPlanPolicy::class,
