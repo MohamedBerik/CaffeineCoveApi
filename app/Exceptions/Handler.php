@@ -41,7 +41,6 @@ class Handler extends ExceptionHandler
     public function register(): void
     {
         $this->reportable(function (Throwable $e) {
-            // ✅ تسجيل الأخطاء مع Tenant Context
             if (Tenant::hasTenant() && app()->environment('production')) {
                 Log::error('Exception in tenant context', [
                     'company_id' => Tenant::id(),
@@ -60,84 +59,19 @@ class Handler extends ExceptionHandler
      */
     public function render($request, Throwable $e)
     {
-        // ✅ توحيد استجابات API
+        // ✅ إجبار ظهور تفاصيل الخطأ في الـ API
         if ($request->expectsJson() || $request->is('api/*')) {
-            return $this->handleApiException($request, $e);
+            return response()->json([
+                'msg' => 'Server Error',
+                'status' => 500,
+                'error' => $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+                'trace' => explode("\n", $e->getTraceAsString()),
+                'tenant_id' => Tenant::id(),
+            ], 500);
         }
 
         return parent::render($request, $e);
-    }
-
-    /**
-     * Handle API exceptions with unified response format
-     */
-    protected function handleApiException($request, Throwable $e)
-    {
-        $statusCode = 500;
-        $message = 'Server Error';
-        $errors = null;
-
-        if ($e instanceof AuthenticationException) {
-            $statusCode = 401;
-            $message = 'Unauthenticated';
-        } elseif ($e instanceof AuthorizationException) {
-            $statusCode = 403;
-            $message = 'Unauthorized';
-        } elseif ($e instanceof ModelNotFoundException) {
-            $statusCode = 404;
-            $message = 'Resource not found';
-        } elseif ($e instanceof NotFoundHttpException) {
-            $statusCode = 404;
-            $message = 'Endpoint not found';
-        } elseif ($e instanceof ValidationException) {
-            $statusCode = 422;
-            $message = 'Validation failed';
-            $errors = $e->errors();
-        } elseif ($e instanceof ThrottleRequestsException) {
-            $statusCode = 429;
-            $message = 'Too many requests';
-        } elseif ($e instanceof \Illuminate\Database\QueryException) {
-            if ((string) $e->getCode() === '23000') {
-                $statusCode = 409;
-                $message = 'Duplicate entry or constraint violation';
-            }
-        }
-
-        $response = [
-            'msg' => $message,
-            'status' => $statusCode,
-        ];
-
-        if ($errors) {
-            $response['errors'] = $errors;
-        }
-
-        // ✅ إضافة تفاصيل في بيئة التطوير
-        if (app()->environment('local', 'development') && !$e instanceof ValidationException) {
-            $response['debug'] = [
-                'exception' => get_class($e),
-                'message' => $e->getMessage(),
-                'file' => $e->getFile(),
-                'line' => $e->getLine(),
-            ];
-        }
-
-        // ✅ إضافة Tenant Context في الـ Response (للتتبع)
-        if (Tenant::hasTenant()) {
-            $response['tenant_id'] = Tenant::id();
-        }
-
-        return response()->json($response, $statusCode);
-    }
-
-    /**
-     * Convert an authentication exception into a response.
-     */
-    protected function unauthenticated($request, AuthenticationException $exception)
-    {
-        return response()->json([
-            'msg' => 'Unauthenticated',
-            'status' => 401,
-        ], 401);
     }
 }
