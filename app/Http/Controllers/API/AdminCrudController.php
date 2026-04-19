@@ -38,6 +38,23 @@ class AdminCrudController extends Controller
     }
 
     /**
+     * ✅ التحقق من صلاحية الوصول للـ Admin CRUD
+     */
+    private function authorizeAdminAccess(): void
+    {
+        $user = auth()->user();
+
+        if (!$user) {
+            abort(401, 'Unauthenticated');
+        }
+
+        // Super Admin or Company Admin only
+        if (!$user->is_super_admin && $user->role !== 'admin') {
+            abort(403, 'Unauthorized. Admin access required.');
+        }
+    }
+
+    /**
      * ✅ تطبيق فلترة الـ Tenant باستخدام Tenant Service
      */
     private function applyTenantFilter($query, string $table)
@@ -62,6 +79,7 @@ class AdminCrudController extends Controller
      */
     public function index(Request $request, string $table)
     {
+        $this->authorizeAdminAccess();
         $this->checkTable($table);
 
         $query = DB::table($table);
@@ -100,6 +118,7 @@ class AdminCrudController extends Controller
      */
     public function show(Request $request, string $table, int $id)
     {
+        $this->authorizeAdminAccess();
         $this->checkTable($table);
 
         $query = DB::table($table);
@@ -122,6 +141,7 @@ class AdminCrudController extends Controller
      */
     public function store(Request $request, string $table)
     {
+        $this->authorizeAdminAccess();
         $this->checkTable($table);
 
         $data = $request->except(['id', 'created_at', 'updated_at']);
@@ -161,6 +181,7 @@ class AdminCrudController extends Controller
      */
     public function update(Request $request, string $table, int $id)
     {
+        $this->authorizeAdminAccess();
         $this->checkTable($table);
 
         $data = $request->except(['id', 'created_at', 'company_id']); // ✅ منع تعديل company_id
@@ -196,6 +217,7 @@ class AdminCrudController extends Controller
      */
     public function destroy(Request $request, string $table, int $id)
     {
+        $this->authorizeAdminAccess();
         $this->checkTable($table);
 
         $query = DB::table($table);
