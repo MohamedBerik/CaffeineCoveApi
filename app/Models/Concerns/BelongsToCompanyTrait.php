@@ -11,7 +11,7 @@ trait BelongsToCompanyTrait
     /**
      * ✅ Performance fix
      */
-    protected static $hasCompanyColumn = true;
+    public static $hasCompanyColumn = true;
 
     protected static function bootBelongsToCompanyTrait()
     {
