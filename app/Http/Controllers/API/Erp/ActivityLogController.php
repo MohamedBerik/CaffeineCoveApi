@@ -13,12 +13,8 @@ class ActivityLogController extends Controller
     {
         $limit = (int) $request->get('limit', 6);
 
+        // ✅ الاعتماد على Global Scope فقط
         $query = ActivityLog::query();
-
-        // ✅ [إصلاح] طبقة حماية ثانية: فلترة حسب company_id إذا لم يكن المستخدم Super Admin
-        if (!Tenant::isSuperAdmin()) {
-            $query->where('company_id', Tenant::id());
-        }
 
         $logs = $query
             ->when(

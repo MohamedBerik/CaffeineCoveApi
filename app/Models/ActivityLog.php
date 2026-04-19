@@ -10,7 +10,9 @@ class ActivityLog extends Model
 {
     use HasFactory;
     use BelongsToCompanyTrait;
-    // protected static $hasCompanyColumn = true;
+
+    // ✅ رجع السطر ده
+    protected static $hasCompanyColumn = true;
 
     protected $fillable = [
         'company_id',
@@ -19,12 +21,12 @@ class ActivityLog extends Model
         'subject_type',
         'subject_id',
         'properties'
-
     ];
 
     protected $casts = [
         'properties' => 'array'
     ];
+
     public function company()
     {
         return $this->belongsTo(Company::class);

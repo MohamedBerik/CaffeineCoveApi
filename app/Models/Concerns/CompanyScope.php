@@ -11,55 +11,30 @@ use App\Services\Tenant;
 class CompanyScope implements Scope
 {
 
-    // app/Models/Concerns/CompanyScope.php
-
-    // public function apply(Builder $builder, Model $model)
-    // {
-    //     $companyId = Tenant::id();
-    //     $isSuperAdmin = Tenant::isSuperAdmin();
-
-    //     // Super admin يرى كل الشركات
-    //     if ($isSuperAdmin && !Tenant::hasTenant()) {
-    //         return;
-    //     }
-
-    //     // ✅ Performance fix
-    //     if (!property_exists($model, 'hasCompanyColumn') || !$model::$hasCompanyColumn) {
-    //         return;
-    //     }
-
-    //     // 🔥 PATCH: fallback بدل empty
-    //     if (!$companyId) {
-    //         $companyId = 1;
-    //     }
-
-    //     $builder->where(
-    //         $model->getTable() . '.company_id',
-    //         $companyId
-    //     );
-    // }
-
-
-    //for testing only
     public function apply(Builder $builder, Model $model)
     {
         $companyId = Tenant::id();
         $isSuperAdmin = Tenant::isSuperAdmin();
 
+        // ✅ Super Admin بدون شركة = يشوف كل حاجة
         if ($isSuperAdmin && !Tenant::hasTenant()) {
             return;
         }
 
+        // ✅ تجاهل User Model عشان Sanctum
         if ($model instanceof \App\Models\User) {
-            return; // مهم جدًا
+            return;
         }
 
+        // ✅ التحقق من وجود hasCompanyColumn
         if (!property_exists(get_class($model), 'hasCompanyColumn') || !$model::$hasCompanyColumn) {
             return;
         }
 
+        // ✅ أمان: لو مفيش company_id، ارجع فاضي (مافيش تسريب بيانات)
         if (!$companyId) {
-            return; // ✅ الحل هنا
+            $builder->whereRaw('1 = 0');
+            return;
         }
 
         $builder->where($model->getTable() . '.company_id', $companyId);
