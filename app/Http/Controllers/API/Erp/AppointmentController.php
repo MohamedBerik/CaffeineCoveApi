@@ -35,6 +35,11 @@ class AppointmentController extends Controller
 {
     use ValidatesAppointments, HandlesAppointmentReminders;
 
+    public function __construct()
+    {
+        $this->authorizeResource(Appointment::class, 'appointment');
+    }
+
     public function index(Request $request)
     {
         $query = Appointment::query()

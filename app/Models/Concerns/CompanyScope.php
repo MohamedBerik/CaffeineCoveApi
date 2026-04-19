@@ -10,7 +10,6 @@ use App\Services\Tenant;
 
 class CompanyScope implements Scope
 {
-
     public function apply(Builder $builder, Model $model)
     {
         $companyId = Tenant::id();
@@ -29,6 +28,11 @@ class CompanyScope implements Scope
         // ✅ التحقق من وجود hasCompanyColumn
         if (!property_exists(get_class($model), 'hasCompanyColumn') || !$model::$hasCompanyColumn) {
             return;
+        }
+
+        // ✅ Fail-Safe: لو مفيش company_id والمستخدم مش Super Admin، ارمي Exception
+        if (!$companyId && !$isSuperAdmin) {
+            throw new \Exception('Tenant context not resolved for model: ' . get_class($model));
         }
 
         // ✅ أمان: لو مفيش company_id، ارجع فاضي (مافيش تسريب بيانات)
