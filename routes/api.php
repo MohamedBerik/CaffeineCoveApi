@@ -6,7 +6,6 @@ use App\Http\Controllers\API\AuthController;
 use App\Http\Controllers\API\UserController;
 use App\Http\Controllers\API\SaleController;
 use App\Http\Controllers\API\ReservationController;
-use App\Http\Controllers\AdminDashboardController;
 use App\Http\Controllers\API\AdminCrudController;
 
 // ERP Controllers
