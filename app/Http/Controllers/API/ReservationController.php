@@ -7,10 +7,15 @@ use App\Mail\ReservationConfirmed;
 use App\Models\Reservation;
 use App\Services\Tenant;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 
 class ReservationController extends Controller
 {
+    public function __construct()
+    {
+        $this->authorizeResource(Reservation::class, 'reservation');
+    }
     /**
      * Get all reservations for current company
      */
@@ -86,7 +91,7 @@ class ReservationController extends Controller
             Mail::to($reservation->email)
                 ->send(new ReservationConfirmed($reservation));
         } catch (\Exception $e) {
-            \Log::error('Failed to send reservation confirmation email', [
+            Log::error('Failed to send reservation confirmation email', [
                 'reservation_id' => $reservation->id,
                 'error' => $e->getMessage(),
             ]);

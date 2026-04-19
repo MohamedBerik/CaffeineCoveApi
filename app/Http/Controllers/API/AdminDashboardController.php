@@ -23,6 +23,18 @@ class AdminDashboardController extends Controller
 {
     public function index(Request $request): JsonResponse
     {
+        // ✅ التحقق من صلاحية الوصول للـ Admin Dashboard
+        $user = auth()->user();
+
+        if (!$user) {
+            return response()->json(['message' => 'Unauthenticated'], 401);
+        }
+
+        // Regular users cannot access admin dashboard
+        if (!$user->is_super_admin && $user->role !== 'admin') {
+            return response()->json(['message' => 'Unauthorized. Admin access required.'], 403);
+        }
+
         // ✅ Super Admin - يشوف كل الشركات
         if (Tenant::isSuperAdmin()) {
             return $this->superAdminDashboard($request);

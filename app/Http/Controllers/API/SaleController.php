@@ -12,6 +12,11 @@ use Illuminate\Validation\Rule;
 
 class SaleController extends Controller
 {
+    public function __construct()
+    {
+        $this->authorizeResource(Sale::class, 'sale');
+    }
+
     public function index()
     {
         $sales = SaleResource::collection(

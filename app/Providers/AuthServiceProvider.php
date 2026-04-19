@@ -16,6 +16,8 @@ use App\Models\Payment;
 use App\Models\Procedure;
 use App\Models\Product;
 use App\Models\PurchaseOrder;
+use App\Models\Reservation;
+use App\Models\Sale;
 use App\Models\Supplier;
 use App\Models\SystemAlert;
 use App\Models\TreatmentPlan;
@@ -33,9 +35,12 @@ use App\Policies\PatientRadiologyPolicy;
 use App\Policies\ProcedurePolicy;
 use App\Policies\ProductPolicy;
 use App\Policies\PurchaseOrderPolicy;
+use App\Policies\ReservationPolicy;
+use App\Policies\SalePolicy;
 use App\Policies\SupplierPolicy;
 use App\Policies\SystemAlertPolicy;
 use App\Policies\TreatmentPlanPolicy;
+use App\Policies\UserPolicy;
 use App\Services\Tenant;
 use Illuminate\Foundation\Support\Providers\AuthServiceProvider as ServiceProvider;
 use Illuminate\Support\Facades\Gate;
@@ -64,6 +69,9 @@ class AuthServiceProvider extends ServiceProvider
         Product::class => ProductPolicy::class,
         Employee::class => EmployeePolicy::class,
         Category::class => CategoryPolicy::class,
+        User::class => UserPolicy::class,
+        Sale::class => SalePolicy::class,
+        Reservation::class => ReservationPolicy::class,
 
 
     ];
