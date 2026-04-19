@@ -12,6 +12,11 @@ use Illuminate\Support\Facades\Validator;
 
 class ProductController extends Controller
 {
+    public function __construct()
+    {
+        $this->authorizeResource(Product::class, 'product');
+    }
+
     public function index(Request $request)
     {
         $products = ProductResource::collection(

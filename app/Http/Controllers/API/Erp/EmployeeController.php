@@ -13,6 +13,11 @@ use Illuminate\Support\Facades\Hash;
 
 class EmployeeController extends Controller
 {
+    public function __construct()
+    {
+        $this->authorizeResource(Employee::class, 'employee');
+    }
+
     public function index(Request $request)
     {
         $employees = EmployeeResource::collection(

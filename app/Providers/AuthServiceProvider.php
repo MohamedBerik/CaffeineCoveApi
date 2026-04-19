@@ -4,9 +4,11 @@ namespace App\Providers;
 
 use App\Models\ActivityLog;
 use App\Models\Appointment;
+use App\Models\Category;
 use App\Models\Customer;
 use App\Models\DentalRecord;
 use App\Models\Doctor;
+use App\Models\Employee;
 use App\Models\Invoice;
 use App\Models\Order;
 use App\Models\PatientRadiology;
@@ -20,13 +22,16 @@ use App\Models\TreatmentPlan;
 use App\Models\User;
 use App\Policies\ActivityLogPolicy;
 use App\Policies\AppointmentPolicy;
+use App\Policies\CategoryPolicy;
 use App\Policies\CustomerPolicy;
 use App\Policies\DentalRecordPolicy;
 use App\Policies\DoctorPolicy;
+use App\Policies\EmployeePolicy;
 use App\Policies\InvoicePolicy;
 use App\Policies\OrderPolicy;
 use App\Policies\PatientRadiologyPolicy;
 use App\Policies\ProcedurePolicy;
+use App\Policies\ProductPolicy;
 use App\Policies\PurchaseOrderPolicy;
 use App\Policies\SupplierPolicy;
 use App\Policies\SystemAlertPolicy;
@@ -56,6 +61,9 @@ class AuthServiceProvider extends ServiceProvider
         PatientRadiology::class => PatientRadiologyPolicy::class,
         Supplier::class => SupplierPolicy::class,
         TreatmentPlan::class => TreatmentPlanPolicy::class,
+        Product::class => ProductPolicy::class,
+        Employee::class => EmployeePolicy::class,
+        Category::class => CategoryPolicy::class,
 
 
     ];
