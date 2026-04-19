@@ -18,17 +18,16 @@ class SetTenant
         $user = $request->user();
 
         if ($user) {
+            $tenantIdFromHeader = $request->header('X-Tenant-ID');
+
             // ✅ Super Admin
             if ($user->is_super_admin) {
                 Tenant::setIsSuperAdmin(true);
 
-                // ✅ قراءة الشركة المختارة من session
-                $sessionCompany = session('tenant_id');
-
-                if ($sessionCompany) {
-                    Tenant::setId($sessionCompany);
+                if ($tenantIdFromHeader) {
+                    Tenant::setId($tenantIdFromHeader);
                 } else {
-                    Tenant::setId(null);
+                    Tenant::setId(null); // Global Mode
                 }
             }
             // ✅ مستخدم عادي
@@ -42,6 +41,13 @@ class SetTenant
                 Tenant::setIsSuperAdmin(false);
             }
         }
+
+        // ✅ Debug Log
+        Log::info('Tenant Check', [
+            'tenant_id' => Tenant::id(),
+            'header' => $request->header('X-Tenant-ID'),
+            'user_id' => $user->id ?? null,
+        ]);
 
         return $next($request);
     }
