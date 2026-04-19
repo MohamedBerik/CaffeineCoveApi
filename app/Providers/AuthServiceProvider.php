@@ -14,6 +14,7 @@ use App\Models\PurchaseOrder;
 use App\Models\Supplier;
 use App\Models\TreatmentPlan;
 use App\Models\User;
+use App\Policies\AppointmentPolicy;
 use App\Services\Tenant;
 use Illuminate\Foundation\Support\Providers\AuthServiceProvider as ServiceProvider;
 use Illuminate\Support\Facades\Gate;
@@ -26,7 +27,7 @@ class AuthServiceProvider extends ServiceProvider
      * @var array<class-string, class-string>
      */
     protected $policies = [
-        // 'App\Models\Model' => 'App\Policies\ModelPolicy',
+        Appointment::class => AppointmentPolicy::class,
     ];
 
     /**

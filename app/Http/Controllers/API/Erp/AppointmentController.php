@@ -282,6 +282,9 @@ class AppointmentController extends Controller
             ])
             ->findOrFail($id);
 
+        // ✅ التحقق من الصلاحية
+        $this->authorize('view', $appointment);
+
         $planItem = \App\Models\TreatmentPlanItem::query()
             ->where('appointment_id', $appointment->id)
             ->first();
