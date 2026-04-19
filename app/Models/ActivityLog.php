@@ -12,7 +12,7 @@ class ActivityLog extends Model
     use BelongsToCompanyTrait;
 
     // ✅ رجع السطر ده
-    protected static $hasCompanyColumn = true;
+    public static $hasCompanyColumn = true;
 
     protected $fillable = [
         'company_id',
