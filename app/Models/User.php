@@ -15,7 +15,7 @@ class User extends Authenticatable
     use BelongsToCompanyTrait;
 
     // ✅ Performance fix - تفعيل
-    // protected static $hasCompanyColumn = true;
+    protected static $hasCompanyColumn = true;
 
     // ✅ الثوابت
     const ROLE_SUPER_ADMIN = 'super_admin';
