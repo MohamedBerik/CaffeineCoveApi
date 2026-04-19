@@ -12,7 +12,7 @@ class TreatmentPlanItem extends Model
     use BelongsToCompanyTrait;
 
     // ✅ Performance fix
-    public static $hasCompanyColumn = true;
+    // public static $hasCompanyColumn = true;
 
     // ✅ الثوابت
     const STATUS_PLANNED = 'planned';

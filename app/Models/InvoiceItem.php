@@ -12,7 +12,7 @@ class InvoiceItem extends Model
     use BelongsToCompanyTrait;
 
     // ✅ Performance fix
-    public static $hasCompanyColumn = true;
+    // public static $hasCompanyColumn = true;
 
     protected $fillable = [
         'company_id',

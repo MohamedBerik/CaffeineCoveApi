@@ -12,7 +12,7 @@ class Account extends Model
     /**
      * ✅ Performance fix
      */
-    public static $hasCompanyColumn = true;
+    // public static $hasCompanyColumn = true;
 
     /**
      * Account types

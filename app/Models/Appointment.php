@@ -12,7 +12,7 @@ class Appointment extends Model
     use HasFactory;
     use BelongsToCompanyTrait;
 
-    public static $hasCompanyColumn = true;
+    // public static $hasCompanyColumn = true;
 
     // ✅ الثوابت
     const STATUS_SCHEDULED = 'scheduled';
