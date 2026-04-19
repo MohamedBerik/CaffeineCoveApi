@@ -3,16 +3,17 @@
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\API\AuthController;
-use App\Http\Controllers\API\CategoryController;
-use App\Http\Controllers\API\SupplierController;
-use App\Http\Controllers\API\EmployeeController;
 use App\Http\Controllers\API\UserController;
-use App\Http\Controllers\API\ProductController;
 use App\Http\Controllers\API\SaleController;
 use App\Http\Controllers\API\ReservationController;
 use App\Http\Controllers\API\AdminDashboardController;
 use App\Http\Controllers\API\AdminCrudController;
+
 // ERP Controllers
+use App\Http\Controllers\API\Erp\CategoryController;
+use App\Http\Controllers\API\Erp\SupplierController;
+use App\Http\Controllers\API\Erp\EmployeeController;
+use App\Http\Controllers\API\Erp\ProductController;
 use App\Http\Controllers\API\Erp\OrderController;
 use App\Http\Controllers\API\Erp\InvoicePaymentController;
 use App\Http\Controllers\API\Erp\InvoiceController;
@@ -137,27 +138,6 @@ Route::middleware(['auth:sanctum', 'super.admin'])->prefix('admin')->group(funct
 Route::middleware(['auth:sanctum', 'admin', 'company.user', 'throttle:120,1'])
     ->prefix('admin')
     ->group(function () {
-
-        // Categories
-        Route::get('/categories', [CategoryController::class, 'index']);
-        Route::post('/categories', [CategoryController::class, 'store']);
-        Route::get('/categories/{id}', [CategoryController::class, 'show']);
-        Route::put('/categories/{id}', [CategoryController::class, 'update']);
-        Route::delete('/categories/{id}', [CategoryController::class, 'destroy']);
-
-        // Suppliers
-        Route::get('/suppliers', [SupplierController::class, 'index']);
-        Route::post('/suppliers', [SupplierController::class, 'store']);
-        Route::get('/suppliers/{id}', [SupplierController::class, 'show']);
-        Route::put('/suppliers/{id}', [SupplierController::class, 'update']);
-        Route::delete('/suppliers/{id}', [SupplierController::class, 'destroy']);
-
-        // Employees
-        Route::get('/employees', [EmployeeController::class, 'index']);
-        Route::post('/employees', [EmployeeController::class, 'store']);
-        Route::get('/employees/{id}', [EmployeeController::class, 'show']);
-        Route::put('/employees/{id}', [EmployeeController::class, 'update']);
-        Route::delete('/employees/{id}', [EmployeeController::class, 'destroy']);
 
         // Users
         Route::get('/users', [UserController::class, 'index']);
@@ -353,6 +333,27 @@ Route::prefix('erp')
         // ==================== CLINIC SETTINGS ====================
         Route::get('/clinic-settings', [ClinicSettingController::class, 'show']);
         Route::put('/clinic-settings', [ClinicSettingController::class, 'update']);
+
+        // ==================== categories  ====================
+        Route::get('/categories', [CategoryController::class, 'index']);
+        Route::post('/categories', [CategoryController::class, 'store']);
+        Route::get('/categories/{id}', [CategoryController::class, 'show']);
+        Route::put('/categories/{id}', [CategoryController::class, 'update']);
+        Route::delete('/categories/{id}', [CategoryController::class, 'destroy']);
+
+        // ==================== suppliers ====================
+        Route::get('/suppliers', [SupplierController::class, 'index']);
+        Route::post('/suppliers', [SupplierController::class, 'store']);
+        Route::get('/suppliers/{id}', [SupplierController::class, 'show']);
+        Route::put('/suppliers/{id}', [SupplierController::class, 'update']);
+        Route::delete('/suppliers/{id}', [SupplierController::class, 'destroy']);
+
+        // ==================== employees ====================
+        Route::get('/employees', [EmployeeController::class, 'index']);
+        Route::post('/employees', [EmployeeController::class, 'store']);
+        Route::get('/employees/{id}', [EmployeeController::class, 'show']);
+        Route::put('/employees/{id}', [EmployeeController::class, 'update']);
+        Route::delete('/employees/{id}', [EmployeeController::class, 'destroy']);
     });
 
 
