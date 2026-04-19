@@ -126,7 +126,7 @@ Route::middleware(['auth:sanctum', 'super.admin'])->prefix('admin')->group(funct
     Route::delete('/crud/{table}/{id}', [AdminCrudController::class, 'destroy']);
 
     // Super Admin Dashboard
-    Route::get('/dashboard', [AdminDashboardController::class, 'index']);
+    // Route::get('/dashboard', [AdminDashboardController::class, 'index']);
 });
 
 /*
