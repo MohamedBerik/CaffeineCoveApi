@@ -11,26 +11,36 @@ use Illuminate\Support\Facades\Log;
 class SetTenant
 {
 
+    // app/Http/Middleware/SetTenant.php
+
     public function handle(Request $request, Closure $next)
     {
         $user = $request->user();
-        Log::info('USER IN TENANT', ['user' => $user]);
 
-        if (!$user) {
-            return $next($request);
-        }
+        if ($user) {
+            // ✅ Super Admin
+            if ($user->is_super_admin) {
+                Tenant::setIsSuperAdmin(true);
 
-        if ($user->is_super_admin) {
-            Tenant::setIsSuperAdmin(true);
+                // ✅ قراءة الشركة المختارة من session
+                $sessionCompany = session('tenant_id');
 
-            if ($user->company_id) {
-                Tenant::setId($user->company_id);
-            } else {
-                Tenant::setId(null); // ❗ مش 1
+                if ($sessionCompany) {
+                    Tenant::setId($sessionCompany);
+                } else {
+                    Tenant::setId(null);
+                }
             }
-        } else {
-            Tenant::setId($user->company_id);
-            Tenant::setIsSuperAdmin(false);
+            // ✅ مستخدم عادي
+            elseif ($user->company_id) {
+                Tenant::setId($user->company_id);
+                Tenant::setIsSuperAdmin(false);
+            }
+            // ❌ مستخدم بدون شركة
+            else {
+                Tenant::setId(null);
+                Tenant::setIsSuperAdmin(false);
+            }
         }
 
         return $next($request);

@@ -383,7 +383,48 @@ Route::prefix('saas')
             ->withoutMiddleware(['auth:sanctum', 'super.admin']);
     });
 
-//testing route
-Route::middleware('auth:sanctum')->get('/test-auth', function (Request $request) {
-    return $request->user();
+/*
+|--------------------------------------------------------------------------
+| SaaS Routes (Super Admin Only)
+|--------------------------------------------------------------------------
+*/
+Route::middleware(['auth:sanctum'])->group(function () {
+
+    // ✅ جلب قائمة الشركات (لـ Super Admin)
+    Route::get('/companies', function () {
+        if (!auth()->user()->is_super_admin) {
+            return response()->json(['message' => 'Unauthorized'], 403);
+        }
+        return \App\Models\Company::select('id', 'name', 'slug', 'status')->get();
+    });
+
+    // ✅ تبديل الشركة (لـ Super Admin)
+    Route::post('/switch-company', function (Request $request) {
+        $user = auth()->user();
+
+        if (!$user->is_super_admin) {
+            return response()->json(['message' => 'Unauthorized'], 403);
+        }
+
+        $companyId = $request->company_id;
+
+        // ✅ لو عايز يرجع لـ Global Mode (بدون شركة)
+        if ($companyId === null || $companyId === 'null') {
+            session(['tenant_id' => null]);
+            return response()->json(['message' => 'Switched to global mode']);
+        }
+
+        // ✅ التحقق من وجود الشركة
+        $company = \App\Models\Company::find($companyId);
+        if (!$company) {
+            return response()->json(['message' => 'Invalid company'], 404);
+        }
+
+        session(['tenant_id' => $companyId]);
+
+        return response()->json([
+            'message' => 'Company switched successfully',
+            'company' => $company->only('id', 'name', 'slug')
+        ]);
+    });
 });
