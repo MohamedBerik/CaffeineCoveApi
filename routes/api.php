@@ -59,7 +59,6 @@ Route::post('/register', [AuthController::class, 'register']);
 | Authenticated Routes (All Users)
 |--------------------------------------------------------------------------
 */
-
 Route::middleware(['auth:sanctum', 'company.user'])->group(function () {
 
     // User Profile
@@ -115,7 +114,6 @@ Route::middleware(['auth:sanctum', 'company.user'])->group(function () {
 | Super Admin Routes (Global Access)
 |--------------------------------------------------------------------------
 */
-
 Route::middleware(['auth:sanctum', 'super.admin'])->prefix('admin')->group(function () {
     // Generic CRUD for any table
     Route::get('/crud/{table}', [AdminCrudController::class, 'index']);
@@ -123,9 +121,6 @@ Route::middleware(['auth:sanctum', 'super.admin'])->prefix('admin')->group(funct
     Route::post('/crud/{table}', [AdminCrudController::class, 'store']);
     Route::put('/crud/{table}/{id}', [AdminCrudController::class, 'update']);
     Route::delete('/crud/{table}/{id}', [AdminCrudController::class, 'destroy']);
-
-    // Super Admin Dashboard
-    // Route::get('/dashboard', [AdminDashboardController::class, 'index']);
 });
 
 /*
@@ -133,7 +128,6 @@ Route::middleware(['auth:sanctum', 'super.admin'])->prefix('admin')->group(funct
 | Company Admin Routes (Tenant Admin)
 |--------------------------------------------------------------------------
 */
-
 Route::middleware(['auth:sanctum', 'admin', 'company.user', 'throttle:120,1'])
     ->prefix('admin')
     ->group(function () {
@@ -172,7 +166,6 @@ Route::middleware(['auth:sanctum', 'admin', 'company.user', 'throttle:120,1'])
 | ERP Routes (Multi-tenant Clinic Management)
 |--------------------------------------------------------------------------
 */
-
 Route::prefix('erp')
     ->middleware([
         'auth:sanctum',
