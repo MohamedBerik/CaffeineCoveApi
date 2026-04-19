@@ -4,43 +4,40 @@ namespace App\Http\Controllers\API;
 
 use App\Http\Controllers\Controller;
 use App\Models\Concerns\CompanyScope;
+use App\Services\AdminCrudService;
 use App\Services\Tenant;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
 
 class AdminCrudController extends Controller
 {
-    protected $allowedTables = [
-        'users',
-        'categories',
-        'products',
-        'customers',
-        'orders',
-        'employees',
-        'sales',
-        'reservations',
-        'invoices',
-        'suppliers',
-        'purchase_orders',
-        'companies',
-    ];
+    protected AdminCrudService $crudService;
 
-    private function checkTable(string $table)
+    public function __construct(AdminCrudService $crudService)
     {
-        if (!in_array($table, $this->allowedTables)) {
+        $this->crudService = $crudService;
+    }
+
+    private function checkTable(string $table): void
+    {
+        if (!in_array($table, $this->crudService->getAllowedTables())) {
             abort(404, 'Table not allowed');
         }
 
-        if (!Schema::hasTable($table)) {
+        // ✅ منع Company Admin من الوصول لجدول companies
+        if ($table === 'companies' && !Tenant::isSuperAdmin()) {
+            abort(403, 'Unauthorized. Only Super Admin can access companies table.');
+        }
+
+        if (!DB::getSchemaBuilder()->hasTable($table)) {
             abort(404, 'Table not found');
         }
     }
 
     /**
-     * ✅ التحقق من صلاحية الوصول للـ Admin CRUD
+     * ✅ التحقق من صلاحية الوصول للـ Table مع مراعاة الـ Action
      */
-    private function authorizeAdminAccess(): void
+    private function authorizeTableAction(string $action, string $table, $recordId = null): void
     {
         $user = auth()->user();
 
@@ -48,10 +45,44 @@ class AdminCrudController extends Controller
             abort(401, 'Unauthenticated');
         }
 
-        // Super Admin or Company Admin only
-        if (!$user->is_super_admin && $user->role !== 'admin') {
-            abort(403, 'Unauthorized. Admin access required.');
+        // Super Admin → مسموح بكل حاجة
+        if ($user->is_super_admin) {
+            return;
         }
+
+        // Company Admin → صلاحيات محددة
+        if ($user->role === 'admin') {
+            $companyId = Tenant::id();
+
+            if (!$companyId) {
+                abort(403, 'No tenant selected');
+            }
+
+            // ✅ Granular Permissions from Config (cached)
+            $permissions = $this->crudService->getTablePermissions($table);
+
+            if (!in_array($action, $permissions)) {
+                abort(403, "Unauthorized. You don't have '{$action}' permission for '{$table}'.");
+            }
+
+            // ✅ لو فيه record معين، نتأكد إنه تبع شركته
+            if ($recordId && $this->crudService->tableHasCompanyId($table)) {
+                $record = DB::table($table)->where('id', $recordId)->first();
+
+                if (!$record) {
+                    abort(404, 'Record not found');
+                }
+
+                if (isset($record->company_id) && $record->company_id != $companyId) {
+                    abort(403, 'Unauthorized. This record belongs to another company.');
+                }
+            }
+
+            return;
+        }
+
+        // Regular user → ممنوع
+        abort(403, 'Unauthorized. Admin access required.');
     }
 
     /**
@@ -67,7 +98,7 @@ class AdminCrudController extends Controller
         // مستخدم عادي - فلترة على company_id
         $companyId = Tenant::id();
 
-        if ($companyId && Schema::hasColumn($table, 'company_id')) {
+        if ($companyId && $this->crudService->tableHasCompanyId($table)) {
             $query->where('company_id', $companyId);
         }
 
@@ -79,15 +110,13 @@ class AdminCrudController extends Controller
      */
     public function index(Request $request, string $table)
     {
-        $this->authorizeAdminAccess();
+        $this->authorizeTableAction('view', $table);
         $this->checkTable($table);
 
         $query = DB::table($table);
         $query = $this->applyTenantFilter($query, $table);
 
-        $columns = Schema::getColumnListing($table);
-        $hiddenColumns = ['password', 'remember_token'];
-        $selectColumns = array_diff($columns, $hiddenColumns);
+        $selectColumns = $this->crudService->getSafeColumns($table);
 
         if ($request->filled('search')) {
             $search = $request->search;
@@ -118,7 +147,7 @@ class AdminCrudController extends Controller
      */
     public function show(Request $request, string $table, int $id)
     {
-        $this->authorizeAdminAccess();
+        $this->authorizeTableAction('view', $table, $id);
         $this->checkTable($table);
 
         $query = DB::table($table);
@@ -131,9 +160,15 @@ class AdminCrudController extends Controller
         }
 
         // إزالة الحقول الحساسة
-        unset($item->password, $item->remember_token);
+        $safeColumns = $this->crudService->getSafeColumns($table);
+        $safeItem = [];
+        foreach ($safeColumns as $column) {
+            if (property_exists($item, $column)) {
+                $safeItem[$column] = $item->$column;
+            }
+        }
 
-        return response()->json($item);
+        return response()->json($safeItem);
     }
 
     /**
@@ -141,7 +176,7 @@ class AdminCrudController extends Controller
      */
     public function store(Request $request, string $table)
     {
-        $this->authorizeAdminAccess();
+        $this->authorizeTableAction('create', $table);
         $this->checkTable($table);
 
         $data = $request->except(['id', 'created_at', 'updated_at']);
@@ -152,7 +187,7 @@ class AdminCrudController extends Controller
         }
 
         // ✅ التعامل مع company_id
-        if (Schema::hasColumn($table, 'company_id')) {
+        if ($this->crudService->tableHasCompanyId($table)) {
             if (Tenant::isSuperAdmin()) {
                 // Super Admin لازم يحدد company_id
                 if (!isset($data['company_id'])) {
@@ -169,6 +204,9 @@ class AdminCrudController extends Controller
 
         $id = DB::table($table)->insertGetId($data);
 
+        // ✅ Clear cache for this table (new record added)
+        $this->crudService->clearTableCache($table);
+
         return response()->json([
             'success' => true,
             'message' => 'Created successfully',
@@ -181,7 +219,7 @@ class AdminCrudController extends Controller
      */
     public function update(Request $request, string $table, int $id)
     {
-        $this->authorizeAdminAccess();
+        $this->authorizeTableAction('update', $table, $id);
         $this->checkTable($table);
 
         $data = $request->except(['id', 'created_at', 'company_id']); // ✅ منع تعديل company_id
@@ -217,7 +255,7 @@ class AdminCrudController extends Controller
      */
     public function destroy(Request $request, string $table, int $id)
     {
-        $this->authorizeAdminAccess();
+        $this->authorizeTableAction('delete', $table, $id);
         $this->checkTable($table);
 
         $query = DB::table($table);
@@ -230,6 +268,9 @@ class AdminCrudController extends Controller
                 'message' => 'Record not found or unauthorized'
             ], 404);
         }
+
+        // ✅ Clear cache for this table (record deleted)
+        $this->crudService->clearTableCache($table);
 
         return response()->json([
             'success' => true,
@@ -252,8 +293,8 @@ class AdminCrudController extends Controller
 
         if ($request->filled('search')) {
             $search = $request->search;
-            $columns = Schema::getColumnListing($table);
-            $searchableColumns = array_diff($columns, ['password', 'created_at', 'updated_at']);
+            $columns = $this->crudService->getSafeColumns($table);
+            $searchableColumns = array_diff($columns, ['created_at', 'updated_at']);
 
             $query->where(function ($q) use ($searchableColumns, $search) {
                 foreach ($searchableColumns as $column) {
