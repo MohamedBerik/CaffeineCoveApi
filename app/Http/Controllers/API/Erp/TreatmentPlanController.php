@@ -22,6 +22,11 @@ class TreatmentPlanController extends Controller
 {
     use ValidatesAppointments, HandlesAppointmentReminders;
 
+    public function __construct()
+    {
+        $this->authorizeResource(TreatmentPlan::class, 'treatmentPlan');
+    }
+
     public function index(Request $request)
     {
         $companyId = Tenant::id();

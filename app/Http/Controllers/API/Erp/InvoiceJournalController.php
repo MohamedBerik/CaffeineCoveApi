@@ -9,6 +9,11 @@ use Illuminate\Http\Request;
 
 class InvoiceJournalController extends Controller
 {
+    public function __construct()
+    {
+        $this->authorizeResource(Invoice::class, 'invoice');
+    }
+
     public function index(Request $request, $invoiceId)
     {
         // ✅ تأكد أن الفاتورة تخص نفس الشركة (الـ Scope هيتأكد)

@@ -9,6 +9,7 @@ use App\Models\DentalRecord;
 use App\Models\Doctor;
 use App\Models\Invoice;
 use App\Models\Order;
+use App\Models\PatientRadiology;
 use App\Models\Payment;
 use App\Models\Procedure;
 use App\Models\Product;
@@ -23,7 +24,10 @@ use App\Policies\CustomerPolicy;
 use App\Policies\DentalRecordPolicy;
 use App\Policies\DoctorPolicy;
 use App\Policies\InvoicePolicy;
+use App\Policies\PatientRadiologyPolicy;
+use App\Policies\SupplierPolicy;
 use App\Policies\SystemAlertPolicy;
+use App\Policies\TreatmentPlanPolicy;
 use App\Services\Tenant;
 use Illuminate\Foundation\Support\Providers\AuthServiceProvider as ServiceProvider;
 use Illuminate\Support\Facades\Gate;
@@ -43,6 +47,14 @@ class AuthServiceProvider extends ServiceProvider
         ActivityLog::class => ActivityLogPolicy::class, // ✅ أضف السطر ده
         DentalRecord::class => DentalRecordPolicy::class, // ✅ أضف السطر ده
         Doctor::class => DoctorPolicy::class, // ✅ أضف السطر ده
+        \App\Models\Order::class => \App\Policies\OrderPolicy::class,
+        \App\Models\Procedure::class => \App\Policies\ProcedurePolicy::class,
+        \App\Models\PurchaseOrder::class => \App\Policies\PurchaseOrderPolicy::class,
+        PatientRadiology::class => PatientRadiologyPolicy::class,
+        Supplier::class => SupplierPolicy::class,
+        TreatmentPlan::class => TreatmentPlanPolicy::class,
+
+
     ];
 
     /**

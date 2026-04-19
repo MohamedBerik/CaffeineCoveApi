@@ -14,6 +14,8 @@ class SupplierStatementController extends Controller
     {
         $supplier = Supplier::query()->findOrFail($supplierId);
 
+        $this->authorize('view', $supplier);
+
         $from = $request->query('from');
         $to   = $request->query('to');
 

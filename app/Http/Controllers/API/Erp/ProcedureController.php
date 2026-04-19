@@ -10,6 +10,10 @@ use Illuminate\Validation\Rule;
 
 class ProcedureController extends Controller
 {
+    public function __construct()
+    {
+        $this->authorizeResource(Procedure::class, 'procedure');
+    }
     public function index(Request $request)
     {
         $q = Procedure::query()->orderByDesc('id');

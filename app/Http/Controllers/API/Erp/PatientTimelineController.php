@@ -20,6 +20,7 @@ class PatientTimelineController extends Controller
         $companyId = Tenant::id();
 
         $customer = Customer::query()->findOrFail($customerId);
+        $this->authorize('view', $customer);
 
         $appointments = Appointment::query()
             ->where('patient_id', $customer->id)

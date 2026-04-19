@@ -12,6 +12,11 @@ use Illuminate\Support\Facades\Validator;
 
 class RadiologyController extends Controller
 {
+    public function __construct()
+    {
+        $this->authorizeResource(PatientRadiology::class, 'radiology');
+    }
+
     public function index(Request $request)
     {
         $customerId = $request->customer_id;

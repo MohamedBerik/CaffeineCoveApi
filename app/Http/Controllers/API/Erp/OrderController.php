@@ -19,6 +19,11 @@ use Illuminate\Validation\Rule;
 
 class OrderController extends Controller
 {
+    public function __construct()
+    {
+        $this->authorizeResource(Order::class, 'order');
+    }
+
     public function indexErp(Request $request)
     {
         $orders = Order::with(['customer', 'items.product', 'invoice'])

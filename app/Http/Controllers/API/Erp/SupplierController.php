@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Http\Controllers\API;
+namespace App\Http\Controllers\API\Erp;
 
 use App\Http\Controllers\Controller;
 use App\Http\Resources\SupplierResource;
@@ -11,6 +11,11 @@ use Illuminate\Support\Facades\Validator;
 
 class SupplierController extends Controller
 {
+    public function __construct()
+    {
+        $this->authorizeResource(Supplier::class, 'supplier');
+    }
+
     public function index(Request $request)
     {
         $suppliers = SupplierResource::collection(

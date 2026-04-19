@@ -85,6 +85,8 @@ class PaymentRefundController extends Controller
                 ->with(['refunds'])
                 ->findOrFail($paymentId);
 
+            $this->authorize('update', $payment);
+
             // 3) invoice required
             $invoice = $payment->invoice_id
                 ? Invoice::query()->find($payment->invoice_id)
@@ -105,6 +107,8 @@ class PaymentRefundController extends Controller
                 }
                 return response()->json($resp, 422);
             }
+
+            $this->authorize('update', $invoice);
 
             // 4) available refund by type
             $refundedInvoice = (float) $payment->refunds->where('applies_to', 'invoice')->sum('amount');
