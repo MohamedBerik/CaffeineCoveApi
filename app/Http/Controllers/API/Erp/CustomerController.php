@@ -12,6 +12,11 @@ use Illuminate\Support\Facades\DB;
 
 class CustomerController extends Controller
 {
+    public function __construct()
+    {
+        $this->authorizeResource(Customer::class, 'customer');
+    }
+
     public function index(Request $request)
     {
         $q = Customer::query()->orderByDesc('id');

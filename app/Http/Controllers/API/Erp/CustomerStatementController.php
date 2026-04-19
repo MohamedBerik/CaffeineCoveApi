@@ -13,8 +13,10 @@ class CustomerStatementController extends Controller
 {
     public function show(Request $request, $customerId)
     {
-        // Ensure customer belongs to tenant (الـ Scope هيتأكد)
+        // Ensure customer belongs to tenant + التحقق من الصلاحية
         $customer = Customer::query()->findOrFail($customerId);
+        $this->authorize('view', $customer);
+
 
         // Parse filters safely
         $from = $request->query('from');

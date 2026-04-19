@@ -12,6 +12,11 @@ use Illuminate\Support\Facades\DB;
 
 class DentalRecordController extends Controller
 {
+    public function __construct()
+    {
+        $this->authorizeResource(DentalRecord::class, 'dentalRecord');
+    }
+
     public function index(Request $request)
     {
         $query = DentalRecord::query()

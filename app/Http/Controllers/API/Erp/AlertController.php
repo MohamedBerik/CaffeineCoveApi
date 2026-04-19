@@ -9,6 +9,11 @@ use Illuminate\Http\Request;
 
 class AlertController extends Controller
 {
+    public function __construct()
+    {
+        $this->authorizeResource(SystemAlert::class, 'alert');
+    }
+
     /**
      * جلب الإشعارات
      */

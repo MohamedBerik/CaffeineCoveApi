@@ -9,6 +9,11 @@ use App\Services\Tenant;
 
 class ActivityLogController extends Controller
 {
+    public function __construct()
+    {
+        $this->authorizeResource(ActivityLog::class, 'activityLog');
+    }
+
     public function index(Request $request)
     {
         $limit = (int) $request->get('limit', 6);

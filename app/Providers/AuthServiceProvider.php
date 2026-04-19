@@ -2,8 +2,10 @@
 
 namespace App\Providers;
 
+use App\Models\ActivityLog;
 use App\Models\Appointment;
 use App\Models\Customer;
+use App\Models\DentalRecord;
 use App\Models\Doctor;
 use App\Models\Invoice;
 use App\Models\Order;
@@ -12,9 +14,16 @@ use App\Models\Procedure;
 use App\Models\Product;
 use App\Models\PurchaseOrder;
 use App\Models\Supplier;
+use App\Models\SystemAlert;
 use App\Models\TreatmentPlan;
 use App\Models\User;
+use App\Policies\ActivityLogPolicy;
 use App\Policies\AppointmentPolicy;
+use App\Policies\CustomerPolicy;
+use App\Policies\DentalRecordPolicy;
+use App\Policies\DoctorPolicy;
+use App\Policies\InvoicePolicy;
+use App\Policies\SystemAlertPolicy;
 use App\Services\Tenant;
 use Illuminate\Foundation\Support\Providers\AuthServiceProvider as ServiceProvider;
 use Illuminate\Support\Facades\Gate;
@@ -28,6 +37,12 @@ class AuthServiceProvider extends ServiceProvider
      */
     protected $policies = [
         Appointment::class => AppointmentPolicy::class,
+        Invoice::class => InvoicePolicy::class, // ✅ أضف السطر ده
+        Customer::class => CustomerPolicy::class, // ✅ أضف السطر ده
+        SystemAlert::class => SystemAlertPolicy::class, // ✅ أضف السطر ده
+        ActivityLog::class => ActivityLogPolicy::class, // ✅ أضف السطر ده
+        DentalRecord::class => DentalRecordPolicy::class, // ✅ أضف السطر ده
+        Doctor::class => DoctorPolicy::class, // ✅ أضف السطر ده
     ];
 
     /**

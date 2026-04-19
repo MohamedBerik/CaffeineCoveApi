@@ -12,6 +12,11 @@ use Carbon\Carbon;
 
 class DoctorController extends Controller
 {
+    public function __construct()
+    {
+        $this->authorizeResource(Doctor::class, 'doctor');
+    }
+
     public function index(Request $request)
     {
         $q = Doctor::query()->orderByDesc('id');

@@ -20,6 +20,7 @@ class ErpDashboardController extends Controller
 {
     public function index(Request $request)
     {
+        $this->authorize('viewAny', Appointment::class);
 
         Log::info('Tenant Context', [
             'tenant_id' => Tenant::id(),

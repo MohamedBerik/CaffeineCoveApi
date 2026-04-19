@@ -15,6 +15,8 @@ class AppointmentActivityController extends Controller
         // ✅ تأكيد أن الموعد بتاع نفس الشركة (Tenant safe - الـ Scope هيتأكد)
         Appointment::query()->findOrFail($id);
 
+        $this->authorize('view', $appointment);
+
         $logs = ActivityLog::query()
             ->where('subject_type', Appointment::class)
             ->where('subject_id', (int) $id)

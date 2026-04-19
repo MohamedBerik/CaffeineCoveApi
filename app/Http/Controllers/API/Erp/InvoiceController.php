@@ -12,6 +12,11 @@ use App\Events\DashboardUpdated;
 
 class InvoiceController extends Controller
 {
+    public function __construct()
+    {
+        $this->authorizeResource(Invoice::class, 'invoice');
+    }
+
     public function indexErp(Request $request)
     {
         $invoices = Invoice::with('customer')

@@ -35,6 +35,8 @@ class InvoicePaymentController extends Controller
 
             $invoice = Invoice::lockForUpdate()->findOrFail($invoiceId);
 
+            $this->authorize('update', $invoice);
+
             if ($invoice->status === 'cancelled') {
                 return response()->json(['msg' => 'Cannot receive payment for cancelled invoice'], 422);
             }

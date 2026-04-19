@@ -12,8 +12,9 @@ class CustomerCreditController extends Controller
 {
     public function show(Request $request, $customerId)
     {
-        // تأكد إن العميل تابع لنفس الشركة (الـ Scope هيتأكد)
-        Customer::query()->findOrFail($customerId);
+        // تأكد إن العميل تابع لنفس الشركة + التحقق من الصلاحية
+        $customer = Customer::query()->findOrFail($customerId);
+        $this->authorize('view', $customer);
 
         $base = DB::table('customer_credits')
             ->where('customer_id', $customerId);

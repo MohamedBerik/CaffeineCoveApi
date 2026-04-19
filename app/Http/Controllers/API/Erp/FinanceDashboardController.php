@@ -17,6 +17,8 @@ class FinanceDashboardController extends Controller
 {
     public function index(Request $request)
     {
+        $this->authorize('viewAny', Invoice::class);
+
         $companyId = Tenant::id();
 
         /* ============================================================
