@@ -40,7 +40,6 @@ use App\Http\Controllers\API\Erp\PatientTimelineController;
 use App\Http\Controllers\API\Erp\ProcedureController;
 use App\Http\Controllers\API\Erp\RadiologyController;
 use App\Services\Tenant;
-use App\Services\PermissionService;
 
 /*
 |--------------------------------------------------------------------------

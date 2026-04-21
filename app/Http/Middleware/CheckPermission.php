@@ -46,6 +46,7 @@ class CheckPermission
             return response()->json([
                 'message' => 'Unauthorized. You don\'t have the required permission.',
                 'required_permissions' => $permissions,
+                'missing_permissions' => $missingPermissions,
             ], 403);
         }
 
