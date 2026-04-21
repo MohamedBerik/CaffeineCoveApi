@@ -11,9 +11,6 @@ class Product extends Model
     use HasFactory;
     use BelongsToCompanyTrait;
 
-    // ✅ Performance fix
-    // public static $hasCompanyColumn = true;
-
     protected $fillable = [
         'company_id',
         'product_image',
@@ -22,6 +19,7 @@ class Product extends Model
         'description_en',
         'description_ar',
         'unit_price',
+        'quantity',
         'stock_quantity',
         'category_id',
     ];
