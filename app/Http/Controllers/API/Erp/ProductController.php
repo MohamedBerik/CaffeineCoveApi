@@ -8,6 +8,7 @@ use App\Models\Product;
 use App\Services\Tenant;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
 
 class ProductController extends Controller
@@ -77,7 +78,7 @@ class ProductController extends Controller
     public function store(Request $request)
     {
         // ✅ Debug - شوف قيمة Tenant::id()
-        \Log::info('Product Store Debug', [
+        Log::info('Product Store Debug', [
             'tenant_id' => Tenant::id(),
             'user_id' => auth()->id(),
             'user_company_id' => auth()->user()?->company_id,
