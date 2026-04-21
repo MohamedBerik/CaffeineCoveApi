@@ -133,22 +133,19 @@ class RadiologyController extends Controller
 
     public function destroy(Request $request, $id)
     {
-        $radiology = PatientRadiology::query()
-            ->where('id', $id)
-            ->first();
+        $radiology = PatientRadiology::query()->find($id);
 
         if (!$radiology) {
-            return response()->json([
-                'status' => 404,
-                'message' => 'Radiology image not found',
-            ], 404);
+            return response()->json(['status' => 404, 'message' => 'Radiology image not found'], 404);
+        }
+
+        // ✅ احذف الملف من التخزين
+        if ($radiology->file_path && Storage::disk('public')->exists($radiology->file_path)) {
+            Storage::disk('public')->delete($radiology->file_path);
         }
 
         $radiology->delete();
 
-        return response()->json([
-            'status' => 200,
-            'message' => 'Radiology image deleted successfully',
-        ]);
+        return response()->json(['status' => 200, 'message' => 'Radiology image deleted successfully']);
     }
 }

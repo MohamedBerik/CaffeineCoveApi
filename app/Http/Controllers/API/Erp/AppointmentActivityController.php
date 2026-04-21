@@ -12,30 +12,32 @@ class AppointmentActivityController extends Controller
 {
     public function index(Request $request, $id)
     {
-        // ✅ تأكيد أن الموعد بتاع نفس الشركة (Tenant safe - الـ Scope هيتأكد)
-        Appointment::query()->findOrFail($id);
+        // ✅ تأكيد أن الموعد بتاع نفس الشركة
+        $appointment = Appointment::query()->findOrFail($id);
 
+        // ✅ Authorization check
         $this->authorize('view', $appointment);
 
-        $logs = ActivityLog::query()
+        // ✅ Eager load user relationship
+        $logs = ActivityLog::with('user:id,name')
             ->where('subject_type', Appointment::class)
             ->where('subject_id', (int) $id)
             ->orderByDesc('id')
-            ->get([
-                'id',
-                'company_id',
-                'user_id',
-                'action',
-                'subject_type',
-                'subject_id',
-                'properties',
-                'created_at',
-            ]);
+            ->get();
 
         return response()->json([
             'msg' => 'Appointment activity',
             'status' => 200,
-            'data' => $logs,
+            'data' => $logs->map(fn($log) => [
+                'id' => $log->id,
+                'action' => $log->action,
+                'user_id' => $log->user_id,
+                'user_name' => $log->user?->name,
+                'subject_type' => $log->subject_type,
+                'subject_id' => $log->subject_id,
+                'properties' => $log->properties,
+                'created_at' => $log->created_at?->toISOString(),
+            ]),
         ]);
     }
 }

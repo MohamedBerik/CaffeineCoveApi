@@ -43,7 +43,7 @@ class AlertController extends Controller
                     'priority' => $alert->priority,
                     'type' => $alert->type,
                     'code' => $alert->code,
-                    'time' => $alert->triggered_at,
+                    'time' => $alert->triggered_at?->toISOString(), // ✅ String format
                     'read' => $alert->acknowledged_at !== null,
                 ];
             }),

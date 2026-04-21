@@ -131,10 +131,6 @@ class CategoryController extends Controller
 
         $validate = Validator::make($request->all(), [
             "cate_image" => "nullable|image|max:2048|mimes:png,jpeg",
-            "id" => [
-                'required',
-                Rule::unique('categories')->ignore($old_id),
-            ],
             "title_en" => "required|min:3|max:255",
             "title_ar" => "required|min:3|max:255",
             "description_en" => "required|min:3|max:255",
@@ -164,7 +160,6 @@ class CategoryController extends Controller
 
         $category->update([
             "cate_image" => $imageName,
-            "id" => $request->id,
             "title_en" => $request->title_en,
             "title_ar" => $request->title_ar,
             "description_en" => $request->description_en,

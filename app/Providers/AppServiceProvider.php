@@ -20,6 +20,13 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Queue;
+use App\Models\Doctor;
+use App\Models\DentalRecord;
+use App\Models\Employee;
+use App\Models\Category;
+use App\Models\Supplier;
+use App\Models\Procedure;
+use App\Models\PatientRadiology;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -70,12 +77,20 @@ class AppServiceProvider extends ServiceProvider
         $loggableModels = [
             Product::class,
             Invoice::class,
-            Appointment::class,
             Customer::class,
             TreatmentPlan::class,
             Order::class,
             PurchaseOrder::class,
             Payment::class,
+            Doctor::class,           // ✅ أضف
+            DentalRecord::class,     // ✅ أضف
+            Employee::class,         // ✅ أضف
+            Category::class,         // ✅ أضف
+            Supplier::class,         // ✅ أضف
+            Procedure::class,        // ✅ أضف
+            PatientRadiology::class, // ✅ أضف (Radiology)
+            User::class, // ⚠️ مش موجود
+
         ];
 
         foreach ($loggableModels as $model) {

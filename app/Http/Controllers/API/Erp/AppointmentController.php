@@ -423,12 +423,30 @@ class AppointmentController extends Controller
     public function destroy(Request $request, $id)
     {
         $appointment = Appointment::query()->findOrFail($id);
+
+        // ✅ أضف Logging قبل الحذف
+        ActivityLogger::log(
+            Tenant::id(),
+            $request->user(),
+            'appointment.deleted',
+            Appointment::class,
+            $appointment->id,
+            [
+                'doctor_id' => $appointment->doctor_id,
+                'patient_id' => $appointment->patient_id,
+                'date' => Carbon::parse($appointment->appointment_date)->toDateString(),
+                'time' => substr((string) $appointment->appointment_time, 0, 5),
+                'status' => $appointment->status,
+                'appointment_type' => $appointment->appointment_type,
+            ]
+        );
+
         $appointment->delete();
 
         return response()->json([
-            'msg' => 'Appointment deleted',
-            'status' => 200,
-            'data' => null,
+            "msg" => "Appointment deleted",
+            "status" => 200,
+            "data" => null
         ]);
     }
 
