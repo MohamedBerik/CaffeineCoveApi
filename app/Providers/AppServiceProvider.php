@@ -27,6 +27,7 @@ use App\Models\Category;
 use App\Models\Supplier;
 use App\Models\Procedure;
 use App\Models\PatientRadiology;
+use App\Models\User;
 
 class AppServiceProvider extends ServiceProvider
 {
