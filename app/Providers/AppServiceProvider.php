@@ -12,7 +12,6 @@ use App\Models\Product;
 use App\Models\PurchaseOrder;
 use App\Observers\ActivityLogObserver;
 use App\Observers\DashboardObserver;
-use App\Observers\ProductObserver;
 use App\Services\Tenant;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\ServiceProvider;
@@ -58,13 +57,8 @@ class AppServiceProvider extends ServiceProvider
         // ✅ Configure cache for multi-tenant
         $this->configureTenantCache();
 
-        $this->app['queue']->createPayloadUsing(function ($connection, $queue, $payload) {
-            return ['tenant_middleware' => true];
-        });
-        Queue::after(function () {
-            Tenant::reset();
-        });
-        Model::observe(ActivityLogObserver::class);
+        // ✅ Queue tenant reset
+        $this->configureQueueTenantReset();
     }
 
     /**
@@ -72,13 +66,36 @@ class AppServiceProvider extends ServiceProvider
      */
     protected function registerObservers(): void
     {
-        Appointment::observe(DashboardObserver::class);
-        Invoice::observe(DashboardObserver::class);
-        Payment::observe(DashboardObserver::class);
-        Customer::observe(DashboardObserver::class);
-        TreatmentPlan::observe(DashboardObserver::class);
-        Order::observe(DashboardObserver::class);
-        PurchaseOrder::observe(DashboardObserver::class);
+        // ✅ Models that need Activity Logging
+        $loggableModels = [
+            Product::class,
+            Invoice::class,
+            Appointment::class,
+            Customer::class,
+            TreatmentPlan::class,
+            Order::class,
+            PurchaseOrder::class,
+            Payment::class,
+        ];
+
+        foreach ($loggableModels as $model) {
+            $model::observe(ActivityLogObserver::class);
+        }
+
+        // ✅ Models that trigger Dashboard cache invalidation
+        $dashboardModels = [
+            Appointment::class,
+            Invoice::class,
+            Payment::class,
+            Customer::class,
+            TreatmentPlan::class,
+            Order::class,
+            PurchaseOrder::class,
+        ];
+
+        foreach ($dashboardModels as $model) {
+            $model::observe(DashboardObserver::class);
+        }
     }
 
     /**
@@ -155,6 +172,20 @@ class AppServiceProvider extends ServiceProvider
             $tenantId = Tenant::id() ?? 'global';
             $tenantKey = "tenant_{$tenantId}_{$key}";
             return Cache::forget($tenantKey);
+        });
+    }
+
+    /**
+     * Configure queue tenant reset
+     */
+    protected function configureQueueTenantReset(): void
+    {
+        $this->app['queue']->createPayloadUsing(function ($connection, $queue, $payload) {
+            return ['tenant_middleware' => true];
+        });
+
+        Queue::after(function () {
+            Tenant::reset();
         });
     }
 
