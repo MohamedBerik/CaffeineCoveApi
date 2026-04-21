@@ -116,7 +116,7 @@ Route::prefix('erp')
             Route::get('/dashboard/finance', [FinanceDashboardController::class, 'index']);
         });
 
-        // ✅ Activity Logs (مع Permission منفصل)
+        // ==================== Activity-logs ====================
         Route::middleware('permission:activity_logs.view')->group(function () {
             Route::get('/activity-logs', [ActivityLogController::class, 'index']);
         });
