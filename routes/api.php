@@ -4,11 +4,11 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\API\AuthController;
 use App\Http\Controllers\API\UserController;
-use App\Http\Controllers\API\SaleController;
-use App\Http\Controllers\API\ReservationController;
 use App\Http\Controllers\API\AdminCrudController;
 
 // ERP Controllers
+use App\Http\Controllers\API\Erp\SaleController;
+use App\Http\Controllers\API\Erp\ReservationController;
 use App\Http\Controllers\API\Erp\CategoryController;
 use App\Http\Controllers\API\Erp\SupplierController;
 use App\Http\Controllers\API\Erp\EmployeeController;
@@ -138,26 +138,12 @@ Route::middleware(['auth:sanctum', 'admin', 'company.user', 'throttle:120,1'])
         Route::put('/users/{id}', [UserController::class, 'update']);
         Route::delete('/users/{id}', [UserController::class, 'destroy']);
 
-        // Sales
-        Route::get('/sales', [SaleController::class, 'index']);
-        Route::post('/sales', [SaleController::class, 'store']);
-        Route::get('/sales/{id}', [SaleController::class, 'show']);
-        Route::put('/sales/{id}', [SaleController::class, 'update']);
-        Route::delete('/sales/{id}', [SaleController::class, 'destroy']);
-
         // Appointments
         Route::get('/appointments', [AppointmentController::class, 'index']);
         Route::post('/appointments', [AppointmentController::class, 'store']);
         Route::get('/appointments/{id}', [AppointmentController::class, 'show']);
         Route::put('/appointments/{id}', [AppointmentController::class, 'update']);
         Route::delete('/appointments/{id}', [AppointmentController::class, 'destroy']);
-
-        // Reservations
-        Route::get('/reservations', [ReservationController::class, 'index']);
-        Route::post('/reservations', [ReservationController::class, 'store']);
-        Route::post('/reservations/{id}/confirm', [ReservationController::class, 'confirm']);
-        Route::post('/reservations/{id}/cancel', [ReservationController::class, 'cancel']);
-        Route::delete('/reservations/{id}', [ReservationController::class, 'destroy']);
     });
 
 /*
@@ -343,6 +329,20 @@ Route::prefix('erp')
         Route::get('/products/{id}', [ProductController::class, 'show']);
         Route::put('/products/{id}', [ProductController::class, 'update']);
         Route::delete('/products/{id}', [ProductController::class, 'destroy']);
+
+        // ==================== sales ====================
+        Route::get('/sales', [SaleController::class, 'index']);
+        Route::post('/sales', [SaleController::class, 'store']);
+        Route::get('/sales/{id}', [SaleController::class, 'show']);
+        Route::put('/sales/{id}', [SaleController::class, 'update']);
+        Route::delete('/sales/{id}', [SaleController::class, 'destroy']);
+
+        // ==================== reservations ====================
+        Route::get('/reservations', [ReservationController::class, 'index']);
+        Route::post('/reservations', [ReservationController::class, 'store']);
+        Route::post('/reservations/{id}/confirm', [ReservationController::class, 'confirm']);
+        Route::post('/reservations/{id}/cancel', [ReservationController::class, 'cancel']);
+        Route::delete('/reservations/{id}', [ReservationController::class, 'destroy']);
     });
 
 /*
