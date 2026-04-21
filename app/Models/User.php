@@ -7,12 +7,14 @@ use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
 use App\Models\Concerns\BelongsToCompanyTrait;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Spatie\Permission\Traits\HasRoles;
 
 class User extends Authenticatable
 {
     use HasFactory;
     use HasApiTokens, Notifiable;
     use BelongsToCompanyTrait;
+    use HasRoles;
 
     // ✅ Performance fix - تفعيل
     public static $hasCompanyColumn = true;

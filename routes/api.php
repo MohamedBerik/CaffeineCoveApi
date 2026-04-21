@@ -40,9 +40,7 @@ use App\Http\Controllers\API\Erp\PatientTimelineController;
 use App\Http\Controllers\API\Erp\ProcedureController;
 use App\Http\Controllers\API\Erp\RadiologyController;
 use App\Services\Tenant;
-
-use App\Http\Controllers\API\SaaS\TenantController;
-use App\Http\Controllers\API\SaaS\ClinicOnboardingController;
+use App\Services\PermissionService;
 
 /*
 |--------------------------------------------------------------------------
@@ -55,6 +53,19 @@ Route::post('/register', [AuthController::class, 'register']);
 
 /*
 |--------------------------------------------------------------------------
+| Super Admin Routes (Global Access)
+|--------------------------------------------------------------------------
+*/
+Route::middleware(['auth:sanctum', 'super.admin'])->prefix('admin')->group(function () {
+    Route::get('/crud/{table}', [AdminCrudController::class, 'index']);
+    Route::get('/crud/{table}/{id}', [AdminCrudController::class, 'show']);
+    Route::post('/crud/{table}', [AdminCrudController::class, 'store']);
+    Route::put('/crud/{table}/{id}', [AdminCrudController::class, 'update']);
+    Route::delete('/crud/{table}/{id}', [AdminCrudController::class, 'destroy']);
+});
+
+/*
+|--------------------------------------------------------------------------
 | Authenticated Routes (All Users)
 |--------------------------------------------------------------------------
 */
@@ -64,30 +75,12 @@ Route::middleware(['auth:sanctum', 'company.user'])->group(function () {
     Route::get('/me', function (Request $request) {
         $user = $request->user();
 
-        $permissions = [];
+        // ✅ الحصول على الصلاحيات من Spatie/Permission
+        $permissions = $user->getAllPermissions()->pluck('name')->toArray();
 
-        if ($user->is_super_admin || $user->role === 'admin') {
-            $permissions = [
-                'finance.view',
-                'finance.create',
-                'orders.view',
-                'orders.manage',
-                'orders.confirm',
-                'orders.cancel',
-                'payments.refund',
-                'purchases.manage',
-                'purchases.receive',
-                'purchases.return',
-                'appointments.view',
-                'appointments.manage',
-                'appointments.complete',
-                'treatment_plans.view',
-                'treatment_plans.manage',
-                'procedures.view',
-                'procedures.manage',
-                'patients.view',
-                'patients.manage',
-            ];
+        // ✅ Super Admin ياخد كل الصلاحيات
+        if ($user->is_super_admin) {
+            $permissions = ['*'];
         }
 
         return response()->json([
@@ -95,6 +88,7 @@ Route::middleware(['auth:sanctum', 'company.user'])->group(function () {
             'name' => $user->name,
             'email' => $user->email,
             'role' => $user->role,
+            'roles' => $user->getRoleNames(),
             'company_id' => Tenant::id(),
             'is_super_admin' => (bool) $user->is_super_admin,
             'permissions' => $permissions,
@@ -110,47 +104,7 @@ Route::middleware(['auth:sanctum', 'company.user'])->group(function () {
 
 /*
 |--------------------------------------------------------------------------
-| Super Admin Routes (Global Access)
-|--------------------------------------------------------------------------
-*/
-Route::middleware(['auth:sanctum', 'super.admin'])->prefix('admin')->group(function () {
-    // Generic CRUD for any table
-    Route::get('/crud/{table}', [AdminCrudController::class, 'index']);
-    Route::get('/crud/{table}/{id}', [AdminCrudController::class, 'show']);
-    Route::post('/crud/{table}', [AdminCrudController::class, 'store']);
-    Route::put('/crud/{table}/{id}', [AdminCrudController::class, 'update']);
-    Route::delete('/crud/{table}/{id}', [AdminCrudController::class, 'destroy']);
-});
-
-/*
-|--------------------------------------------------------------------------
-| Company Admin Routes (Tenant Admin)
-|--------------------------------------------------------------------------
-*/
-Route::middleware(['auth:sanctum', 'admin', 'company.user', 'throttle:120,1'])
-    ->prefix('admin')
-    ->group(function () {
-
-        // Users
-        Route::get('/users', [UserController::class, 'index']);
-        Route::post('/users', [UserController::class, 'store']);
-        Route::get('/users/{id}', [UserController::class, 'show']);
-        Route::put('/users/{id}', [UserController::class, 'update']);
-        Route::delete('/users/{id}', [UserController::class, 'destroy']);
-
-        // Appointments
-        Route::get('/appointments', [AppointmentController::class, 'index']);
-        Route::post('/appointments', [AppointmentController::class, 'store']);
-        Route::get('/appointments/{id}', [AppointmentController::class, 'show']);
-        Route::put('/appointments/{id}', [AppointmentController::class, 'update']);
-        Route::delete('/appointments/{id}', [AppointmentController::class, 'destroy']);
-    });
-
-/*
-|--------------------------------------------------------------------------
 | ERP Routes (Multi-tenant Clinic Management)
-|--------------------------------------------------------------------------
-| ✅ SetTenant Middleware removed - Now in Kernel.php (Global)
 |--------------------------------------------------------------------------
 */
 Route::prefix('erp')
@@ -161,6 +115,10 @@ Route::prefix('erp')
         Route::middleware('permission:finance.view')->group(function () {
             Route::get('/dashboard', [ErpDashboardController::class, 'index']);
             Route::get('/dashboard/finance', [FinanceDashboardController::class, 'index']);
+        });
+
+        // ✅ Activity Logs (مع Permission منفصل)
+        Route::middleware('permission:activity_logs.view')->group(function () {
             Route::get('/activity-logs', [ActivityLogController::class, 'index']);
         });
 
@@ -172,10 +130,17 @@ Route::prefix('erp')
             Route::post('/alerts/mark-all-read', [AlertController::class, 'markAllRead']);
         });
 
+        // ==================== ADMIN PANEL (Company Admin Only) ====================
+        Route::middleware(['admin', 'permission:users.manage'])->group(function () {
+            Route::apiResource('admin/users', UserController::class);
+        });
+
         // ==================== ORDERS ====================
         Route::middleware('permission:orders.manage')->post('/orders', [OrderController::class, 'storeErp']);
-        Route::middleware('permission:orders.view')->get('/orders', [OrderController::class, 'indexErp']);
-        Route::middleware('permission:orders.view')->get('/orders/{id}', [OrderController::class, 'showErp']);
+        Route::middleware('permission:orders.view')->group(function () {
+            Route::get('/orders', [OrderController::class, 'indexErp']);
+            Route::get('/orders/{id}', [OrderController::class, 'showErp']);
+        });
         Route::middleware('permission:orders.confirm')->post('/orders/{id}/confirm', [OrderController::class, 'confirm']);
         Route::middleware('permission:orders.cancel')->post('/orders/{id}/cancel', [OrderController::class, 'cancel']);
 
@@ -186,8 +151,10 @@ Route::prefix('erp')
             Route::get('/invoices/{id}/full', [InvoiceController::class, 'showFullInvoice']);
             Route::get('/invoices/{invoiceId}/journal-entries', [InvoiceJournalController::class, 'index']);
         });
-        Route::middleware('permission:finance.create')->post('/invoices/{invoice}/payments', [InvoicePaymentController::class, 'store']);
-        Route::post('/invoices/{invoice}/apply-credit', [InvoicePaymentController::class, 'applyCustomerCredit']);
+        Route::middleware('permission:finance.create')->group(function () {
+            Route::post('/invoices/{invoice}/payments', [InvoicePaymentController::class, 'store']);
+            Route::post('/invoices/{invoice}/apply-credit', [InvoicePaymentController::class, 'applyCustomerCredit']);
+        });
 
         // ==================== PAYMENTS & REFUNDS ====================
         Route::middleware('permission:payments.refund')->post('/payments/{payment}/refund', [PaymentRefundController::class, 'refund']);
@@ -259,12 +226,16 @@ Route::prefix('erp')
         });
 
         // ==================== DOCTORS ====================
-        Route::get('/doctors', [DoctorController::class, 'index']);
-        Route::post('/doctors', [DoctorController::class, 'store']);
-        Route::get('/doctors/{id}', [DoctorController::class, 'show']);
-        Route::put('/doctors/{id}', [DoctorController::class, 'update']);
-        Route::delete('/doctors/{id}', [DoctorController::class, 'destroy']);
-        Route::get('/doctors/{doctorId}/availability', [DoctorAvailabilityController::class, 'show']);
+        Route::middleware('permission:doctors.view')->group(function () {
+            Route::get('/doctors', [DoctorController::class, 'index']);
+            Route::get('/doctors/{id}', [DoctorController::class, 'show']);
+            Route::get('/doctors/{doctorId}/availability', [DoctorAvailabilityController::class, 'show']);
+        });
+        Route::middleware('permission:doctors.manage')->group(function () {
+            Route::post('/doctors', [DoctorController::class, 'store']);
+            Route::put('/doctors/{id}', [DoctorController::class, 'update']);
+            Route::delete('/doctors/{id}', [DoctorController::class, 'destroy']);
+        });
 
         // ==================== CUSTOMERS (PATIENTS) ====================
         Route::middleware('permission:patients.view')->group(function () {
@@ -280,10 +251,14 @@ Route::prefix('erp')
         });
 
         // ==================== RADIOLOGY ====================
-        Route::get('/patient-radiologies', [RadiologyController::class, 'index']);
-        Route::post('/patient-radiologies', [RadiologyController::class, 'store']);
-        Route::get('/patient-radiologies/{id}', [RadiologyController::class, 'show']);
-        Route::delete('/patient-radiologies/{id}', [RadiologyController::class, 'destroy']);
+        Route::middleware('permission:radiology.view')->group(function () {
+            Route::get('/patient-radiologies', [RadiologyController::class, 'index']);
+            Route::get('/patient-radiologies/{id}', [RadiologyController::class, 'show']);
+        });
+        Route::middleware('permission:radiology.manage')->group(function () {
+            Route::post('/patient-radiologies', [RadiologyController::class, 'store']);
+            Route::delete('/patient-radiologies/{id}', [RadiologyController::class, 'destroy']);
+        });
 
         // ==================== DENTAL RECORDS ====================
         Route::middleware('permission:patients.view')->group(function () {
@@ -299,50 +274,64 @@ Route::prefix('erp')
             ->post('/dental-records/{id}/to-treatment-plan-item', [DentalRecordController::class, 'toTreatmentPlanItem']);
 
         // ==================== CLINIC SETTINGS ====================
-        Route::get('/clinic-settings', [ClinicSettingController::class, 'show']);
-        Route::put('/clinic-settings', [ClinicSettingController::class, 'update']);
+        Route::middleware('permission:settings.view')->get('/clinic-settings', [ClinicSettingController::class, 'show']);
+        Route::middleware('permission:settings.manage')->put('/clinic-settings', [ClinicSettingController::class, 'update']);
 
-        // ==================== categories  ====================
-        Route::get('/categories', [CategoryController::class, 'index']);
-        Route::post('/categories', [CategoryController::class, 'store']);
-        Route::get('/categories/{id}', [CategoryController::class, 'show']);
-        Route::put('/categories/{id}', [CategoryController::class, 'update']);
-        Route::delete('/categories/{id}', [CategoryController::class, 'destroy']);
+        // ==================== INVENTORY (Categories, Suppliers, Products) ====================
+        Route::middleware('permission:inventory.view')->group(function () {
+            Route::get('/categories', [CategoryController::class, 'index']);
+            Route::get('/categories/{id}', [CategoryController::class, 'show']);
+            Route::get('/suppliers', [SupplierController::class, 'index']);
+            Route::get('/suppliers/{id}', [SupplierController::class, 'show']);
+            Route::get('/products', [ProductController::class, 'index']);
+            Route::get('/products/{id}', [ProductController::class, 'show']);
+        });
+        Route::middleware('permission:inventory.manage')->group(function () {
+            Route::post('/categories', [CategoryController::class, 'store']);
+            Route::put('/categories/{id}', [CategoryController::class, 'update']);
+            Route::delete('/categories/{id}', [CategoryController::class, 'destroy']);
 
-        // ==================== suppliers ====================
-        Route::get('/suppliers', [SupplierController::class, 'index']);
-        Route::post('/suppliers', [SupplierController::class, 'store']);
-        Route::get('/suppliers/{id}', [SupplierController::class, 'show']);
-        Route::put('/suppliers/{id}', [SupplierController::class, 'update']);
-        Route::delete('/suppliers/{id}', [SupplierController::class, 'destroy']);
+            Route::post('/suppliers', [SupplierController::class, 'store']);
+            Route::put('/suppliers/{id}', [SupplierController::class, 'update']);
+            Route::delete('/suppliers/{id}', [SupplierController::class, 'destroy']);
 
-        // ==================== employees ====================
-        Route::get('/employees', [EmployeeController::class, 'index']);
-        Route::post('/employees', [EmployeeController::class, 'store']);
-        Route::get('/employees/{id}', [EmployeeController::class, 'show']);
-        Route::put('/employees/{id}', [EmployeeController::class, 'update']);
-        Route::delete('/employees/{id}', [EmployeeController::class, 'destroy']);
+            Route::post('/products', [ProductController::class, 'store']);
+            Route::put('/products/{id}', [ProductController::class, 'update']);
+            Route::delete('/products/{id}', [ProductController::class, 'destroy']);
+        });
 
-        // ==================== products ====================
-        Route::get('/products', [ProductController::class, 'index']);
-        Route::post('/products', [ProductController::class, 'store']);
-        Route::get('/products/{id}', [ProductController::class, 'show']);
-        Route::put('/products/{id}', [ProductController::class, 'update']);
-        Route::delete('/products/{id}', [ProductController::class, 'destroy']);
+        // ==================== EMPLOYEES ====================
+        Route::middleware('permission:employees.view')->group(function () {
+            Route::get('/employees', [EmployeeController::class, 'index']);
+            Route::get('/employees/{id}', [EmployeeController::class, 'show']);
+        });
+        Route::middleware('permission:employees.manage')->group(function () {
+            Route::post('/employees', [EmployeeController::class, 'store']);
+            Route::put('/employees/{id}', [EmployeeController::class, 'update']);
+            Route::delete('/employees/{id}', [EmployeeController::class, 'destroy']);
+        });
 
-        // ==================== sales ====================
-        Route::get('/sales', [SaleController::class, 'index']);
-        Route::post('/sales', [SaleController::class, 'store']);
-        Route::get('/sales/{id}', [SaleController::class, 'show']);
-        Route::put('/sales/{id}', [SaleController::class, 'update']);
-        Route::delete('/sales/{id}', [SaleController::class, 'destroy']);
+        // ==================== SALES ====================
+        Route::middleware('permission:sales.view')->group(function () {
+            Route::get('/sales', [SaleController::class, 'index']);
+            Route::get('/sales/{id}', [SaleController::class, 'show']);
+        });
+        Route::middleware('permission:sales.manage')->group(function () {
+            Route::post('/sales', [SaleController::class, 'store']);
+            Route::put('/sales/{id}', [SaleController::class, 'update']);
+            Route::delete('/sales/{id}', [SaleController::class, 'destroy']);
+        });
 
-        // ==================== reservations ====================
-        Route::get('/reservations', [ReservationController::class, 'index']);
-        Route::post('/reservations', [ReservationController::class, 'store']);
-        Route::post('/reservations/{id}/confirm', [ReservationController::class, 'confirm']);
-        Route::post('/reservations/{id}/cancel', [ReservationController::class, 'cancel']);
-        Route::delete('/reservations/{id}', [ReservationController::class, 'destroy']);
+        // ==================== RESERVATIONS ====================
+        Route::middleware('permission:reservations.view')->group(function () {
+            Route::get('/reservations', [ReservationController::class, 'index']);
+        });
+        Route::middleware('permission:reservations.manage')->group(function () {
+            Route::post('/reservations', [ReservationController::class, 'store']);
+            Route::post('/reservations/{id}/confirm', [ReservationController::class, 'confirm']);
+            Route::post('/reservations/{id}/cancel', [ReservationController::class, 'cancel']);
+            Route::delete('/reservations/{id}', [ReservationController::class, 'destroy']);
+        });
     });
 
 /*
@@ -350,33 +339,20 @@ Route::prefix('erp')
 | SaaS Routes (Super Admin Only)
 |--------------------------------------------------------------------------
 */
-Route::middleware(['auth:sanctum'])->group(function () {
+Route::middleware(['auth:sanctum', 'super.admin'])->group(function () {
 
-    // ✅ جلب قائمة الشركات (لـ Super Admin)
     Route::get('/companies', function () {
-        if (!auth()->user()->is_super_admin) {
-            return response()->json(['message' => 'Unauthorized'], 403);
-        }
         return \App\Models\Company::select('id', 'name', 'slug', 'status')->get();
     });
 
-    // ✅ تبديل الشركة (لـ Super Admin)
     Route::post('/switch-company', function (Request $request) {
-        $user = auth()->user();
-
-        if (!$user->is_super_admin) {
-            return response()->json(['message' => 'Unauthorized'], 403);
-        }
-
         $companyId = $request->company_id;
 
-        // ✅ لو عايز يرجع لـ Global Mode (بدون شركة)
         if ($companyId === null || $companyId === 'null') {
             session(['tenant_id' => null]);
             return response()->json(['message' => 'Switched to global mode']);
         }
 
-        // ✅ التحقق من وجود الشركة
         $company = \App\Models\Company::find($companyId);
         if (!$company) {
             return response()->json(['message' => 'Invalid company'], 404);
