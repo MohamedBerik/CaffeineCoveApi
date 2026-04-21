@@ -24,10 +24,11 @@ class ActivityLogController extends Controller
             $query = ActivityLog::query();
 
             $logs = $query
-                ->when(
-                    $request->subject_type,
-                    fn($q) => $q->where('subject_type', $request->subject_type)
-                )
+                ->when($request->subject_type, fn($q) => $q->where('subject_type', $request->subject_type))
+                ->when($request->action, fn($q) => $q->where('action', $request->action))
+                ->when($request->user_id, fn($q) => $q->where('user_id', $request->user_id))
+                ->when($request->from, fn($q) => $q->whereDate('created_at', '>=', $request->from))
+                ->when($request->to, fn($q) => $q->whereDate('created_at', '<=', $request->to))
                 ->latest()
                 ->paginate($limit);
 

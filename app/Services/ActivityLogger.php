@@ -19,13 +19,19 @@ class ActivityLogger
         ?int $subjectId = null,
         array $properties = []
     ): ?ActivityLog {
-        // ✅ تحديد company_id تلقائيًا لو مش موجود
         $companyId = $companyId ?? Tenant::id();
 
         if (!$companyId) {
-            // لو مفيش company_id، مش هنقدر نسجل activity
             return null;
         }
+
+        // ✅ إضافة meta data تلقائيًا
+        $properties['meta'] = [
+            'ip' => request()->ip(),
+            'user_agent' => request()->userAgent(),
+            'url' => request()->fullUrl(),
+            'method' => request()->method(),
+        ];
 
         return ActivityLog::create([
             'company_id'   => $companyId,
@@ -45,7 +51,7 @@ class ActivityLogger
         return self::log(
             $model->company_id ?? null,
             $user ?? auth()->user(),
-            'created',
+            class_basename($model) . '.created', // 'Order.created'
             get_class($model),
             $model->id,
             ['attributes' => $model->toArray()]
@@ -57,6 +63,8 @@ class ActivityLogger
      */
     public static function logUpdated($model, array $changes = [], ?Authenticatable $user = null): ?ActivityLog
     {
+        $changedFields = array_keys($changes);
+
         if (empty($changes)) {
             $changes = $model->getChanges();
             unset($changes['updated_at']);
@@ -73,8 +81,9 @@ class ActivityLogger
             get_class($model),
             $model->id,
             [
-                'changes' => $changes,
                 'old' => array_intersect_key($model->getOriginal(), $changes),
+                'new' => $changes,
+                'changed_fields' => $changedFields,
             ]
         );
     }

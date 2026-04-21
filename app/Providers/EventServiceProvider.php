@@ -2,9 +2,11 @@
 
 namespace App\Providers;
 
+use App\Observers\ActivityLogObserver;
 use App\Services\Tenant;
 use Illuminate\Auth\Events\Registered;
 use Illuminate\Auth\Listeners\SendEmailVerificationNotification;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Foundation\Support\Providers\EventServiceProvider as ServiceProvider;
 use Illuminate\Queue\Events\JobProcessed;
@@ -31,6 +33,8 @@ class EventServiceProvider extends ServiceProvider
         Event::listen(JobProcessed::class, function () {
             Tenant::reset();
         });
+
+        // Model::observe(ActivityLogObserver::class);
     }
 
 
