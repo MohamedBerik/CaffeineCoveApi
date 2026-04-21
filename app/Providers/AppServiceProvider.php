@@ -9,8 +9,10 @@ use App\Models\Customer;
 use App\Models\TreatmentPlan;
 use App\Models\Order;
 use App\Models\PurchaseOrder;
+use App\Observers\ActivityLogObserver;
 use App\Observers\DashboardObserver;
 use App\Services\Tenant;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Log;
@@ -60,6 +62,7 @@ class AppServiceProvider extends ServiceProvider
         Queue::after(function () {
             Tenant::reset();
         });
+        Model::observe(ActivityLogObserver::class);
     }
 
     /**

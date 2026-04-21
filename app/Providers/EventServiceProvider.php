@@ -33,8 +33,6 @@ class EventServiceProvider extends ServiceProvider
         Event::listen(JobProcessed::class, function () {
             Tenant::reset();
         });
-
-        Model::observe(ActivityLogObserver::class);
     }
 
 
