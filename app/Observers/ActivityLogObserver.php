@@ -2,45 +2,104 @@
 
 namespace App\Observers;
 
+use App\Models\ActivityLog;
 use App\Services\ActivityLogger;
+use App\Services\Tenant;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Schema;
 
 class ActivityLogObserver
 {
-    public function created(Model $model): void
+    protected $manualLoggingModels = [
+        \App\Models\Appointment::class,
+        \App\Models\Invoice::class,
+        \App\Models\TreatmentPlan::class,
+        \App\Models\Order::class,
+        \App\Models\PurchaseOrder::class,
+    ];
+
+    public function created(Model $model)
     {
-        if ($this->shouldIgnore($model)) return;
-
-        ActivityLogger::logCreated($model);
-    }
-
-    public function updated(Model $model): void
-    {
-        if ($this->shouldIgnore($model)) return;
-
-        $changes = $model->getChanges();
-
-        // ❗ تجاهل updated_at فقط
-        if (count($changes) === 1 && isset($changes['updated_at'])) {
+        if (in_array(get_class($model), $this->manualLoggingModels)) {
             return;
         }
 
-        // ❗ تجاهل لو مفيش تغييرات حقيقية
+        ActivityLog::create([
+            'company_id' => $model->company_id ?? Tenant::id(),
+            'user_id' => auth()->id(),
+            'action' => strtolower(class_basename($model)) . '.created', // ✅ product.created
+            'subject_type' => get_class($model),
+            'subject_id' => $model->id,
+            'properties' => [
+                'attributes' => $model->toArray(),
+                'meta' => $this->getRequestMeta(),
+            ],
+        ]);
+    }
+
+    public function updated(Model $model)
+    {
+        if (in_array(get_class($model), $this->manualLoggingModels)) {
+            return;
+        }
+
+        // ✅ احصل على التغييرات بدون updated_at
+        $changes = $model->getChanges();
+        unset($changes['updated_at']);
+
+        // ✅ لو مفيش تغييرات حقيقية، متسجلش
         if (empty($changes)) {
             return;
         }
 
-        ActivityLogger::logUpdated($model, $changes);
+        ActivityLog::create([
+            'company_id' => $model->company_id ?? Tenant::id(),
+            'user_id' => auth()->id(),
+            'action' => strtolower(class_basename($model)) . '.updated', // ✅ product.updated
+            'subject_type' => get_class($model),
+            'subject_id' => $model->id,
+            'properties' => [
+                'old' => array_intersect_key($model->getOriginal(), $changes),
+                'new' => $changes,
+                'changed_fields' => array_keys($changes),
+                'meta' => $this->getRequestMeta(),
+            ],
+        ]);
     }
 
-    public function deleted(Model $model): void
+    public function deleted(Model $model)
     {
-        if ($this->shouldIgnore($model)) return;
+        if (in_array(get_class($model), $this->manualLoggingModels)) {
+            return;
+        }
 
-        ActivityLogger::logDeleted($model);
+        ActivityLog::create([
+            'company_id' => $model->company_id ?? Tenant::id(),
+            'user_id' => auth()->id(),
+            'action' => strtolower(class_basename($model)) . '.deleted', // ✅ product.deleted
+            'subject_type' => get_class($model),
+            'subject_id' => $model->id,
+            'properties' => [
+                'attributes' => $model->toArray(),
+                'meta' => $this->getRequestMeta(),
+            ],
+        ]);
     }
 
+    /**
+     * ✅ Get request meta information
+     */
+    private function getRequestMeta(): array
+    {
+        $request = request();
+
+        return [
+            'ip' => $request->ip(),
+            'url' => $request->fullUrl(),
+            'method' => $request->method(),
+            'user_agent' => $request->userAgent(),
+        ];
+    }
     /**
      * ✅ فلترة الموديلات
      */
