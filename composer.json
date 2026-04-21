@@ -38,7 +38,7 @@
         },
         "files": [
             "app/Helpers/activity.php",
-            "app/Helpers/tenant.php",
+            "app/Helpers/TenantHelper.php",
             "app/Helpers/formatting.php",
             "app/Helpers/helpers.php"
         ]
