@@ -83,14 +83,14 @@ class AppServiceProvider extends ServiceProvider
             Order::class,
             PurchaseOrder::class,
             Payment::class,
-            Doctor::class,           // ✅ أضف
-            DentalRecord::class,     // ✅ أضف
-            Employee::class,         // ✅ أضف
-            Category::class,         // ✅ أضف
-            Supplier::class,         // ✅ أضف
-            Procedure::class,        // ✅ أضف
-            PatientRadiology::class, // ✅ أضف (Radiology)
-            User::class, // ⚠️ مش موجود
+            Doctor::class,
+            DentalRecord::class,
+            Employee::class,
+            Category::class,
+            Supplier::class,
+            Procedure::class,
+            PatientRadiology::class,
+            User::class,
 
         ];
 
