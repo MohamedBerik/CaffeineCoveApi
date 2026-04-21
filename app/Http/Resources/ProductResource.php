@@ -6,12 +6,6 @@ use Illuminate\Http\Resources\Json\JsonResource;
 
 class ProductResource extends JsonResource
 {
-    /**
-     * Transform the resource into an array.
-     *
-     * @param  \Illuminate\Http\Request  $request
-     * @return array
-     */
     public function toArray($request)
     {
         return [
@@ -36,6 +30,7 @@ class ProductResource extends JsonResource
             'unit_price' => (float) $this->unit_price,
             'unit_price_formatted' => number_format($this->unit_price, 2) . ' EGP',
             'stock_quantity' => (int) $this->stock_quantity,
+            'quantity' => (int) $this->quantity, // ✅ أضف السطر ده
             'on_hand' => (int) $this->on_hand,
 
             // Inventory Status
@@ -64,17 +59,15 @@ class ProductResource extends JsonResource
                 'title_ar' => $this->category->title_ar,
             ]),
 
-            'order_items_count' => $this->whenCounted('orderItems'),
-            'invoice_items_count' => $this->whenCounted('invoiceItems'),
-            'stock_movements_count' => $this->whenCounted('stockMovements'),
+            // ✅ استبدل whenCounted بـ whenLoaded مع count()
+            'order_items_count' => $this->whenLoaded('orderItems', fn() => $this->orderItems->count(), 0),
+            'invoice_items_count' => $this->whenLoaded('invoiceItems', fn() => $this->invoiceItems->count(), 0),
+            'stock_movements_count' => $this->whenLoaded('stockMovements', fn() => $this->stockMovements->count(), 0),
 
             'stock_movements' => StockMovementResource::collection($this->whenLoaded('stockMovements')),
         ];
     }
 
-    /**
-     * Get additional data that should be returned with the resource array.
-     */
     public function with($request): array
     {
         return [
@@ -82,9 +75,6 @@ class ProductResource extends JsonResource
         ];
     }
 
-    /**
-     * Get localized title.
-     */
     private function getTitleAttribute(): string
     {
         return app()->getLocale() === 'ar'
@@ -92,9 +82,6 @@ class ProductResource extends JsonResource
             : ($this->title_en ?: $this->title_ar);
     }
 
-    /**
-     * Get localized description.
-     */
     private function getDescriptionAttribute(): ?string
     {
         return app()->getLocale() === 'ar'
@@ -102,9 +89,6 @@ class ProductResource extends JsonResource
             : ($this->description_en ?: $this->description_ar);
     }
 
-    /**
-     * Get inventory status.
-     */
     private function getInventoryStatus(): string
     {
         if ($this->stock_quantity <= 0) {
@@ -115,9 +99,6 @@ class ProductResource extends JsonResource
         return 'in_stock';
     }
 
-    /**
-     * Get inventory status label in Arabic.
-     */
     private function getInventoryStatusLabel(): string
     {
         return match ($this->getInventoryStatus()) {
@@ -128,9 +109,6 @@ class ProductResource extends JsonResource
         };
     }
 
-    /**
-     * Get inventory status color for UI.
-     */
     private function getInventoryStatusColor(): string
     {
         return match ($this->getInventoryStatus()) {
