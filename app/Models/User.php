@@ -193,19 +193,6 @@ class User extends Authenticatable
         return $this->status === self::STATUS_ACTIVE;
     }
 
-    public function hasPermission(string $permission): bool
-    {
-        if ($this->isSuperAdmin()) {
-            return true;
-        }
-
-        if ($this->isAdmin()) {
-            return true;
-        }
-
-        return false;
-    }
-
     public function mustHaveCompany(): bool
     {
         return !$this->isSuperAdmin();
@@ -216,9 +203,24 @@ class User extends Authenticatable
         return $this->company_id === $company->id;
     }
 
-    public function canAccessCompany(Company $company): bool
+    /**
+     * ✅ التحقق من صلاحية الوصول للشركة (تقبل Company object أو company_id)
+     */
+    public function canAccessCompany($company): bool
     {
-        return $this->isSuperAdmin() || $this->belongsToCompany($company);
+        // Super Admin يقدر يوصل لأي شركة
+        if ($this->isSuperAdmin()) {
+            return true;
+        }
+
+        // لو اتبعت Company object
+        if ($company instanceof Company) {
+            return $this->company_id === $company->id;
+        }
+
+        // لو اتبعت company_id (int)
+        $companyId = (int) $company;
+        return $this->company_id === $companyId;
     }
 
     public function activate(): void
@@ -229,6 +231,19 @@ class User extends Authenticatable
     public function deactivate(): void
     {
         $this->update(['status' => self::STATUS_INACTIVE]);
+    }
+
+    /**
+     * ✅ Override Spatie's hasPermissionTo to include Super Admin check
+     */
+    public function hasPermissionTo($permission, $guardName = null): bool
+    {
+        // Super Admin has all permissions
+        if ($this->isSuperAdmin()) {
+            return true;
+        }
+
+        return parent::hasPermissionTo($permission, $guardName);
     }
 
     // ============ Boot ============

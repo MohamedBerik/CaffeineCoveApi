@@ -1,5 +1,4 @@
 <?php
-// app/Models/Concerns/BelongsToCompanyTrait.php
 
 namespace App\Models\Concerns;
 
@@ -18,31 +17,53 @@ trait BelongsToCompanyTrait
         static::addGlobalScope(new CompanyScope);
 
         static::creating(function ($model) {
-            $companyId = Tenant::id();
-            $isSuperAdmin = Tenant::isSuperAdmin();
-
-            // ✅ إصلاح: منع الـ Exception لو Super Admin بدون شركة
-            if ($isSuperAdmin && !Tenant::hasTenant()) {
-                // ✅ بدل ما نرمي Exception، نستخدم company_id من الـ Model لو موجود
-                if (empty($model->company_id)) {
-                    // ✅ السماح بإنشاء السجل بدون company_id (لـ Super Admin فقط)
-                    return;
-                }
-                return;
-            }
-
+            // ✅ لو الـ Model مش محتاج company_id
             if (!static::$hasCompanyColumn) {
                 return;
             }
 
-            if ($companyId && empty($model->company_id)) {
-                $model->company_id = $companyId;
+            $companyId = Tenant::id();
+            $isSuperAdmin = Tenant::isSuperAdmin();
+
+            // ✅ Super Admin بدون Tenant Context
+            if ($isSuperAdmin && !Tenant::hasTenant()) {
+                // لو الـ company_id موجود، خلاص
+                if (!empty($model->company_id)) {
+                    return;
+                }
+                // السماح بإنشاء السجل بدون company_id (لـ Super Admin فقط)
+                return;
+            }
+
+            // ✅ لو company_id موجود بالفعل، خلاص
+            if (!empty($model->company_id)) {
+                return;
+            }
+
+            // ✅ لو companyId مش موجود والمستخدم مش Super Admin → خطأ
+            if (!$companyId) {
+                throw new \Exception('Tenant not resolved for model: ' . get_class($model));
+            }
+
+            // ✅ تعيين company_id تلقائيًا
+            $model->company_id = $companyId;
+        });
+
+        // ✅ منع تغيير company_id بعد الإنشاء
+        static::updating(function ($model) {
+            if (!static::$hasCompanyColumn) {
+                return;
+            }
+
+            // ✅ لو مش Super Admin والـ company_id اتغير → منع
+            if (!Tenant::isSuperAdmin() && $model->isDirty('company_id')) {
+                throw new \Exception('Cannot change company_id');
             }
         });
     }
 
     /**
-     * ✅ إصلاح المشكلة 2: withoutCompanyScope للـ Super Admin فقط
+     * ✅ إزالة الـ Scope (لـ Super Admin فقط)
      */
     public static function withoutCompanyScope()
     {
@@ -54,7 +75,7 @@ trait BelongsToCompanyTrait
     }
 
     /**
-     * ✅ إصلاح المشكلة 2: allCompanies للـ Super Admin فقط
+     * ✅ الاستعلام عن كل الشركات (لـ Super Admin فقط)
      */
     public static function allCompanies()
     {
@@ -65,16 +86,16 @@ trait BelongsToCompanyTrait
         return static::withoutGlobalScope(CompanyScope::class);
     }
 
-    /*
-     | العلاقة مع الشركة
+    /**
+     * ✅ العلاقة مع الشركة
      */
     public function company()
     {
         return $this->belongsTo(\App\Models\Company::class);
     }
 
-    /*
-     | Scope: فلترة حسب الشركة الحالية
+    /**
+     * ✅ Scope: فلترة حسب الشركة الحالية
      */
     public function scopeForCurrentCompany($query)
     {
@@ -85,5 +106,19 @@ trait BelongsToCompanyTrait
         }
 
         return $query->where('company_id', $companyId);
+    }
+
+    /**
+     * ✅ التحقق إذا كان السجل تبع الشركة الحالية
+     */
+    public function belongsToCurrentCompany(): bool
+    {
+        $companyId = Tenant::id();
+
+        if (!$companyId) {
+            return false;
+        }
+
+        return $this->company_id == $companyId;
     }
 }

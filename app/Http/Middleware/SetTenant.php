@@ -16,16 +16,26 @@ class SetTenant
         $user = $request->user();
 
         if (!$user) {
-            // ✅ Public Routes - No Tenant Context
             Tenant::setId(null);
             Tenant::setIsSuperAdmin(false);
 
-            Log::info('Tenant Check - Public Route', [
+            $this->logDebug('Tenant Check - Public Route', [
                 'path' => $request->path(),
                 'tenant_id' => null,
             ]);
 
             return $next($request);
+        }
+
+        // ✅ Early return for ERP requirement (تحسين #2)
+        if ($user->is_super_admin && $this->isErpRoute($request)) {
+            $tenantIdFromHeader = $request->header('X-Tenant-ID');
+
+            if (!filled($tenantIdFromHeader)) { // ✅ تحسين #3
+                return response()->json([
+                    'message' => 'Tenant ID is required for ERP operations. Please select a clinic.',
+                ], 400);
+            }
         }
 
         // ✅ Super Admin Logic
@@ -34,11 +44,10 @@ class SetTenant
 
             $tenantIdFromHeader = $request->header('X-Tenant-ID');
 
-            // ✅ لو عايز Global Mode (بدون شركة)
-            if ($tenantIdFromHeader === null || $tenantIdFromHeader === 'null' || $tenantIdFromHeader === '') {
+            if (!filled($tenantIdFromHeader)) { // ✅ تحسين #3
                 Tenant::setId(null);
 
-                Log::info('Tenant Check - Super Admin (Global Mode)', [
+                $this->logDebug('Tenant Check - Super Admin (Global Mode)', [
                     'user_id' => $user->id,
                     'tenant_id' => null,
                 ]);
@@ -46,7 +55,6 @@ class SetTenant
                 return $next($request);
             }
 
-            // ✅ التحقق من وجود الشركة وصلاحيتها
             $company = $this->findCompany($tenantIdFromHeader);
 
             if (!$company) {
@@ -61,20 +69,29 @@ class SetTenant
                 ], 400);
             }
 
+            // ✅ تحسين #4 - التحقق من صلاحية الوصول للشركة
+            if (!$user->canAccessCompany($company->id)) {
+                Log::warning('Tenant Check - Unauthorized Company Access', [
+                    'user_id' => $user->id,
+                    'company_id' => $company->id,
+                ]);
+
+                return response()->json([
+                    'message' => 'Unauthorized company access',
+                ], 403);
+            }
+
             if ($company->status === 'suspended') {
                 Log::warning('Tenant Check - Suspended Company', [
                     'user_id' => $user->id,
                     'company_id' => $company->id,
                     'company_status' => $company->status,
                 ]);
-
-                // ✅ اختياري: نسمح لـ Super Admin بالدخول للشركات المعلقة
-                // return response()->json(['message' => 'Company is suspended'], 403);
             }
 
             Tenant::setId($company->id);
 
-            Log::info('Tenant Check - Super Admin (Company Mode)', [
+            $this->logDebug('Tenant Check - Super Admin (Company Mode)', [
                 'user_id' => $user->id,
                 'tenant_id' => $company->id,
                 'company_slug' => $company->slug,
@@ -86,7 +103,6 @@ class SetTenant
 
         // ✅ Regular User Logic
         if ($user->company_id) {
-            // ✅ Cache الشركة عشان نقلل الـ Queries
             $company = $this->findCompany($user->company_id);
 
             if (!$company) {
@@ -120,7 +136,7 @@ class SetTenant
             Tenant::setId($user->company_id);
             Tenant::setIsSuperAdmin(false);
 
-            Log::info('Tenant Check - Regular User', [
+            $this->logDebug('Tenant Check - Regular User', [
                 'user_id' => $user->id,
                 'tenant_id' => $user->company_id,
                 'company_slug' => $company->slug,
@@ -141,6 +157,24 @@ class SetTenant
         return response()->json([
             'message' => 'Your account is not associated with any clinic. Please contact support.',
         ], 403);
+    }
+
+    /**
+     * ✅ التحقق إذا كان الـ Route من ERP (تحسين #1)
+     */
+    private function isErpRoute(Request $request): bool
+    {
+        return $request->is('api/erp/*', 'erp/*');
+    }
+
+    /**
+     * ✅ Debug logging - فقط في البيئة المحلية (تحسين #5)
+     */
+    private function logDebug(string $message, array $context = []): void
+    {
+        if (app()->environment('local', 'development')) {
+            Log::debug($message, $context);
+        }
     }
 
     /**
