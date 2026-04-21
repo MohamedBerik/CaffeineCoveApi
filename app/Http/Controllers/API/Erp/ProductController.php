@@ -76,6 +76,29 @@ class ProductController extends Controller
 
     public function store(Request $request)
     {
+        // ✅ Debug - شوف قيمة Tenant::id()
+        \Log::info('Product Store Debug', [
+            'tenant_id' => Tenant::id(),
+            'user_id' => auth()->id(),
+            'user_company_id' => auth()->user()?->company_id,
+            'is_super_admin' => Tenant::isSuperAdmin(),
+        ]);
+
+        $companyId = Tenant::id();
+
+        // ✅ لو company_id لسه null، ارجع Error واضح
+        if (!$companyId) {
+            return response()->json([
+                'msg' => 'Tenant context not resolved',
+                'status' => 500,
+                'debug' => [
+                    'tenant_id' => $companyId,
+                    'user_id' => auth()->id(),
+                    'user_company_id' => auth()->user()?->company_id,
+                ]
+            ], 500);
+        }
+
         $validate = Validator::make($request->all(), [
             'title_en' => 'required|min:3|max:255',
             'title_ar' => 'required|min:3|max:255',
@@ -103,7 +126,7 @@ class ProductController extends Controller
         }
 
         $product = Product::create([
-            "company_id"     => Tenant::id(),
+            "company_id"     => $companyId, // ✅ استخدم المتغير
             "title_en"       => $request->title_en,
             "title_ar"       => $request->title_ar,
             "description_en" => $request->description_en,
