@@ -76,15 +76,6 @@ class ProductController extends Controller
 
     public function store(Request $request)
     {
-        $companyId = auth()->user()->company_id; // ✅ حل مؤقت
-
-        if (!$companyId) {
-            return response()->json([
-                'msg' => 'Company ID not found',
-                'status' => 500,
-            ], 500);
-        }
-
         $validate = Validator::make($request->all(), [
             'title_en' => 'required|min:3|max:255',
             'title_ar' => 'required|min:3|max:255',
@@ -112,7 +103,7 @@ class ProductController extends Controller
         }
 
         $product = Product::create([
-            "company_id" => $companyId,
+            "company_id"     => Tenant::id(),
             "title_en"       => $request->title_en,
             "title_ar"       => $request->title_ar,
             "description_en" => $request->description_en,
