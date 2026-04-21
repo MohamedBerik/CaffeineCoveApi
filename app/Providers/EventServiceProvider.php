@@ -34,7 +34,7 @@ class EventServiceProvider extends ServiceProvider
             Tenant::reset();
         });
 
-        // Model::observe(ActivityLogObserver::class);
+        Model::observe(ActivityLogObserver::class);
     }
 
 
