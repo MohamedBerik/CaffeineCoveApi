@@ -43,7 +43,6 @@ use App\Services\Tenant;
 
 use App\Http\Controllers\API\SaaS\TenantController;
 use App\Http\Controllers\API\SaaS\ClinicOnboardingController;
-use App\Http\Middleware\SetTenant;
 
 /*
 |--------------------------------------------------------------------------
@@ -165,13 +164,11 @@ Route::middleware(['auth:sanctum', 'admin', 'company.user', 'throttle:120,1'])
 |--------------------------------------------------------------------------
 | ERP Routes (Multi-tenant Clinic Management)
 |--------------------------------------------------------------------------
+| ✅ SetTenant Middleware removed - Now in Kernel.php (Global)
+|--------------------------------------------------------------------------
 */
 Route::prefix('erp')
-    ->middleware([
-        'auth:sanctum',
-        SetTenant::class,
-        'company.user',
-    ])
+    ->middleware(['auth:sanctum', 'company.user'])
     ->group(function () {
 
         // ==================== DASHBOARD & REPORTS ====================
@@ -347,34 +344,6 @@ Route::prefix('erp')
         Route::put('/products/{id}', [ProductController::class, 'update']);
         Route::delete('/products/{id}', [ProductController::class, 'destroy']);
     });
-
-
-
-/*
-|--------------------------------------------------------------------------
-| SaaS Routes (Super Admin Only)
-|--------------------------------------------------------------------------
-*/
-
-// Route::prefix('saas')
-//     ->middleware(['auth:sanctum', 'super.admin'])
-//     ->group(function () {
-
-//         // Tenant management
-//         Route::get('/me', [TenantController::class, 'me']);
-//         Route::post('/switch-company', [TenantController::class, 'switch']);
-//         Route::post('/exit-company', [TenantController::class, 'exitCompany']);
-
-//         // Clinic onboarding (public - no auth required for register)
-//         Route::post('/register-clinic', [ClinicOnboardingController::class, 'register'])
-//             ->withoutMiddleware(['auth:sanctum', 'super.admin']);
-
-//         Route::get('/check-slug', [ClinicOnboardingController::class, 'checkSlug'])
-//             ->withoutMiddleware(['auth:sanctum', 'super.admin']);
-
-//         Route::get('/onboarding-progress', [ClinicOnboardingController::class, 'progress'])
-//             ->withoutMiddleware(['auth:sanctum', 'super.admin']);
-//     });
 
 /*
 |--------------------------------------------------------------------------
