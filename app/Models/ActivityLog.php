@@ -11,9 +11,6 @@ class ActivityLog extends Model
     use HasFactory;
     use BelongsToCompanyTrait;
 
-    // ✅ رجع السطر ده
-    // public static $hasCompanyColumn = true;
-
     protected $fillable = [
         'company_id',
         'user_id',
@@ -30,5 +27,15 @@ class ActivityLog extends Model
     public function company()
     {
         return $this->belongsTo(Company::class);
+    }
+
+    public function user()
+    {
+        return $this->belongsTo(User::class);
+    }
+
+    public function subject()
+    {
+        return $this->morphTo();
     }
 }
