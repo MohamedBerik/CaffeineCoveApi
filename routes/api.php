@@ -385,4 +385,19 @@ Route::middleware(['auth:sanctum', 'super.admin'])->group(function () {
     Route::get('/admin/companies/{id}/stats', [\App\Http\Controllers\API\SaaS\CompanyManagementController::class, 'stats']);
     Route::get('/admin/companies/{id}/users', [\App\Http\Controllers\API\SaaS\CompanyManagementController::class, 'users']);
     Route::get('/admin/companies/{id}/subscriptions', [\App\Http\Controllers\API\SaaS\CompanyManagementController::class, 'subscriptions']);
+
+    // ✅ Plans Management
+    Route::get('/admin/plans', [\App\Http\Controllers\API\SaaS\PlanController::class, 'index']);
+    Route::post('/admin/plans', [\App\Http\Controllers\API\SaaS\PlanController::class, 'store']);
+    Route::get('/admin/plans/{id}', [\App\Http\Controllers\API\SaaS\PlanController::class, 'show']);
+    Route::put('/admin/plans/{id}', [\App\Http\Controllers\API\SaaS\PlanController::class, 'update']);
+    Route::delete('/admin/plans/{id}', [\App\Http\Controllers\API\SaaS\PlanController::class, 'destroy']);
+    Route::put('/admin/plans/{id}/toggle', [\App\Http\Controllers\API\SaaS\PlanController::class, 'toggle']);
+
+    // ✅ Subscriptions Management
+    Route::get('/admin/subscriptions', [\App\Http\Controllers\API\SaaS\SubscriptionController::class, 'index']);
+    Route::post('/admin/subscriptions', [\App\Http\Controllers\API\SaaS\SubscriptionController::class, 'store']);
+    Route::put('/admin/subscriptions/{id}', [\App\Http\Controllers\API\SaaS\SubscriptionController::class, 'update']);
+    Route::post('/admin/subscriptions/{id}/cancel', [\App\Http\Controllers\API\SaaS\SubscriptionController::class, 'cancel']);
+    Route::post('/admin/subscriptions/{id}/renew', [\App\Http\Controllers\API\SaaS\SubscriptionController::class, 'renew']);
 });
