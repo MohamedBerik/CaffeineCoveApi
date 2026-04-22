@@ -125,7 +125,6 @@ Route::prefix('erp')
             Route::delete('/billing/payment-methods/{id}', [\App\Http\Controllers\API\Erp\BillingController::class, 'removePaymentMethod']);
         });
 
-
         // ==================== DASHBOARD & REPORTS ====================
         Route::middleware('permission:finance.view')->group(function () {
             Route::get('/dashboard', [ErpDashboardController::class, 'index']);
