@@ -4,6 +4,7 @@ namespace App\Http\Controllers\API\SaaS;
 
 use App\Http\Controllers\Controller;
 use App\Models\Company;
+use App\Models\Subscription;
 use App\Models\User;
 use App\Services\Tenant;
 use Illuminate\Http\Request;
@@ -267,17 +268,10 @@ class CompanyManagementController extends Controller
      */
     public function subscriptions($id)
     {
-        // لو مفيش جدول subscriptions، رجع بيانات وهمية
-        $subscriptions = [
-            [
-                'id' => 1,
-                'plan' => ['name' => 'Professional'],
-                'amount' => 199,
-                'status' => 'active',
-                'starts_at' => now()->subMonths(2)->toDateString(),
-                'ends_at' => now()->addMonths(10)->toDateString(),
-            ]
-        ];
+        $subscriptions = Subscription::where('company_id', $id)
+            ->with('plan')
+            ->orderByDesc('created_at')
+            ->get();
 
         return response()->json([
             'msg' => 'Company subscriptions',

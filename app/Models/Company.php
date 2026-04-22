@@ -79,6 +79,18 @@ class Company extends Model
         return $this->hasOne(ClinicSetting::class);
     }
 
+    public function subscriptions()
+    {
+        return $this->hasMany(Subscription::class);
+    }
+
+    public function activeSubscription()
+    {
+        return $this->hasOne(Subscription::class)
+            ->where('status', 'active')
+            ->latest();
+    }
+
     // ============ Scopes ============
     public function scopeActive($query)
     {
