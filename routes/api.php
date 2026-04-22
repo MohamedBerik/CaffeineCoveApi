@@ -364,5 +364,13 @@ Route::middleware(['auth:sanctum', 'super.admin'])->group(function () {
             'company' => $company->only('id', 'name', 'slug')
         ]);
     });
+    // ✅ SaaS Dashboard
     Route::get('/saas/dashboard', [\App\Http\Controllers\API\SaaS\SaasDashboardController::class, 'index']);
+
+    // ✅ SaaS Reports
+    Route::get('/saas/reports', [\App\Http\Controllers\API\SaaS\SaasReportsController::class, 'index']);
+
+    // ✅ Platform Settings
+    Route::get('/admin/settings/platform', [\App\Http\Controllers\API\SaaS\PlatformSettingsController::class, 'index']);
+    Route::post('/admin/settings/platform', [\App\Http\Controllers\API\SaaS\PlatformSettingsController::class, 'update']);
 });
