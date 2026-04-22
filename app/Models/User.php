@@ -216,9 +216,21 @@ class User extends Authenticatable
         return $this->company_id === $company->id;
     }
 
-    public function canAccessCompany(Company $company): bool
+    public function canAccessCompany($company): bool
     {
-        return $this->isSuperAdmin() || $this->belongsToCompany($company);
+        // Super Admin يقدر يوصل لأي شركة
+        if ($this->isSuperAdmin()) {
+            return true;
+        }
+
+        // لو اتبعت Company object
+        if ($company instanceof Company) {
+            return $this->company_id === $company->id;
+        }
+
+        // لو اتبعت company_id (int)
+        $companyId = (int) $company;
+        return $this->company_id === $companyId;
     }
 
     public function activate(): void
