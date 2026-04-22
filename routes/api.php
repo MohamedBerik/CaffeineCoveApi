@@ -400,4 +400,6 @@ Route::middleware(['auth:sanctum', 'super.admin'])->group(function () {
     Route::put('/admin/subscriptions/{id}', [\App\Http\Controllers\API\SaaS\SubscriptionController::class, 'update']);
     Route::post('/admin/subscriptions/{id}/cancel', [\App\Http\Controllers\API\SaaS\SubscriptionController::class, 'cancel']);
     Route::post('/admin/subscriptions/{id}/renew', [\App\Http\Controllers\API\SaaS\SubscriptionController::class, 'renew']);
+
+    Route::get('/admin/activity-logs', [\App\Http\Controllers\API\Erp\ActivityLogController::class, 'index']);
 });
