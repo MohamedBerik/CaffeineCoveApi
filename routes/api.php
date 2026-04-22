@@ -364,4 +364,5 @@ Route::middleware(['auth:sanctum', 'super.admin'])->group(function () {
             'company' => $company->only('id', 'name', 'slug')
         ]);
     });
+    Route::get('/saas/dashboard', [\App\Http\Controllers\API\SaaS\SaasDashboardController::class, 'index']);
 });
