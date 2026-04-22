@@ -43,6 +43,7 @@ class DatabaseSeeder extends Seeder
             CompanySeeder::class,           // 1. الشركات الأساسية
             CompanyAccountsSeeder::class,   // 2. الحسابات المحاسبية لكل شركة
             CompanyAdminSeeder::class,      // 3. الأدمنز (بما فيهم Super Admin)
+            PlanSeeder::class,              // 4. ✅ خطط الاشتراك (SaaS Plans)
         ]);
 
         $this->command->info('');
