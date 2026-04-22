@@ -110,6 +110,22 @@ Route::prefix('erp')
     ->middleware(['auth:sanctum', 'company.user'])
     ->group(function () {
 
+        // ==================== BILLING ====================
+        Route::middleware('permission:finance.view')->group(function () {
+            Route::get('/billing/subscription', [\App\Http\Controllers\API\Erp\BillingController::class, 'currentSubscription']);
+            Route::get('/billing/invoices', [\App\Http\Controllers\API\Erp\BillingController::class, 'invoices']);
+            Route::get('/billing/plans', [\App\Http\Controllers\API\Erp\BillingController::class, 'availablePlans']);
+            Route::get('/billing/payment-methods', [\App\Http\Controllers\API\Erp\BillingController::class, 'paymentMethods']);
+        });
+
+        Route::middleware('permission:finance.create')->group(function () {
+            Route::post('/billing/subscribe', [\App\Http\Controllers\API\Erp\BillingController::class, 'subscribe']);
+            Route::post('/billing/cancel', [\App\Http\Controllers\API\Erp\BillingController::class, 'cancel']);
+            Route::post('/billing/payment-methods', [\App\Http\Controllers\API\Erp\BillingController::class, 'addPaymentMethod']);
+            Route::delete('/billing/payment-methods/{id}', [\App\Http\Controllers\API\Erp\BillingController::class, 'removePaymentMethod']);
+        });
+
+
         // ==================== DASHBOARD & REPORTS ====================
         Route::middleware('permission:finance.view')->group(function () {
             Route::get('/dashboard', [ErpDashboardController::class, 'index']);
