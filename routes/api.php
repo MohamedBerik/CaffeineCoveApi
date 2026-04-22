@@ -373,4 +373,16 @@ Route::middleware(['auth:sanctum', 'super.admin'])->group(function () {
     // ✅ Platform Settings
     Route::get('/admin/settings/platform', [\App\Http\Controllers\API\SaaS\PlatformSettingsController::class, 'index']);
     Route::post('/admin/settings/platform', [\App\Http\Controllers\API\SaaS\PlatformSettingsController::class, 'update']);
+
+    // ✅ Companies Management
+    Route::get('/admin/companies', [\App\Http\Controllers\API\SaaS\CompanyManagementController::class, 'index']);
+    Route::post('/admin/companies', [\App\Http\Controllers\API\SaaS\CompanyManagementController::class, 'store']);
+    Route::get('/admin/companies/{id}', [\App\Http\Controllers\API\SaaS\CompanyManagementController::class, 'show']);
+    Route::put('/admin/companies/{id}', [\App\Http\Controllers\API\SaaS\CompanyManagementController::class, 'update']);
+    Route::delete('/admin/companies/{id}', [\App\Http\Controllers\API\SaaS\CompanyManagementController::class, 'destroy']);
+    Route::post('/admin/companies/{id}/suspend', [\App\Http\Controllers\API\SaaS\CompanyManagementController::class, 'suspend']);
+    Route::post('/admin/companies/{id}/activate', [\App\Http\Controllers\API\SaaS\CompanyManagementController::class, 'activate']);
+    Route::get('/admin/companies/{id}/stats', [\App\Http\Controllers\API\SaaS\CompanyManagementController::class, 'stats']);
+    Route::get('/admin/companies/{id}/users', [\App\Http\Controllers\API\SaaS\CompanyManagementController::class, 'users']);
+    Route::get('/admin/companies/{id}/subscriptions', [\App\Http\Controllers\API\SaaS\CompanyManagementController::class, 'subscriptions']);
 });
