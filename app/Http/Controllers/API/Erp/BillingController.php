@@ -5,49 +5,14 @@ namespace App\Http\Controllers\API\Erp;
 use App\Http\Controllers\Controller;
 use App\Models\Plan;
 use App\Models\Subscription;
+use App\Models\BillingInvoice;
+use App\Models\PaymentMethod;
 use App\Services\Tenant;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
 class BillingController extends Controller
 {
-    /**
-     * GET /api/erp/billing/subscription
-     * الاشتراك الحالي للشركة
-     */
-    public function currentSubscription()
-    {
-        $companyId = Tenant::id();
-
-        $subscription = Subscription::where('company_id', $companyId)
-            ->with('plan')
-            ->latest()
-            ->first();
-
-        // لو مفيش اشتراك، نرجع بيانات افتراضية (Trial)
-        if (!$subscription) {
-            $company = \App\Models\Company::find($companyId);
-            $subscription = [
-                'id' => null,
-                'status' => $company->status ?? 'trial',
-                'starts_at' => $company->created_at,
-                'ends_at' => $company->trial_ends_at,
-                'amount' => 0,
-                'plan' => [
-                    'id' => null,
-                    'name' => 'Trial Plan',
-                    'name_ar' => 'الخطة التجريبية',
-                ],
-            ];
-        }
-
-        return response()->json([
-            'msg' => 'Current subscription',
-            'status' => 200,
-            'data' => $subscription,
-        ]);
-    }
-
     /**
      * GET /api/erp/billing/invoices
      * فواتير الاشتراك السابقة
@@ -56,23 +21,9 @@ class BillingController extends Controller
     {
         $companyId = Tenant::id();
 
-        // لو مفيش جدول billing_invoices، نرجع بيانات وهمية
-        $invoices = [
-            [
-                'id' => 1,
-                'number' => 'INV-2024-001',
-                'amount' => 199,
-                'status' => 'paid',
-                'created_at' => now()->subMonths(1),
-            ],
-            [
-                'id' => 2,
-                'number' => 'INV-2024-002',
-                'amount' => 199,
-                'status' => 'paid',
-                'created_at' => now(),
-            ],
-        ];
+        $invoices = BillingInvoice::where('company_id', $companyId)
+            ->latest()
+            ->get();
 
         return response()->json([
             'msg' => 'Billing invoices',
@@ -82,39 +33,16 @@ class BillingController extends Controller
     }
 
     /**
-     * GET /api/erp/billing/plans
-     * الخطط المتاحة للاشتراك
-     */
-    public function availablePlans()
-    {
-        $plans = Plan::where('is_active', true)
-            ->orderBy('price_monthly')
-            ->get();
-
-        return response()->json([
-            'msg' => 'Available plans',
-            'status' => 200,
-            'data' => $plans,
-        ]);
-    }
-
-    /**
      * GET /api/erp/billing/payment-methods
      * وسائل الدفع المحفوظة
      */
     public function paymentMethods()
     {
-        // مؤقت - لو مفيش جدول payment_methods
-        $methods = [
-            [
-                'id' => 1,
-                'card_brand' => 'Visa',
-                'card_last4' => '4242',
-                'card_exp_month' => 12,
-                'card_exp_year' => 2026,
-                'is_default' => true,
-            ],
-        ];
+        $companyId = Tenant::id();
+
+        $methods = PaymentMethod::where('company_id', $companyId)
+            ->orderByDesc('is_default')
+            ->get();
 
         return response()->json([
             'msg' => 'Payment methods',
@@ -141,7 +69,10 @@ class BillingController extends Controller
             ? $plan->price_monthly
             : ($plan->price_yearly ?? $plan->price_monthly * 10);
 
-        return DB::transaction(function () use ($companyId, $plan, $amount) {
+        $tax = $amount * 0.14; // 14% VAT
+        $total = $amount + $tax;
+
+        return DB::transaction(function () use ($companyId, $plan, $amount, $tax, $total) {
             // إلغاء الاشتراك القديم
             Subscription::where('company_id', $companyId)
                 ->where('status', 'active')
@@ -157,6 +88,19 @@ class BillingController extends Controller
                 'status' => 'active',
             ]);
 
+            // إنشاء فاتورة
+            $invoice = BillingInvoice::create([
+                'company_id' => $companyId,
+                'subscription_id' => $subscription->id,
+                'number' => BillingInvoice::generateNumber(),
+                'amount' => $amount,
+                'tax' => $tax,
+                'total' => $total,
+                'status' => 'paid', // مؤقت - لما نضيف بوابة دفع هيكون pending
+                'paid_at' => now(),
+                'due_date' => now()->addDays(7),
+            ]);
+
             // تحديث حالة الشركة
             \App\Models\Company::where('id', $companyId)
                 ->update(['status' => 'active']);
@@ -165,26 +109,9 @@ class BillingController extends Controller
                 'msg' => 'Subscription activated successfully',
                 'status' => 200,
                 'data' => $subscription,
+                'invoice' => $invoice,
             ]);
         });
-    }
-
-    /**
-     * POST /api/erp/billing/cancel
-     * إلغاء الاشتراك
-     */
-    public function cancel()
-    {
-        $companyId = Tenant::id();
-
-        Subscription::where('company_id', $companyId)
-            ->where('status', 'active')
-            ->update(['status' => 'cancelled']);
-
-        return response()->json([
-            'msg' => 'Subscription cancelled successfully',
-            'status' => 200,
-        ]);
     }
 
     /**
@@ -193,18 +120,28 @@ class BillingController extends Controller
      */
     public function addPaymentMethod(Request $request)
     {
-        // مؤقت - محتاج ربط بـ Stripe/PayMob
+        $request->validate([
+            'stripe_token' => ['required', 'string'],
+            'is_default' => ['boolean'],
+        ]);
+
+        $companyId = Tenant::id();
+
+        // مؤقت - محتاج ربط بـ Stripe فعلي
+        $method = PaymentMethod::create([
+            'company_id' => $companyId,
+            'stripe_id' => 'pm_' . uniqid(),
+            'card_brand' => 'Visa',
+            'card_last4' => '4242',
+            'card_exp_month' => 12,
+            'card_exp_year' => 2026,
+            'is_default' => $request->is_default ?? true,
+        ]);
+
         return response()->json([
             'msg' => 'Payment method added successfully',
             'status' => 200,
-            'data' => [
-                'id' => rand(1, 100),
-                'card_brand' => 'Visa',
-                'card_last4' => substr($request->card_number ?? '4242424242424242', -4),
-                'card_exp_month' => $request->exp_month ?? 12,
-                'card_exp_year' => $request->exp_year ?? 2026,
-                'is_default' => true,
-            ],
+            'data' => $method,
         ]);
     }
 
@@ -214,6 +151,14 @@ class BillingController extends Controller
      */
     public function removePaymentMethod($id)
     {
+        $companyId = Tenant::id();
+
+        $method = PaymentMethod::where('company_id', $companyId)
+            ->where('id', $id)
+            ->firstOrFail();
+
+        $method->delete();
+
         return response()->json([
             'msg' => 'Payment method removed',
             'status' => 200,
