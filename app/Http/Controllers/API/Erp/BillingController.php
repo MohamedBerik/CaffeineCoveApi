@@ -8,6 +8,7 @@ use App\Models\Subscription;
 use App\Models\BillingInvoice;
 use App\Models\PaymentMethod;
 use App\Services\Tenant;
+use App\Services\PayMobService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -95,7 +96,7 @@ class BillingController extends Controller
             ]);
 
             // إنشاء طلب دفع عند PayMob
-            $paymob = new \App\Services\PayMobService();
+            $paymob = new PayMobService();
             $intention = $paymob->createIntention([
                 'amount' => (int) ($amount * 100), // بالقروش
                 'currency' => 'EGP',
@@ -119,26 +120,72 @@ class BillingController extends Controller
     }
 
     /**
+     * POST /api/erp/billing/cancel
+     * إلغاء الاشتراك الحالي
+     */
+    public function cancel()
+    {
+        $companyId = Tenant::id();
+
+        $subscription = Subscription::where('company_id', $companyId)
+            ->where('status', 'active')
+            ->first();
+
+        if ($subscription) {
+            $subscription->update(['status' => 'cancelled']);
+
+            return response()->json([
+                'msg' => 'Subscription cancelled successfully',
+                'status' => 200,
+            ]);
+        }
+
+        return response()->json([
+            'msg' => 'No active subscription found',
+            'status' => 404,
+        ], 404);
+    }
+
+    /**
+     * POST /api/erp/billing/cancel-pending/{id}
+     * إلغاء اشتراك معلق
+     */
+    public function cancelPending($id)
+    {
+        $companyId = Tenant::id();
+
+        Subscription::where('company_id', $companyId)
+            ->where('id', $id)
+            ->where('status', 'pending')
+            ->delete();
+
+        return response()->json(['status' => 'ok']);
+    }
+
+    /**
      * POST /api/erp/billing/payment-methods
      * إضافة وسيلة دفع جديدة
      */
     public function addPaymentMethod(Request $request)
     {
         $request->validate([
-            'stripe_token' => ['required', 'string'],
+            'card_brand' => ['required', 'string'],
+            'card_last4' => ['required', 'string'],
+            'card_exp_month' => ['required', 'integer'],
+            'card_exp_year' => ['required', 'integer'],
             'is_default' => ['boolean'],
         ]);
 
         $companyId = Tenant::id();
 
-        // مؤقت - محتاج ربط بـ Stripe فعلي
         $method = PaymentMethod::create([
             'company_id' => $companyId,
-            'stripe_id' => 'pm_' . uniqid(),
-            'card_brand' => 'Visa',
-            'card_last4' => '4242',
-            'card_exp_month' => 12,
-            'card_exp_year' => 2026,
+            'gateway' => 'paymob',
+            'token' => 'pm_' . uniqid(),
+            'card_brand' => $request->card_brand,
+            'card_last4' => $request->card_last4,
+            'card_exp_month' => $request->card_exp_month,
+            'card_exp_year' => $request->card_exp_year,
             'is_default' => $request->is_default ?? true,
         ]);
 
@@ -203,16 +250,20 @@ class BillingController extends Controller
         ]);
     }
 
-    // BillingController.php
-    public function cancelPending($id)
+    /**
+     * GET /api/erp/billing/plans
+     * الخطط المتاحة
+     */
+    public function availablePlans()
     {
-        $companyId = Tenant::id();
+        $plans = Plan::where('is_active', true)
+            ->orderBy('price_monthly')
+            ->get();
 
-        Subscription::where('company_id', $companyId)
-            ->where('id', $id)
-            ->where('status', 'pending')
-            ->delete();
-
-        return response()->json(['status' => 'ok']);
+        return response()->json([
+            'msg' => 'Available plans',
+            'status' => 200,
+            'data' => $plans,
+        ]);
     }
 }
