@@ -164,4 +164,34 @@ class BillingController extends Controller
             'status' => 200,
         ]);
     }
+
+    /**
+     * GET /api/erp/billing/subscription
+     * الاشتراك الحالي للشركة
+     */
+    public function currentSubscription()
+    {
+        $companyId = Tenant::id();
+
+        $subscription = Subscription::where('company_id', $companyId)
+            ->with('plan')
+            ->latest()
+            ->first();
+
+        // ✅ لو فيه اشتراك، رجعه
+        if ($subscription) {
+            return response()->json([
+                'msg' => 'Current subscription',
+                'status' => 200,
+                'data' => $subscription,
+            ]);
+        }
+
+        // ✅ لو مفيش اشتراك، رجع null (مش بيانات وهمية)
+        return response()->json([
+            'msg' => 'No active subscription',
+            'status' => 200,
+            'data' => null,
+        ]);
+    }
 }
