@@ -111,12 +111,12 @@ Route::prefix('erp')
     ->group(function () {
 
         // ==================== BILLING ====================
-        // Route::middleware('permission:finance.view')->group(function () {
-        Route::get('/billing/subscription', [\App\Http\Controllers\API\Erp\BillingController::class, 'currentSubscription']);
-        Route::get('/billing/invoices', [\App\Http\Controllers\API\Erp\BillingController::class, 'invoices']);
-        Route::get('/billing/plans', [\App\Http\Controllers\API\Erp\BillingController::class, 'availablePlans']);
-        Route::get('/billing/payment-methods', [\App\Http\Controllers\API\Erp\BillingController::class, 'paymentMethods']);
-        // });
+        Route::middleware('permission:finance.view')->group(function () {
+            Route::get('/billing/subscription', [\App\Http\Controllers\API\Erp\BillingController::class, 'currentSubscription']);
+            Route::get('/billing/invoices', [\App\Http\Controllers\API\Erp\BillingController::class, 'invoices']);
+            Route::get('/billing/plans', [\App\Http\Controllers\API\Erp\BillingController::class, 'availablePlans']);
+            Route::get('/billing/payment-methods', [\App\Http\Controllers\API\Erp\BillingController::class, 'paymentMethods']);
+        });
 
         Route::middleware('permission:finance.create')->group(function () {
             Route::post('/billing/subscribe', [\App\Http\Controllers\API\Erp\BillingController::class, 'subscribe']);
