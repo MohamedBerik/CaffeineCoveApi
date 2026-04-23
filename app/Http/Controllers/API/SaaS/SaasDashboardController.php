@@ -4,6 +4,8 @@ namespace App\Http\Controllers\API\SaaS;
 
 use App\Http\Controllers\Controller;
 use App\Models\Company;
+use App\Models\Subscription;
+use App\Models\BillingInvoice;
 use App\Models\ActivityLog;
 use App\Services\Tenant;
 use Illuminate\Http\Request;
@@ -16,122 +18,65 @@ class SaasDashboardController extends Controller
     {
         $period = $request->get('period', 'month');
 
-        // ✅ Run in Super Admin Context
         return Tenant::asSuperAdmin(function () use ($period) {
 
-            // ==================== Stats ====================
-            $totalCompanies = Company::count();
-            $activeCompanies = Company::where('status', 'active')->count();
-            $trialCompanies = Company::where('status', 'trial')->count();
-            $suspendedCompanies = Company::where('status', 'suspended')->count();
+            // ==================== BILLING KPIs ====================
+            $activeSubscriptions = Subscription::where('status', 'active')->count();
+            $mrr = (float) Subscription::where('status', 'active')->sum('amount');
+            $totalRevenue = (float) BillingInvoice::where('status', 'paid')->sum('total');
+            $churnRate = $this->calculateChurnRate();
+            $avgRevenue = $activeSubscriptions > 0 ? $mrr / $activeSubscriptions : 0;
 
-            $activePercentage = $totalCompanies > 0
-                ? ($activeCompanies / $totalCompanies) * 100
-                : 0;
-
-            // ==================== MRR (Monthly Recurring Revenue) ====================
-            $mrr = DB::table('invoices')
-                ->join('companies', 'companies.id', '=', 'invoices.company_id')
-                ->where('companies.status', 'active')
-                ->whereMonth('invoices.issued_at', now()->month)
-                ->sum('invoices.total');
-
-            $lastMonthMrr = DB::table('invoices')
-                ->join('companies', 'companies.id', '=', 'invoices.company_id')
-                ->where('companies.status', 'active')
-                ->whereMonth('invoices.issued_at', now()->subMonth()->month)
-                ->sum('invoices.total');
-
-            $mrrGrowth = $lastMonthMrr > 0
-                ? (($mrr - $lastMonthMrr) / $lastMonthMrr) * 100
-                : 0;
-
-            // ==================== Total Revenue ====================
             $dateRange = $this->getDateRange($period);
 
-            $totalRevenue = DB::table('payments')
-                ->whereBetween('paid_at', [$dateRange['start'], $dateRange['end']])
-                ->sum('applied_amount');
+            // ==================== STATS ====================
+            $stats = [
+                'total_companies' => Company::count(),
+                'active_companies' => Company::where('status', 'active')->count(),
+                'trial_companies' => Company::where('status', 'trial')->count(),
+                'suspended_companies' => Company::where('status', 'suspended')->count(),
+                'active_percentage' => Company::count() > 0 ? round((Company::where('status', 'active')->count() / Company::count()) * 100, 1) : 0,
+                'mrr' => $mrr,
+                'mrr_growth' => $this->calculateMrrGrowth(),
+                'total_revenue' => $totalRevenue,
+                'revenue_growth' => $this->calculateRevenueGrowth($dateRange),
+                'companies_growth' => $this->calculateCompaniesGrowth($dateRange),
+                'trial_growth' => $this->calculateTrialGrowth($dateRange),
+                'active_subscriptions' => $activeSubscriptions,
+                'churn_rate' => round($churnRate, 1),
+                'avg_revenue_per_company' => round($avgRevenue, 2),
+            ];
 
-            $previousRevenue = DB::table('payments')
-                ->whereBetween('paid_at', [$dateRange['previous_start'], $dateRange['previous_end']])
-                ->sum('applied_amount');
-
-            $revenueGrowth = $previousRevenue > 0
-                ? (($totalRevenue - $previousRevenue) / $previousRevenue) * 100
-                : 0;
-
-            // ==================== Companies Growth ====================
-            $newCompanies = Company::whereBetween('created_at', [$dateRange['start'], $dateRange['end']])->count();
-            $churnedCompanies = Company::where('status', 'cancelled')
-                ->whereBetween('updated_at', [$dateRange['start'], $dateRange['end']])
-                ->count();
-
-            $companiesGrowth = $newCompanies - $churnedCompanies;
-            $companiesGrowthPercent = $totalCompanies > 0
-                ? ($companiesGrowth / $totalCompanies) * 100
-                : 0;
-
-            // ==================== Trial Growth ====================
-            $trialGrowth = Company::where('status', 'trial')
-                ->whereBetween('created_at', [$dateRange['start'], $dateRange['end']])
-                ->count();
-
-            // ==================== MRR Chart Data ====================
+            // ==================== MRR CHART ====================
             $mrrData = $this->getMrrChartData();
 
-            // ==================== Growth Chart Data ====================
+            // ==================== GROWTH CHART ====================
             $growthData = $this->getGrowthChartData();
 
-            // ==================== Companies by Status ====================
+            // ==================== COMPANIES BY STATUS ====================
             $companiesByStatus = [
-                'active' => $activeCompanies,
-                'trial' => $trialCompanies,
-                'suspended' => $suspendedCompanies,
+                'active' => Company::where('status', 'active')->count(),
+                'trial' => Company::where('status', 'trial')->count(),
+                'suspended' => Company::where('status', 'suspended')->count(),
                 'cancelled' => Company::where('status', 'cancelled')->count(),
             ];
 
-            // ==================== Top Clinics ====================
-            $topClinics = Company::where('status', 'active')
-                ->withSum(['invoices as total_revenue' => function ($q) {
-                    $q->whereMonth('issued_at', now()->month);
-                }], 'total')
-                ->withCount(['appointments as total_appointments' => function ($q) {
-                    $q->whereMonth('appointment_date', now()->month);
-                }])
-                ->orderByDesc('total_revenue')
-                ->limit(5)
-                ->get()
-                ->map(function ($company) {
-                    $lastMonthRevenue = $company->invoices()
-                        ->whereMonth('issued_at', now()->subMonth()->month)
-                        ->sum('total');
+            // ==================== TOP CLINICS ====================
+            $topClinics = $this->getTopClinics();
 
-                    $growth = $lastMonthRevenue > 0
-                        ? (($company->total_revenue - $lastMonthRevenue) / $lastMonthRevenue) * 100
-                        : 0;
+            // ==================== RECENT COMPANIES ====================
+            $recentCompanies = Company::latest()->limit(10)->get(['id', 'name', 'slug', 'status', 'created_at', 'trial_ends_at']);
 
-                    return [
-                        'id' => $company->id,
-                        'name' => $company->name,
-                        'revenue' => $company->total_revenue ?? 0,
-                        'appointments' => $company->total_appointments ?? 0,
-                        'growth' => round($growth, 1),
-                    ];
-                });
+            // ==================== RECENT TRANSACTIONS ====================
+            $recentTransactions = $this->getRecentTransactions();
 
-            // ==================== Recent Companies ====================
-            $recentCompanies = Company::latest()
-                ->limit(10)
-                ->get(['id', 'name', 'slug', 'status', 'created_at', 'trial_ends_at']);
-
-            // ==================== Recent Activities ====================
+            // ==================== RECENT ACTIVITIES ====================
             $recentActivities = ActivityLog::whereIn('action', [
-                'company.created',
-                'company.activated',
-                'company.suspended',
                 'subscription.created',
+                'subscription.cancelled',
+                'subscription.changed',
                 'payment.received',
+                'company.created',
             ])
                 ->latest()
                 ->limit(10)
@@ -148,28 +93,69 @@ class SaasDashboardController extends Controller
                 'msg' => 'SaaS Dashboard',
                 'status' => 200,
                 'data' => [
-                    'stats' => [
-                        'total_companies' => $totalCompanies,
-                        'active_companies' => $activeCompanies,
-                        'trial_companies' => $trialCompanies,
-                        'suspended_companies' => $suspendedCompanies,
-                        'active_percentage' => round($activePercentage, 1),
-                        'mrr' => $mrr,
-                        'mrr_growth' => round($mrrGrowth, 1),
-                        'total_revenue' => $totalRevenue,
-                        'revenue_growth' => round($revenueGrowth, 1),
-                        'companies_growth' => $companiesGrowthPercent,
-                        'trial_growth' => $trialGrowth,
-                    ],
+                    'stats' => $stats,
                     'mrr' => $mrrData,
                     'growth' => $growthData,
                     'companies_by_status' => $companiesByStatus,
                     'top_clinics' => $topClinics,
                     'recent_companies' => $recentCompanies,
+                    'recent_transactions' => $recentTransactions,
                     'recent_activities' => $recentActivities,
                 ],
             ]);
         });
+    }
+
+    // ==================== HELPER METHODS ====================
+
+    private function calculateChurnRate(): float
+    {
+        $totalActive = Subscription::where('status', 'active')->count();
+        $cancelledThisMonth = Subscription::where('status', 'cancelled')
+            ->whereMonth('updated_at', now()->month)
+            ->count();
+
+        return $totalActive > 0 ? ($cancelledThisMonth / $totalActive) * 100 : 0;
+    }
+
+    private function calculateMrrGrowth(): float
+    {
+        $currentMrr = (float) Subscription::where('status', 'active')->sum('amount');
+        $lastMonthMrr = (float) Subscription::where('status', 'active')
+            ->whereMonth('created_at', now()->subMonth()->month)
+            ->sum('amount');
+
+        return $lastMonthMrr > 0 ? (($currentMrr - $lastMonthMrr) / $lastMonthMrr) * 100 : 0;
+    }
+
+    private function calculateRevenueGrowth(array $dateRange): float
+    {
+        $current = (float) BillingInvoice::where('status', 'paid')
+            ->whereBetween('created_at', [$dateRange['start'], $dateRange['end']])
+            ->sum('total');
+
+        $previous = (float) BillingInvoice::where('status', 'paid')
+            ->whereBetween('created_at', [$dateRange['previous_start'], $dateRange['previous_end']])
+            ->sum('total');
+
+        return $previous > 0 ? (($current - $previous) / $previous) * 100 : 0;
+    }
+
+    private function calculateCompaniesGrowth(array $dateRange): float
+    {
+        $current = Company::whereBetween('created_at', [$dateRange['start'], $dateRange['end']])->count();
+        $previous = Company::whereBetween('created_at', [$dateRange['previous_start'], $dateRange['previous_end']])->count();
+
+        return $previous > 0 ? (($current - $previous) / $previous) * 100 : 0;
+    }
+
+    private function calculateTrialGrowth(array $dateRange): float
+    {
+        $current = Company::where('status', 'trial')
+            ->whereBetween('created_at', [$dateRange['start'], $dateRange['end']])
+            ->count();
+
+        return $current;
     }
 
     private function getDateRange(string $period): array
@@ -213,12 +199,10 @@ class SaasDashboardController extends Controller
         $data = [];
         for ($i = 11; $i >= 0; $i--) {
             $date = now()->subMonths($i);
-            $mrr = DB::table('invoices')
-                ->join('companies', 'companies.id', '=', 'invoices.company_id')
-                ->where('companies.status', 'active')
-                ->whereYear('invoices.issued_at', $date->year)
-                ->whereMonth('invoices.issued_at', $date->month)
-                ->sum('invoices.total');
+            $mrr = (float) Subscription::where('status', 'active')
+                ->whereYear('created_at', $date->year)
+                ->whereMonth('created_at', $date->month)
+                ->sum('amount');
 
             $data[] = [
                 'month' => $date->format('M Y'),
@@ -250,5 +234,44 @@ class SaasDashboardController extends Controller
             ];
         }
         return $data;
+    }
+
+    private function getTopClinics(): array
+    {
+        return Company::where('status', 'active')
+            ->withSum(['subscriptions as total_revenue' => function ($q) {
+                $q->where('status', 'active');
+            }], 'amount')
+            ->orderByDesc('total_revenue')
+            ->limit(5)
+            ->get()
+            ->map(function ($company) {
+                return [
+                    'id' => $company->id,
+                    'name' => $company->name,
+                    'revenue' => $company->total_revenue ?? 0,
+                    'appointments' => 0,
+                    'growth' => 0,
+                ];
+            })
+            ->toArray();
+    }
+
+    private function getRecentTransactions(): array
+    {
+        return BillingInvoice::where('status', 'paid')
+            ->latest()
+            ->limit(5)
+            ->get()
+            ->map(function ($invoice) {
+                return [
+                    'id' => $invoice->id,
+                    'number' => $invoice->number,
+                    'amount' => $invoice->total,
+                    'company_id' => $invoice->company_id,
+                    'created_at' => $invoice->created_at,
+                ];
+            })
+            ->toArray();
     }
 }
