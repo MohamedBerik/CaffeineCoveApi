@@ -32,6 +32,7 @@ use App\Http\Controllers\API\Erp\DoctorAvailabilityController;
 use App\Http\Controllers\API\Erp\TreatmentPlanController;
 use App\Http\Controllers\API\Erp\CustomerController;
 use App\Http\Controllers\API\Erp\AppointmentController;
+use App\Http\Controllers\API\Erp\BillingController;
 use App\Http\Controllers\API\Erp\ClinicSettingController;
 use App\Http\Controllers\API\Erp\DentalRecordController;
 use App\Http\Controllers\API\Erp\ErpDashboardController;
@@ -421,3 +422,4 @@ Route::middleware(['auth:sanctum', 'super.admin'])->group(function () {
 
 Route::post('/webhooks/paymob', [\App\Http\Controllers\API\Webhook\PayMobWebhookController::class, 'handle'])
     ->withoutMiddleware(['auth:sanctum', 'company.user']);
+Route::post('/billing/cancel-pending/{id}', [BillingController::class, 'cancelPending']);

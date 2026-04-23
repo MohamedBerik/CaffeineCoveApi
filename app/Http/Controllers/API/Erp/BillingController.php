@@ -202,4 +202,17 @@ class BillingController extends Controller
             'data' => null,
         ]);
     }
+
+    // BillingController.php
+    public function cancelPending($id)
+    {
+        $companyId = Tenant::id();
+
+        Subscription::where('company_id', $companyId)
+            ->where('id', $id)
+            ->where('status', 'pending')
+            ->delete();
+
+        return response()->json(['status' => 'ok']);
+    }
 }
