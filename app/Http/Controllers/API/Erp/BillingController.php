@@ -180,6 +180,10 @@ class BillingController extends Controller
 
         // ✅ لو فيه اشتراك، رجعه
         if ($subscription) {
+            if ($subscription->plan && is_string($subscription->plan->features)) {
+                $subscription->plan->features = json_decode($subscription->plan->features, true);
+            }
+
             return response()->json([
                 'msg' => 'Current subscription',
                 'status' => 200,
@@ -187,7 +191,7 @@ class BillingController extends Controller
             ]);
         }
 
-        // ✅ لو مفيش اشتراك، رجع null (مش بيانات وهمية)
+        // ✅ لو مفيش اشتراك، رجع null
         return response()->json([
             'msg' => 'No active subscription',
             'status' => 200,
