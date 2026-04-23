@@ -95,6 +95,8 @@ class BillingController extends Controller
                 'payment_gateway' => 'paymob',
             ]);
 
+            event(new \App\Events\SubscriptionCreated($subscription));
+
             // إنشاء طلب دفع عند PayMob
             $paymob = new PayMobService();
             $intention = $paymob->createIntention([
@@ -133,6 +135,8 @@ class BillingController extends Controller
 
         if ($subscription) {
             $subscription->update(['status' => 'cancelled']);
+
+            event(new \App\Events\SubscriptionCancelled($subscription));
 
             return response()->json([
                 'msg' => 'Subscription cancelled successfully',

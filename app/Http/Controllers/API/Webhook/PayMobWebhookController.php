@@ -69,7 +69,7 @@ class PayMobWebhookController extends Controller
         }
 
         // إنشاء فاتورة
-        BillingInvoice::create([
+        $invoice = BillingInvoice::create([
             'company_id' => $subscription->company_id,
             'subscription_id' => $subscription->id,
             'number' => BillingInvoice::generateNumber(),
@@ -82,6 +82,7 @@ class PayMobWebhookController extends Controller
         ]);
 
         Log::info('PayMob Webhook: Subscription activated', ['subscription_id' => $subscription->id]);
+        event(new \App\Events\PaymentReceived($invoice));
 
         return response()->json(['status' => 'ok']);
     }
