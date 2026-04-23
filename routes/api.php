@@ -418,3 +418,6 @@ Route::middleware(['auth:sanctum', 'super.admin'])->group(function () {
 
     Route::get('/admin/activity-logs', [\App\Http\Controllers\API\Erp\ActivityLogController::class, 'index']);
 });
+
+Route::post('/webhooks/paymob', [\App\Http\Controllers\API\Webhook\PayMobWebhookController::class, 'handle'])
+    ->withoutMiddleware(['auth:sanctum', 'company.user']);

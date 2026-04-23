@@ -37,4 +37,10 @@ return [
         'whatsapp_template_sid' => env('TWILIO_WHATSAPP_TEMPLATE_SID', 'HXb5b62575e6e4ff6129ad7c8efe1f983e'),
     ],
 
+    'paymob' => [
+        'api_key' => env('PAYMOB_API_KEY'),
+        'integration_id' => env('PAYMOB_INTEGRATION_ID'),
+        'iframe_id' => env('PAYMOB_IFRAME_ID'),
+    ],
+
 ];

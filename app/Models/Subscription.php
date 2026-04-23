@@ -14,6 +14,9 @@ class Subscription extends Model
         'amount',
         'billing_cycle',
         'status',
+        'payment_gateway',      // ✅ أضف
+        'payment_token',        // ✅ أضف
+        'payment_intent_id',    // ✅ أضف
         'payment_method',
         'transaction_id',
         'notes',

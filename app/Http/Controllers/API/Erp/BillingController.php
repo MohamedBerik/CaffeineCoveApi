@@ -66,27 +66,23 @@ class BillingController extends Controller
         $plan = Plan::findOrFail($request->plan_id);
         $isYearly = $request->billing_cycle === 'yearly';
 
-        // ✅ حساب السعر الصحيح
+        // حساب السعر
         if ($isYearly) {
             $monthlyPrice = $plan->price_monthly;
-            $amount = ($monthlyPrice * 12) * 0.8; // 20% discount
+            $amount = ($monthlyPrice * 12) * 0.8;
         } else {
             $amount = $plan->price_monthly;
         }
 
-        $tax = $amount * 0.14;
-        $total = $amount + $tax;
+        $endsAt = $isYearly ? now()->addYear() : now()->addMonth();
 
-        return DB::transaction(function () use ($companyId, $plan, $amount, $tax, $total, $isYearly) {
+        return DB::transaction(function () use ($companyId, $plan, $amount, $isYearly, $endsAt) {
             // إلغاء الاشتراك القديم
             Subscription::where('company_id', $companyId)
                 ->where('status', 'active')
                 ->update(['status' => 'cancelled']);
 
-            // ✅ تاريخ الانتهاء حسب الدورة
-            $endsAt = $isYearly ? now()->addYear() : now()->addMonth();
-
-            // إنشاء اشتراك جديد
+            // إنشاء اشتراك بحالة pending
             $subscription = Subscription::create([
                 'company_id' => $companyId,
                 'plan_id' => $plan->id,
@@ -94,31 +90,30 @@ class BillingController extends Controller
                 'ends_at' => $endsAt,
                 'amount' => $amount,
                 'billing_cycle' => $isYearly ? 'yearly' : 'monthly',
-                'status' => 'active',
+                'status' => 'pending',
+                'payment_gateway' => 'paymob',
             ]);
 
-            // إنشاء فاتورة
-            $invoice = BillingInvoice::create([
-                'company_id' => $companyId,
-                'subscription_id' => $subscription->id,
-                'number' => BillingInvoice::generateNumber(),
-                'amount' => $amount,
-                'tax' => $tax,
-                'total' => $total,
-                'status' => 'paid', // مؤقت - لما نضيف بوابة دفع هيكون pending
-                'paid_at' => now(),
-                'due_date' => now()->addDays(7),
+            // إنشاء طلب دفع عند PayMob
+            $paymob = new \App\Services\PayMobService();
+            $intention = $paymob->createIntention([
+                'amount' => (int) ($amount * 100), // بالقروش
+                'currency' => 'EGP',
+                'metadata' => [
+                    'subscription_id' => $subscription->id,
+                    'company_id' => $companyId,
+                    'plan_id' => $plan->id,
+                ],
             ]);
 
-            // تحديث حالة الشركة
-            \App\Models\Company::where('id', $companyId)
-                ->update(['status' => 'active']);
+            // تحديث الاشتراك بـ payment_intent_id
+            $subscription->update(['payment_intent_id' => $intention['id']]);
 
             return response()->json([
-                'msg' => 'Subscription activated successfully',
+                'msg' => 'Payment initiated',
                 'status' => 200,
-                'data' => $subscription,
-                'invoice' => $invoice,
+                'payment_url' => $intention['iframe_url'],
+                'subscription_id' => $subscription->id,
             ]);
         });
     }
