@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Exceptions\TenantException;
 use Closure;
 use Illuminate\Http\Request;
 use App\Services\Tenant;
@@ -27,11 +28,11 @@ class SetTenant
             return $next($request);
         }
 
-        // ✅ Early return for ERP requirement (تحسين #2)
+        // ✅ Early return for ERP requirement
         if ($user->is_super_admin && $this->isErpRoute($request)) {
             $tenantIdFromHeader = $request->header('X-Tenant-ID');
 
-            if (!filled($tenantIdFromHeader)) { // ✅ تحسين #3
+            if (!filled($tenantIdFromHeader)) {
                 return response()->json([
                     'message' => 'Tenant ID is required for ERP operations. Please select a clinic.',
                 ], 400);
@@ -44,7 +45,7 @@ class SetTenant
 
             $tenantIdFromHeader = $request->header('X-Tenant-ID');
 
-            if (!filled($tenantIdFromHeader)) { // ✅ تحسين #3
+            if (!filled($tenantIdFromHeader)) {
                 Tenant::setId(null);
 
                 $this->logDebug('Tenant Check - Super Admin (Global Mode)', [
@@ -69,7 +70,6 @@ class SetTenant
                 ], 400);
             }
 
-            // ✅ تحسين #4 - التحقق من صلاحية الوصول للشركة
             if (!$user->canAccessCompany($company->id)) {
                 Log::warning('Tenant Check - Unauthorized Company Access', [
                     'user_id' => $user->id,
@@ -114,9 +114,12 @@ class SetTenant
                 Tenant::setId(null);
                 Tenant::setIsSuperAdmin(false);
 
-                return response()->json([
-                    'message' => 'Your company account could not be found. Please contact support.',
-                ], 403);
+                // ✅ استخدم TenantException هنا (المستخدم موجود بس شركته مش موجودة)
+                throw new TenantException(
+                    'Your company account could not be found. Please contact support.',
+                    403,
+                    'TENANT_NOT_FOUND'
+                );
             }
 
             if ($company->status === 'suspended') {
@@ -128,9 +131,11 @@ class SetTenant
                 Tenant::setId(null);
                 Tenant::setIsSuperAdmin(false);
 
-                return response()->json([
-                    'message' => 'Your clinic account has been suspended. Please contact support.',
-                ], 403);
+                throw new TenantException(
+                    'Your clinic account has been suspended. Please contact support.',
+                    403,
+                    'TENANT_SUSPENDED'
+                );
             }
 
             Tenant::setId($user->company_id);
@@ -145,7 +150,7 @@ class SetTenant
             return $next($request);
         }
 
-        // ❌ User بدون Company (حالة خطأ)
+        // ❌ User بدون Company
         Log::error('Tenant Check - User Without Company', [
             'user_id' => $user->id,
             'user_email' => $user->email,
@@ -154,9 +159,11 @@ class SetTenant
         Tenant::setId(null);
         Tenant::setIsSuperAdmin(false);
 
-        return response()->json([
-            'message' => 'Your account is not associated with any clinic. Please contact support.',
-        ], 403);
+        throw new TenantException(
+            'Your account is not associated with any clinic. Please contact support.',
+            403,
+            'TENANT_NOT_FOUND'
+        );
     }
 
     /**

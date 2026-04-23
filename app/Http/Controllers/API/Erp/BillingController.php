@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers\API\Erp;
 
+use App\Exceptions\BillingException;
+use App\Exceptions\SubscriptionException;
 use App\Http\Controllers\Controller;
 use App\Models\Plan;
 use App\Models\Subscription;
@@ -64,7 +66,26 @@ class BillingController extends Controller
         ]);
 
         $companyId = Tenant::id();
-        $plan = Plan::findOrFail($request->plan_id);
+
+        // ✅ التحقق من الخطة (exists validation كفاية)
+        $plan = Plan::find($request->plan_id);
+        if (!$plan) {
+            throw new BillingException('Plan not found', 404, 'PLAN_NOT_FOUND');
+        }
+
+        // ✅ التحقق من الاشتراك الحالي
+        $existingSubscription = Subscription::where('company_id', $companyId)
+            ->where('status', 'active')
+            ->first();
+
+        if ($existingSubscription) {
+            throw new SubscriptionException(
+                'You already have an active subscription. Use change plan instead.',
+                422,
+                'ACTIVE_SUBSCRIPTION_EXISTS'
+            );
+        }
+
         $isYearly = $request->billing_cycle === 'yearly';
 
         // حساب السعر
@@ -78,11 +99,6 @@ class BillingController extends Controller
         $endsAt = $isYearly ? now()->addYear() : now()->addMonth();
 
         return DB::transaction(function () use ($companyId, $plan, $amount, $isYearly, $endsAt) {
-            // إلغاء الاشتراك القديم
-            Subscription::where('company_id', $companyId)
-                ->where('status', 'active')
-                ->update(['status' => 'cancelled']);
-
             // إنشاء اشتراك بحالة pending
             $subscription = Subscription::create([
                 'company_id' => $companyId,
@@ -100,7 +116,7 @@ class BillingController extends Controller
             // إنشاء طلب دفع عند PayMob
             $paymob = new PayMobService();
             $intention = $paymob->createIntention([
-                'amount' => (int) ($amount * 100), // بالقروش
+                'amount' => (int) ($amount * 100),
                 'currency' => 'EGP',
                 'metadata' => [
                     'subscription_id' => $subscription->id,
@@ -109,7 +125,6 @@ class BillingController extends Controller
                 ],
             ]);
 
-            // تحديث الاشتراك بـ payment_intent_id
             $subscription->update(['payment_intent_id' => $intention['id']]);
 
             return response()->json([
@@ -282,8 +297,37 @@ class BillingController extends Controller
         ]);
 
         $companyId = Tenant::id();
-        $newPlan = Plan::findOrFail($request->plan_id);
+
+        $newPlan = Plan::find($request->plan_id);
+        if (!$newPlan) {
+            throw new BillingException('Plan not found', 404, 'PLAN_NOT_FOUND');
+        }
+
+        $currentSubscription = Subscription::where('company_id', $companyId)
+            ->where('status', 'active')
+            ->first();
+
+        if (!$currentSubscription) {
+            throw new SubscriptionException(
+                'No active subscription to change',
+                404,
+                'NO_ACTIVE_SUBSCRIPTION'
+            );
+        }
+
         $isYearly = $request->billing_cycle === 'yearly';
+
+        // منع التغيير لنفس الخطة ونفس الدورة
+        if (
+            $currentSubscription->plan_id == $newPlan->id &&
+            $currentSubscription->billing_cycle === $request->billing_cycle
+        ) {
+            throw new SubscriptionException(
+                'You are already on this plan with this billing cycle',
+                422,
+                'SAME_PLAN'
+            );
+        }
 
         // حساب السعر الجديد
         if ($isYearly) {
@@ -292,31 +336,13 @@ class BillingController extends Controller
             $newAmount = $newPlan->price_monthly;
         }
 
-        $currentSubscription = Subscription::where('company_id', $companyId)
-            ->where('status', 'active')
-            ->first();
-
-        if (!$currentSubscription) {
-            return response()->json(['msg' => 'No active subscription to change'], 404);
-        }
-
-        // منع التغيير لنفس الخطة
-        if (
-            $currentSubscription->plan_id == $newPlan->id &&
-            $currentSubscription->billing_cycle === $request->billing_cycle
-        ) {
-            return response()->json(['msg' => 'You are already on this plan'], 422);
-        }
-
         $endsAt = $isYearly ? now()->addYear() : now()->addMonth();
 
         return DB::transaction(function () use ($currentSubscription, $newPlan, $newAmount, $isYearly, $endsAt) {
-            // إلغاء الاشتراك القديم
             $oldPlanId = $currentSubscription->plan_id;
             $oldAmount = $currentSubscription->amount;
             $currentSubscription->update(['status' => 'changed']);
 
-            // إنشاء اشتراك جديد
             $subscription = Subscription::create([
                 'company_id' => $currentSubscription->company_id,
                 'plan_id' => $newPlan->id,
@@ -328,7 +354,6 @@ class BillingController extends Controller
                 'payment_gateway' => $currentSubscription->payment_gateway,
             ]);
 
-            // ✅ Event
             event(new \App\Events\SubscriptionCreated($subscription));
             event(new \App\Events\SubscriptionChanged($currentSubscription, $subscription));
 

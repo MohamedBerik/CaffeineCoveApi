@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Exceptions\BillingException;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
@@ -39,9 +40,18 @@ class PayMobService
                 'id' => $order['id'],
                 'iframe_url' => "https://accept.paymob.com/api/acceptance/iframes/{$this->iframeId}?payment_token={$paymentKey['token']}",
             ];
-        } catch (\Exception $e) {
-            Log::error('PayMob Error: ' . $e->getMessage());
+        } catch (BillingException $e) {
+            // ✅ BillingException بتمرر عادي
             throw $e;
+        } catch (\Exception $e) {
+            // ✅ أي Exception تانية بنحولها لـ BillingException
+            Log::error('PayMob Error: ' . $e->getMessage());
+            throw new BillingException(
+                'Payment processing failed. Please try again.',
+                500,
+                'PAYMENT_GATEWAY_ERROR',
+                ['error' => $e->getMessage()]
+            );
         }
     }
 
@@ -55,7 +65,12 @@ class PayMobService
         ]);
 
         if (!$response->successful()) {
-            throw new \Exception('PayMob authentication failed: ' . $response->body());
+            throw new BillingException(
+                'Payment gateway authentication failed',
+                500,
+                'PAYMENT_GATEWAY_ERROR',
+                ['response' => $response->body()]
+            );
         }
 
         return $response->json();
@@ -76,7 +91,12 @@ class PayMobService
         ]);
 
         if (!$response->successful()) {
-            throw new \Exception('PayMob order creation failed: ' . $response->body());
+            throw new BillingException(
+                'Order creation failed',
+                500,
+                'PAYMENT_ORDER_ERROR',
+                ['response' => $response->body()]
+            );
         }
 
         return $response->json();
@@ -115,13 +135,18 @@ class PayMobService
             'integration_id' => $this->integrationId,
             'lock_order_when_paid' => true,
             'single_payment_attempt' => false,
-            'disable_3ds' => true,              // ✅ أضف
-            'is_live' => false,                 // ✅ أضف (Test Mode)
+            'disable_3ds' => true,
+            'is_live' => false,
             'redirection_url' => config('app.url') . '/billing/callback',
         ]);
 
         if (!$response->successful()) {
-            throw new \Exception('PayMob payment key creation failed: ' . $response->body());
+            throw new BillingException(
+                'Payment key creation failed',
+                500,
+                'PAYMENT_KEY_ERROR',
+                ['response' => $response->body()]
+            );
         }
 
         return $response->json();
@@ -132,7 +157,6 @@ class PayMobService
      */
     public function verifyWebhook(array $payload): bool
     {
-        // PayMob بيبعت HMAC للتأكيد
         $hmac = $payload['hmac'] ?? '';
         unset($payload['hmac']);
 
