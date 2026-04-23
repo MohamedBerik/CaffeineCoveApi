@@ -64,27 +64,36 @@ class BillingController extends Controller
 
         $companyId = Tenant::id();
         $plan = Plan::findOrFail($request->plan_id);
+        $isYearly = $request->billing_cycle === 'yearly';
 
-        $amount = $request->billing_cycle === 'monthly'
-            ? $plan->price_monthly
-            : ($plan->price_yearly ?? $plan->price_monthly * 10);
+        // ✅ حساب السعر الصحيح
+        if ($isYearly) {
+            $monthlyPrice = $plan->price_monthly;
+            $amount = ($monthlyPrice * 12) * 0.8; // 20% discount
+        } else {
+            $amount = $plan->price_monthly;
+        }
 
-        $tax = $amount * 0.14; // 14% VAT
+        $tax = $amount * 0.14;
         $total = $amount + $tax;
 
-        return DB::transaction(function () use ($companyId, $plan, $amount, $tax, $total) {
+        return DB::transaction(function () use ($companyId, $plan, $amount, $tax, $total, $isYearly) {
             // إلغاء الاشتراك القديم
             Subscription::where('company_id', $companyId)
                 ->where('status', 'active')
                 ->update(['status' => 'cancelled']);
+
+            // ✅ تاريخ الانتهاء حسب الدورة
+            $endsAt = $isYearly ? now()->addYear() : now()->addMonth();
 
             // إنشاء اشتراك جديد
             $subscription = Subscription::create([
                 'company_id' => $companyId,
                 'plan_id' => $plan->id,
                 'starts_at' => now(),
-                'ends_at' => now()->addMonth(),
+                'ends_at' => $endsAt,
                 'amount' => $amount,
+                'billing_cycle' => $isYearly ? 'yearly' : 'monthly',
                 'status' => 'active',
             ]);
 

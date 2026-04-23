@@ -12,6 +12,7 @@ class Subscription extends Model
         'starts_at',
         'ends_at',
         'amount',
+        'billing_cycle',
         'status',
         'payment_method',
         'transaction_id',
