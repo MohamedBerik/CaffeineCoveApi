@@ -114,6 +114,9 @@ class PayMobService
             'currency' => $data['currency'] ?? 'EGP',
             'integration_id' => $this->integrationId,
             'lock_order_when_paid' => true,
+            'single_payment_attempt' => false,
+            'disable_3ds' => true,              // ✅ أضف
+            'is_live' => false,                 // ✅ أضف (Test Mode)
             'redirection_url' => config('app.url') . '/billing/callback',
         ]);
 
