@@ -92,7 +92,7 @@ class PayMobService
         $billingData = [
             'email' => $user->email ?? 'customer@example.com',
             'first_name' => $user->name ?? 'Customer',
-            'last_name' => '',
+            'last_name' => $user->name ?? 'Customer',
             'phone_number' => $user->phone ?? '01234567890',
             'apartment' => 'NA',
             'floor' => 'NA',
@@ -100,9 +100,9 @@ class PayMobService
             'building' => 'NA',
             'shipping_method' => 'NA',
             'postal_code' => 'NA',
-            'city' => 'NA',
+            'city' => 'Cairo',
             'country' => 'EG',
-            'state' => 'NA',
+            'state' => 'Cairo',
         ];
 
         $response = Http::post($this->baseUrl . '/acceptance/payment_keys', [
