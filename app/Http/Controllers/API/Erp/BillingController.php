@@ -229,8 +229,8 @@ class BillingController extends Controller
             ->latest()
             ->first();
 
-        // ✅ لو فيه اشتراك، رجعه
         if ($subscription) {
+            // ✅ تأكد إن features راجعة كـ Array
             if ($subscription->plan && is_string($subscription->plan->features)) {
                 $subscription->plan->features = json_decode($subscription->plan->features, true);
             }
@@ -242,7 +242,6 @@ class BillingController extends Controller
             ]);
         }
 
-        // ✅ لو مفيش اشتراك، رجع null
         return response()->json([
             'msg' => 'No active subscription',
             'status' => 200,
