@@ -40,6 +40,18 @@ use App\Http\Controllers\API\Erp\PatientProfileController;
 use App\Http\Controllers\API\Erp\PatientTimelineController;
 use App\Http\Controllers\API\Erp\ProcedureController;
 use App\Http\Controllers\API\Erp\RadiologyController;
+
+// SaaS Controllers
+use App\Http\Controllers\API\SaaS\SaasDashboardController;
+use App\Http\Controllers\API\SaaS\SaasReportsController;
+use App\Http\Controllers\API\SaaS\PlatformSettingsController;
+use App\Http\Controllers\API\SaaS\CompanyManagementController;
+use App\Http\Controllers\API\SaaS\PlanController;
+use App\Http\Controllers\API\SaaS\SubscriptionController;
+
+// Webhook
+use App\Http\Controllers\API\Webhook\PayMobWebhookController;
+
 use App\Services\Tenant;
 
 /*
@@ -53,7 +65,14 @@ Route::post('/register', [AuthController::class, 'register']);
 
 /*
 |--------------------------------------------------------------------------
-| Super Admin Routes (Global Access)
+| Webhooks (No Auth)
+|--------------------------------------------------------------------------
+*/
+Route::post('/webhooks/paymob', [PayMobWebhookController::class, 'handle']);
+
+/*
+|--------------------------------------------------------------------------
+| Super Admin Dynamic CRUD
 |--------------------------------------------------------------------------
 */
 Route::middleware(['auth:sanctum', 'super.admin'])->prefix('admin')->group(function () {
@@ -74,11 +93,8 @@ Route::middleware(['auth:sanctum', 'company.user'])->group(function () {
     // User Profile
     Route::get('/me', function (Request $request) {
         $user = $request->user();
-
-        // ✅ الحصول على الصلاحيات من Spatie/Permission
         $permissions = $user->getAllPermissions()->pluck('name')->toArray();
 
-        // ✅ Super Admin ياخد كل الصلاحيات
         if ($user->is_super_admin) {
             $permissions = ['*'];
         }
@@ -95,10 +111,35 @@ Route::middleware(['auth:sanctum', 'company.user'])->group(function () {
         ]);
     });
 
-    // Logout
     Route::post('/logout', function (Request $request) {
         $request->user()->currentAccessToken()->delete();
         return response()->json(['message' => 'Logged out successfully']);
+    });
+
+    // Tenant Context
+    Route::get('/companies', function () {
+        return \App\Models\Company::select('id', 'name', 'slug', 'status')->get();
+    });
+
+    Route::post('/switch-company', function (Request $request) {
+        $companyId = $request->company_id;
+
+        if ($companyId === null || $companyId === 'null') {
+            session(['tenant_id' => null]);
+            return response()->json(['message' => 'Switched to global mode']);
+        }
+
+        $company = \App\Models\Company::find($companyId);
+        if (!$company) {
+            return response()->json(['message' => 'Invalid company'], 404);
+        }
+
+        session(['tenant_id' => $companyId]);
+
+        return response()->json([
+            'message' => 'Company switched successfully',
+            'company' => $company->only('id', 'name', 'slug')
+        ]);
     });
 });
 
@@ -111,28 +152,12 @@ Route::prefix('erp')
     ->middleware(['auth:sanctum', 'company.user'])
     ->group(function () {
 
-        // ==================== BILLING ====================
-        // Route::middleware('permission:finance.view')->group(function () {
-        Route::get('/billing/subscription', [\App\Http\Controllers\API\Erp\BillingController::class, 'currentSubscription']);
-        Route::get('/billing/invoices', [\App\Http\Controllers\API\Erp\BillingController::class, 'invoices']);
-        Route::get('/billing/plans', [\App\Http\Controllers\API\Erp\BillingController::class, 'availablePlans']);
-        Route::get('/billing/payment-methods', [\App\Http\Controllers\API\Erp\BillingController::class, 'paymentMethods']);
-        // });
-
-        // Route::middleware('permission:finance.create')->group(function () {
-        Route::post('/billing/subscribe', [\App\Http\Controllers\API\Erp\BillingController::class, 'subscribe']);
-        Route::post('/billing/cancel', [\App\Http\Controllers\API\Erp\BillingController::class, 'cancel']);
-        Route::post('/billing/payment-methods', [\App\Http\Controllers\API\Erp\BillingController::class, 'addPaymentMethod']);
-        Route::delete('/billing/payment-methods/{id}', [\App\Http\Controllers\API\Erp\BillingController::class, 'removePaymentMethod']);
-        // });
-
         // ==================== DASHBOARD & REPORTS ====================
         Route::middleware('permission:finance.view')->group(function () {
             Route::get('/dashboard', [ErpDashboardController::class, 'index']);
             Route::get('/dashboard/finance', [FinanceDashboardController::class, 'index']);
         });
 
-        // ==================== Activity-logs ====================
         Route::middleware('permission:activity_logs.view')->group(function () {
             Route::get('/activity-logs', [ActivityLogController::class, 'index']);
         });
@@ -145,7 +170,18 @@ Route::prefix('erp')
             Route::post('/alerts/mark-all-read', [AlertController::class, 'markAllRead']);
         });
 
-        // ==================== ADMIN PANEL (Company Admin Only) ====================
+        // ==================== BILLING ====================
+        Route::get('/billing/subscription', [BillingController::class, 'currentSubscription']);
+        Route::get('/billing/invoices', [BillingController::class, 'invoices']);
+        Route::get('/billing/plans', [BillingController::class, 'availablePlans']);
+        Route::get('/billing/payment-methods', [BillingController::class, 'paymentMethods']);
+        Route::post('/billing/subscribe', [BillingController::class, 'subscribe']);
+        Route::post('/billing/cancel', [BillingController::class, 'cancel']);
+        Route::post('/billing/cancel-pending/{id}', [BillingController::class, 'cancelPending']);
+        Route::post('/billing/payment-methods', [BillingController::class, 'addPaymentMethod']);
+        Route::delete('/billing/payment-methods/{id}', [BillingController::class, 'removePaymentMethod']);
+
+        // ==================== ADMIN PANEL ====================
         Route::middleware(['admin', 'permission:users.manage'])->group(function () {
             Route::apiResource('admin/users', UserController::class);
         });
@@ -292,7 +328,7 @@ Route::prefix('erp')
         Route::middleware('permission:settings.view')->get('/clinic-settings', [ClinicSettingController::class, 'show']);
         Route::middleware('permission:settings.manage')->put('/clinic-settings', [ClinicSettingController::class, 'update']);
 
-        // ==================== INVENTORY (Categories, Suppliers, Products) ====================
+        // ==================== INVENTORY ====================
         Route::middleware('permission:inventory.view')->group(function () {
             Route::get('/categories', [CategoryController::class, 'index']);
             Route::get('/categories/{id}', [CategoryController::class, 'show']);
@@ -305,11 +341,9 @@ Route::prefix('erp')
             Route::post('/categories', [CategoryController::class, 'store']);
             Route::put('/categories/{id}', [CategoryController::class, 'update']);
             Route::delete('/categories/{id}', [CategoryController::class, 'destroy']);
-
             Route::post('/suppliers', [SupplierController::class, 'store']);
             Route::put('/suppliers/{id}', [SupplierController::class, 'update']);
             Route::delete('/suppliers/{id}', [SupplierController::class, 'destroy']);
-
             Route::post('/products', [ProductController::class, 'store']);
             Route::put('/products/{id}', [ProductController::class, 'update']);
             Route::delete('/products/{id}', [ProductController::class, 'destroy']);
@@ -354,72 +388,43 @@ Route::prefix('erp')
 | SaaS Routes (Super Admin Only)
 |--------------------------------------------------------------------------
 */
-Route::middleware(['auth:sanctum', 'super.admin'])->group(function () {
+Route::prefix('saas')
+    ->middleware(['auth:sanctum', 'super.admin'])
+    ->group(function () {
 
-    Route::get('/companies', function () {
-        return \App\Models\Company::select('id', 'name', 'slug', 'status')->get();
+        // ==================== DASHBOARD & REPORTS ====================
+        Route::get('/dashboard', [SaasDashboardController::class, 'index']);
+        Route::get('/reports', [SaasReportsController::class, 'index']);
+        Route::get('/activity-logs', [ActivityLogController::class, 'index']);
+
+        // ==================== COMPANIES MANAGEMENT ====================
+        Route::get('/companies', [CompanyManagementController::class, 'index']);
+        Route::post('/companies', [CompanyManagementController::class, 'store']);
+        Route::get('/companies/{id}', [CompanyManagementController::class, 'show']);
+        Route::put('/companies/{id}', [CompanyManagementController::class, 'update']);
+        Route::delete('/companies/{id}', [CompanyManagementController::class, 'destroy']);
+        Route::post('/companies/{id}/suspend', [CompanyManagementController::class, 'suspend']);
+        Route::post('/companies/{id}/activate', [CompanyManagementController::class, 'activate']);
+        Route::get('/companies/{id}/stats', [CompanyManagementController::class, 'stats']);
+        Route::get('/companies/{id}/users', [CompanyManagementController::class, 'users']);
+        Route::get('/companies/{id}/subscriptions', [CompanyManagementController::class, 'subscriptions']);
+
+        // ==================== PLANS MANAGEMENT ====================
+        Route::get('/plans', [PlanController::class, 'index']);
+        Route::post('/plans', [PlanController::class, 'store']);
+        Route::get('/plans/{id}', [PlanController::class, 'show']);
+        Route::put('/plans/{id}', [PlanController::class, 'update']);
+        Route::delete('/plans/{id}', [PlanController::class, 'destroy']);
+        Route::put('/plans/{id}/toggle', [PlanController::class, 'toggle']);
+
+        // ==================== SUBSCRIPTIONS MANAGEMENT ====================
+        Route::get('/subscriptions', [SubscriptionController::class, 'index']);
+        Route::post('/subscriptions', [SubscriptionController::class, 'store']);
+        Route::put('/subscriptions/{id}', [SubscriptionController::class, 'update']);
+        Route::post('/subscriptions/{id}/cancel', [SubscriptionController::class, 'cancel']);
+        Route::post('/subscriptions/{id}/renew', [SubscriptionController::class, 'renew']);
+
+        // ==================== SETTINGS ====================
+        Route::get('/settings', [PlatformSettingsController::class, 'index']);
+        Route::put('/settings', [PlatformSettingsController::class, 'update']);
     });
-
-    Route::post('/switch-company', function (Request $request) {
-        $companyId = $request->company_id;
-
-        if ($companyId === null || $companyId === 'null') {
-            session(['tenant_id' => null]);
-            return response()->json(['message' => 'Switched to global mode']);
-        }
-
-        $company = \App\Models\Company::find($companyId);
-        if (!$company) {
-            return response()->json(['message' => 'Invalid company'], 404);
-        }
-
-        session(['tenant_id' => $companyId]);
-
-        return response()->json([
-            'message' => 'Company switched successfully',
-            'company' => $company->only('id', 'name', 'slug')
-        ]);
-    });
-    // ✅ SaaS Dashboard
-    Route::get('/saas/dashboard', [\App\Http\Controllers\API\SaaS\SaasDashboardController::class, 'index']);
-
-    // ✅ SaaS Reports
-    Route::get('/saas/reports', [\App\Http\Controllers\API\SaaS\SaasReportsController::class, 'index']);
-
-    // ✅ Platform Settings
-    Route::get('/admin/settings/platform', [\App\Http\Controllers\API\SaaS\PlatformSettingsController::class, 'index']);
-    Route::post('/admin/settings/platform', [\App\Http\Controllers\API\SaaS\PlatformSettingsController::class, 'update']);
-
-    // ✅ Companies Management
-    Route::get('/admin/companies', [\App\Http\Controllers\API\SaaS\CompanyManagementController::class, 'index']);
-    Route::post('/admin/companies', [\App\Http\Controllers\API\SaaS\CompanyManagementController::class, 'store']);
-    Route::get('/admin/companies/{id}', [\App\Http\Controllers\API\SaaS\CompanyManagementController::class, 'show']);
-    Route::put('/admin/companies/{id}', [\App\Http\Controllers\API\SaaS\CompanyManagementController::class, 'update']);
-    Route::delete('/admin/companies/{id}', [\App\Http\Controllers\API\SaaS\CompanyManagementController::class, 'destroy']);
-    Route::post('/admin/companies/{id}/suspend', [\App\Http\Controllers\API\SaaS\CompanyManagementController::class, 'suspend']);
-    Route::post('/admin/companies/{id}/activate', [\App\Http\Controllers\API\SaaS\CompanyManagementController::class, 'activate']);
-    Route::get('/admin/companies/{id}/stats', [\App\Http\Controllers\API\SaaS\CompanyManagementController::class, 'stats']);
-    Route::get('/admin/companies/{id}/users', [\App\Http\Controllers\API\SaaS\CompanyManagementController::class, 'users']);
-    Route::get('/admin/companies/{id}/subscriptions', [\App\Http\Controllers\API\SaaS\CompanyManagementController::class, 'subscriptions']);
-
-    // ✅ Plans Management
-    Route::get('/admin/plans', [\App\Http\Controllers\API\SaaS\PlanController::class, 'index']);
-    Route::post('/admin/plans', [\App\Http\Controllers\API\SaaS\PlanController::class, 'store']);
-    Route::get('/admin/plans/{id}', [\App\Http\Controllers\API\SaaS\PlanController::class, 'show']);
-    Route::put('/admin/plans/{id}', [\App\Http\Controllers\API\SaaS\PlanController::class, 'update']);
-    Route::delete('/admin/plans/{id}', [\App\Http\Controllers\API\SaaS\PlanController::class, 'destroy']);
-    Route::put('/admin/plans/{id}/toggle', [\App\Http\Controllers\API\SaaS\PlanController::class, 'toggle']);
-
-    // ✅ Subscriptions Management
-    Route::get('/admin/subscriptions', [\App\Http\Controllers\API\SaaS\SubscriptionController::class, 'index']);
-    Route::post('/admin/subscriptions', [\App\Http\Controllers\API\SaaS\SubscriptionController::class, 'store']);
-    Route::put('/admin/subscriptions/{id}', [\App\Http\Controllers\API\SaaS\SubscriptionController::class, 'update']);
-    Route::post('/admin/subscriptions/{id}/cancel', [\App\Http\Controllers\API\SaaS\SubscriptionController::class, 'cancel']);
-    Route::post('/admin/subscriptions/{id}/renew', [\App\Http\Controllers\API\SaaS\SubscriptionController::class, 'renew']);
-
-    Route::get('/admin/activity-logs', [\App\Http\Controllers\API\Erp\ActivityLogController::class, 'index']);
-});
-
-Route::post('/webhooks/paymob', [\App\Http\Controllers\API\Webhook\PayMobWebhookController::class, 'handle'])
-    ->withoutMiddleware(['auth:sanctum', 'company.user']);
-Route::post('/billing/cancel-pending/{id}', [BillingController::class, 'cancelPending']);
