@@ -180,6 +180,7 @@ Route::prefix('erp')
         Route::post('/billing/cancel-pending/{id}', [BillingController::class, 'cancelPending']);
         Route::post('/billing/payment-methods', [BillingController::class, 'addPaymentMethod']);
         Route::delete('/billing/payment-methods/{id}', [BillingController::class, 'removePaymentMethod']);
+        Route::post('/billing/change', [BillingController::class, 'change']);
 
         // ==================== ADMIN PANEL ====================
         Route::middleware(['admin', 'permission:users.manage'])->group(function () {

@@ -32,6 +32,21 @@ class SubscriptionCancelled
     }
 }
 
+// في BillingEvents.php
+class SubscriptionChanged
+{
+    use Dispatchable, InteractsWithSockets, SerializesModels;
+
+    public $oldSubscription;
+    public $newSubscription;
+
+    public function __construct(Subscription $oldSubscription, Subscription $newSubscription)
+    {
+        $this->oldSubscription = $oldSubscription;
+        $this->newSubscription = $newSubscription;
+    }
+}
+
 class PaymentReceived
 {
     use Dispatchable, InteractsWithSockets, SerializesModels;

@@ -269,4 +269,76 @@ class BillingController extends Controller
             'data' => $plans,
         ]);
     }
+
+    /**
+     * POST /api/erp/billing/change
+     * ترقية/تخفيض الاشتراك
+     */
+    public function change(Request $request)
+    {
+        $request->validate([
+            'plan_id' => ['required', 'exists:plans,id'],
+            'billing_cycle' => ['required', 'in:monthly,yearly'],
+        ]);
+
+        $companyId = Tenant::id();
+        $newPlan = Plan::findOrFail($request->plan_id);
+        $isYearly = $request->billing_cycle === 'yearly';
+
+        // حساب السعر الجديد
+        if ($isYearly) {
+            $newAmount = ($newPlan->price_monthly * 12) * 0.8;
+        } else {
+            $newAmount = $newPlan->price_monthly;
+        }
+
+        $currentSubscription = Subscription::where('company_id', $companyId)
+            ->where('status', 'active')
+            ->first();
+
+        if (!$currentSubscription) {
+            return response()->json(['msg' => 'No active subscription to change'], 404);
+        }
+
+        // منع التغيير لنفس الخطة
+        if (
+            $currentSubscription->plan_id == $newPlan->id &&
+            $currentSubscription->billing_cycle === $request->billing_cycle
+        ) {
+            return response()->json(['msg' => 'You are already on this plan'], 422);
+        }
+
+        $endsAt = $isYearly ? now()->addYear() : now()->addMonth();
+
+        return DB::transaction(function () use ($currentSubscription, $newPlan, $newAmount, $isYearly, $endsAt) {
+            // إلغاء الاشتراك القديم
+            $oldPlanId = $currentSubscription->plan_id;
+            $oldAmount = $currentSubscription->amount;
+            $currentSubscription->update(['status' => 'changed']);
+
+            // إنشاء اشتراك جديد
+            $subscription = Subscription::create([
+                'company_id' => $currentSubscription->company_id,
+                'plan_id' => $newPlan->id,
+                'starts_at' => now(),
+                'ends_at' => $endsAt,
+                'amount' => $newAmount,
+                'billing_cycle' => $isYearly ? 'yearly' : 'monthly',
+                'status' => 'active',
+                'payment_gateway' => $currentSubscription->payment_gateway,
+            ]);
+
+            // ✅ Event
+            event(new \App\Events\SubscriptionCreated($subscription));
+            event(new \App\Events\SubscriptionChanged($currentSubscription, $subscription));
+
+            return response()->json([
+                'msg' => 'Plan changed successfully',
+                'status' => 200,
+                'data' => $subscription,
+                'old_plan_id' => $oldPlanId,
+                'new_plan_id' => $newPlan->id,
+            ]);
+        });
+    }
 }

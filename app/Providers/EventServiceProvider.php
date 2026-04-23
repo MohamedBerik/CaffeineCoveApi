@@ -32,6 +32,10 @@ class EventServiceProvider extends ServiceProvider
         \App\Events\PaymentReceived::class => [
             \App\Listeners\LogSubscriptionActivity::class . '@onPaymentReceived',
         ],
+
+        \App\Events\SubscriptionChanged::class => [
+            \App\Listeners\LogSubscriptionActivity::class . '@onSubscriptionChanged',
+        ],
     ];
 
     /**
