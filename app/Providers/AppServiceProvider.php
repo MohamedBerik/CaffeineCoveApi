@@ -117,15 +117,6 @@ class AppServiceProvider extends ServiceProvider
 
             return Limit::perMinute(30)->by($request->ip());
         });
-
-        // ✅ Modify the code from `attempted` to `hit`
-        RateLimiter::hit(function ($request) {
-            return response()->json([
-                'message' => 'Too many requests. Please try again later.',
-                'code' => 'TOO_MANY_REQUESTS',
-                'status' => 429,
-            ], 429);
-        });
     }
 
     /**
