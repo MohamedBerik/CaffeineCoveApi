@@ -63,9 +63,33 @@ class Kernel extends ConsoleKernel
             ->runInBackground()
             ->appendOutputTo(storage_path('logs/alerts.log'));
 
-        // ❌ تم حذف الكود المكرر:
-        // $schedule->call(function () { ... })
-        // لأن CheckReminderAlertsJob بيعمل نفس الحاجة بالظبط
+        // ============================================
+        // 6. BILLING SCHEDULER (NEW)
+        // ============================================
+
+        // ✅ تذكير الاشتراكات (كل يوم 8 صباحًا)
+        $schedule->command('billing:reminders')
+            ->dailyAt('08:00')
+            ->withoutOverlapping(30)
+            ->onOneServer()
+            ->runInBackground()
+            ->appendOutputTo(storage_path('logs/billing_reminders.log'));
+
+        // ✅ فحص المدفوعات الفاشلة (كل ساعة)
+        $schedule->command('billing:check-failed')
+            ->hourly()
+            ->withoutOverlapping(15)
+            ->onOneServer()
+            ->runInBackground()
+            ->appendOutputTo(storage_path('logs/billing_failed.log'));
+
+        // ✅ تنظيف Activity Logs القديمة (كل شهر)
+        $schedule->command('cleanup:activity-logs --days=90')
+            ->monthly()
+            ->withoutOverlapping(60)
+            ->onOneServer()
+            ->runInBackground()
+            ->appendOutputTo(storage_path('logs/cleanup.log'));
     }
 
     /**
