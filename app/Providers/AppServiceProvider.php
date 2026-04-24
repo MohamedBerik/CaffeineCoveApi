@@ -118,8 +118,8 @@ class AppServiceProvider extends ServiceProvider
             return Limit::perMinute(30)->by($request->ip());
         });
 
-        // ✅ Custom Rate Limit Response
-        RateLimiter::attempted(function ($request) {
+        // ✅ Modify the code from `attempted` to `hit`
+        RateLimiter::hit(function ($request) {
             return response()->json([
                 'message' => 'Too many requests. Please try again later.',
                 'code' => 'TOO_MANY_REQUESTS',
