@@ -20,6 +20,9 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Queue;
+use Illuminate\Cache\RateLimiting\Limit;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\RateLimiter;
 use App\Models\Doctor;
 use App\Models\DentalRecord;
 use App\Models\Employee;
@@ -67,6 +70,62 @@ class AppServiceProvider extends ServiceProvider
 
         // ✅ Queue tenant reset
         $this->configureQueueTenantReset();
+
+        // ✅ Rate Limiting for Billing endpoints
+        RateLimiter::for('billing', function (Request $request) {
+            $user = $request->user();
+
+            // لو مستخدم مسجل دخول - 10 طلبات في الدقيقة
+            if ($user) {
+                return Limit::perMinute(10)->by($user->id);
+            }
+
+            // لو مش مسجل - 3 طلبات في الدقيقة
+            return Limit::perMinute(3)->by($request->ip());
+        });
+
+        // ✅ Rate Limiting for Payment endpoints (أكثر تشديدًا)
+        RateLimiter::for('payment', function (Request $request) {
+            $user = $request->user();
+
+            if ($user) {
+                return Limit::perMinute(3)->by($user->id);
+            }
+
+            return Limit::perMinute(1)->by($request->ip());
+        });
+
+        // ✅ Rate Limiting for Login (منع brute force)
+        RateLimiter::for('login', function (Request $request) {
+            $email = $request->input('email');
+
+            return Limit::perMinute(5)->by($email ?? $request->ip());
+        });
+
+        // ✅ Rate Limiting for Webhooks
+        RateLimiter::for('webhooks', function (Request $request) {
+            return Limit::perMinute(60)->by($request->ip());
+        });
+
+        // ✅ Rate Limiting for API (عام)
+        RateLimiter::for('api', function (Request $request) {
+            $user = $request->user();
+
+            if ($user) {
+                return Limit::perMinute(120)->by($user->id);
+            }
+
+            return Limit::perMinute(30)->by($request->ip());
+        });
+
+        // ✅ Custom Rate Limit Response
+        RateLimiter::attempted(function ($request) {
+            return response()->json([
+                'message' => 'Too many requests. Please try again later.',
+                'code' => 'TOO_MANY_REQUESTS',
+                'status' => 429,
+            ], 429);
+        });
     }
 
     /**

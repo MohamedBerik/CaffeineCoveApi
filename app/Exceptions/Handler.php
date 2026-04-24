@@ -51,11 +51,22 @@ class Handler extends ExceptionHandler
     /**
      * Render an exception into an HTTP response.
      */
+
     public function render($request, Throwable $e)
     {
         // ✅ لو الـ Exception بتاعنا (ApiException أو اللي ورث منها)
         if ($e instanceof ApiException) {
             return $e->render();
+        }
+
+        // ✅ لو Rate Limiting
+        if ($e instanceof \Illuminate\Http\Exceptions\ThrottleRequestsException) {
+            return response()->json([
+                'message' => 'Too many requests. Please try again later.',
+                'code' => 'TOO_MANY_REQUESTS',
+                'status' => 429,
+                'retry_after' => $e->getHeaders()['Retry-After'] ?? 60,
+            ], 429);
         }
 
         // ✅ لو الـ Request API

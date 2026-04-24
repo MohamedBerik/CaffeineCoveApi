@@ -60,15 +60,19 @@ use App\Services\Tenant;
 |--------------------------------------------------------------------------
 */
 
-Route::post('/login', [AuthController::class, 'login']);
-Route::post('/register', [AuthController::class, 'register']);
+Route::middleware('throttle:login')->group(function () {
+    Route::post('/login', [AuthController::class, 'login']);
+    Route::post('/register', [AuthController::class, 'register']);
+});
 
 /*
 |--------------------------------------------------------------------------
 | Webhooks (No Auth)
 |--------------------------------------------------------------------------
 */
-Route::post('/webhooks/paymob', [PayMobWebhookController::class, 'handle']);
+Route::middleware('throttle:webhooks')->group(function () {
+    Route::post('/webhooks/paymob', [PayMobWebhookController::class, 'handle']);
+});
 
 /*
 |--------------------------------------------------------------------------
@@ -149,7 +153,7 @@ Route::middleware(['auth:sanctum', 'company.user'])->group(function () {
 |--------------------------------------------------------------------------
 */
 Route::prefix('erp')
-    ->middleware(['auth:sanctum', 'company.user'])
+    ->middleware(['auth:sanctum', 'company.user', 'throttle:api'])
     ->group(function () {
 
         // ==================== DASHBOARD & REPORTS ====================
@@ -171,16 +175,21 @@ Route::prefix('erp')
         });
 
         // ==================== BILLING ====================
-        Route::get('/billing/subscription', [BillingController::class, 'currentSubscription']);
-        Route::get('/billing/invoices', [BillingController::class, 'invoices']);
-        Route::get('/billing/plans', [BillingController::class, 'availablePlans']);
-        Route::get('/billing/payment-methods', [BillingController::class, 'paymentMethods']);
-        Route::post('/billing/subscribe', [BillingController::class, 'subscribe']);
-        Route::post('/billing/cancel', [BillingController::class, 'cancel']);
-        Route::post('/billing/cancel-pending/{id}', [BillingController::class, 'cancelPending']);
-        Route::post('/billing/payment-methods', [BillingController::class, 'addPaymentMethod']);
-        Route::delete('/billing/payment-methods/{id}', [BillingController::class, 'removePaymentMethod']);
-        Route::post('/billing/change', [BillingController::class, 'change']);
+        Route::middleware('throttle:billing')->group(function () {
+            Route::get('/billing/subscription', [BillingController::class, 'currentSubscription']);
+            Route::get('/billing/invoices', [BillingController::class, 'invoices']);
+            Route::get('/billing/plans', [BillingController::class, 'availablePlans']);
+            Route::get('/billing/payment-methods', [BillingController::class, 'paymentMethods']);
+        });
+
+        Route::middleware('throttle:payment')->group(function () {
+            Route::post('/billing/subscribe', [BillingController::class, 'subscribe']);
+            Route::post('/billing/cancel', [BillingController::class, 'cancel']);
+            Route::post('/billing/cancel-pending/{id}', [BillingController::class, 'cancelPending']);
+            Route::post('/billing/payment-methods', [BillingController::class, 'addPaymentMethod']);
+            Route::delete('/billing/payment-methods/{id}', [BillingController::class, 'removePaymentMethod']);
+            Route::post('/billing/change', [BillingController::class, 'change']);
+        });
 
         // ==================== ADMIN PANEL ====================
         Route::middleware(['admin', 'permission:users.manage'])->group(function () {
