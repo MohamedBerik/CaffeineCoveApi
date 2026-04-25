@@ -1,2 +1,3 @@
 web: vendor/bin/heroku-php-apache2 public/
-worker: php artisan queue:work database --sleep=3 --tries=3 --timeout=90
+worker: php artisan queue:work database --sleep=3 --tries=3 --timeout=180 --memory=256
+scheduler: php artisan schedule:work

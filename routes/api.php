@@ -53,6 +53,7 @@ use App\Http\Controllers\API\SaaS\SubscriptionController;
 use App\Http\Controllers\API\Webhook\PayMobWebhookController;
 
 use App\Services\Tenant;
+use Illuminate\Support\Facades\DB;
 
 /*
 |--------------------------------------------------------------------------
@@ -444,3 +445,13 @@ Route::prefix('saas')
         Route::post('/companies/{id}/adjust-billing', [CompanyManagementController::class, 'adjustBilling']);
         Route::post('/companies/{id}/impersonate', [CompanyManagementController::class, 'impersonate']);
     });
+
+// Health Check
+Route::get('/health/queue', function () {
+    return response()->json([
+        'pending_jobs' => DB::table('jobs')->count(),
+        'failed_jobs' => DB::table('failed_jobs')->count(),
+        'timestamp' => now()->toIso8601String(),
+        'status' => 'ok',
+    ]);
+})->middleware('auth:sanctum');

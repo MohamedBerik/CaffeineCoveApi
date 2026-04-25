@@ -37,7 +37,8 @@ class SendAppointmentReminderJob implements ShouldQueue, ShouldBeUnique
      * أقصى مدة للتنفيذ (بالثواني)
      */
     public $timeout = 120;
-
+    public $maxExceptions = 3;   // ✅ وقف بعد 3 استثناءات
+    public $failOnTimeout = true; // ✅ فشل لو انتهى الوقت
     /**
      * التأخير بين المحاولات الفاشلة (بالثواني)
      */
