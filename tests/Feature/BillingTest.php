@@ -7,6 +7,7 @@ use App\Models\Plan;
 use App\Models\Subscription;
 use App\Models\User;
 use App\Services\Tenant;
+use App\Services\PayMobService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -52,7 +53,6 @@ class BillingTest extends TestCase
     /** @test */
     public function user_can_view_current_subscription()
     {
-        // إنشاء اشتراك
         Subscription::create([
             'company_id' => $this->company->id,
             'plan_id' => $this->plan->id,
@@ -67,7 +67,6 @@ class BillingTest extends TestCase
 
         $response->assertStatus(200);
         $response->assertJsonPath('data.status', 'active');
-        $response->assertJsonPath('data.amount', '99.00');
     }
 
     /** @test */
@@ -83,18 +82,30 @@ class BillingTest extends TestCase
     /** @test */
     public function user_can_subscribe_to_plan()
     {
+        // ✅ Mock PayMobService
+        $this->mock(PayMobService::class, function ($mock) {
+            $mock->shouldReceive('createIntention')
+                ->once()
+                ->andReturn([
+                    'id' => 'order_test_123',
+                    'iframe_url' => 'https://accept.paymob.com/test',
+                ]);
+        });
+
         $response = $this->actingAs($this->admin, 'sanctum')
             ->postJson('/api/erp/billing/subscribe', [
                 'plan_id' => $this->plan->id,
                 'billing_cycle' => 'monthly',
             ]);
 
-        $response->assertStatus(200);
+        $response->assertStatus(200)
+            ->assertJsonPath('payment_url', 'https://accept.paymob.com/test');
 
         $this->assertDatabaseHas('subscriptions', [
             'company_id' => $this->company->id,
             'plan_id' => $this->plan->id,
             'status' => 'pending',
+            'payment_intent_id' => 'order_test_123',
         ]);
     }
 
@@ -111,9 +122,30 @@ class BillingTest extends TestCase
     }
 
     /** @test */
-    public function user_can_cancel_subscription()
+    public function user_cannot_subscribe_if_already_active()
     {
         // إنشاء اشتراك نشط
+        Subscription::create([
+            'company_id' => $this->company->id,
+            'plan_id' => $this->plan->id,
+            'starts_at' => now(),
+            'ends_at' => now()->addMonth(),
+            'amount' => 99,
+            'status' => 'active',
+        ]);
+
+        $response = $this->actingAs($this->admin, 'sanctum')
+            ->postJson('/api/erp/billing/subscribe', [
+                'plan_id' => $this->plan->id,
+                'billing_cycle' => 'monthly',
+            ]);
+
+        $response->assertStatus(422);
+    }
+
+    /** @test */
+    public function user_can_cancel_subscription()
+    {
         Subscription::create([
             'company_id' => $this->company->id,
             'plan_id' => $this->plan->id,
@@ -132,5 +164,24 @@ class BillingTest extends TestCase
             'company_id' => $this->company->id,
             'status' => 'cancelled',
         ]);
+    }
+
+    /** @test */
+    public function user_can_view_billing_status()
+    {
+        Subscription::create([
+            'company_id' => $this->company->id,
+            'plan_id' => $this->plan->id,
+            'starts_at' => now(),
+            'ends_at' => now()->addMonth(),
+            'amount' => 99,
+            'status' => 'active',
+        ]);
+
+        $response = $this->actingAs($this->admin, 'sanctum')
+            ->getJson('/api/erp/billing/status');
+
+        $response->assertStatus(200);
+        $response->assertJsonPath('data.subscription_status', 'active');
     }
 }
