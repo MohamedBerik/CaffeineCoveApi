@@ -13,6 +13,14 @@ class PlanController extends Controller
     {
         $plans = Plan::orderBy('price_monthly')->get();
 
+        // ✅ تأكد إن features راجعة كـ Array
+        $plans->transform(function ($plan) {
+            if (is_string($plan->features)) {
+                $plan->features = json_decode($plan->features, true);
+            }
+            return $plan;
+        });
+
         return response()->json([
             'msg' => 'Plans list',
             'status' => 200,
