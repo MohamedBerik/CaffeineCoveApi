@@ -67,7 +67,56 @@ class AuthController extends Controller
      */
     public function login(Request $request)
     {
-        return response()->json(['message' => 'Test success', 'token' => 'test_token']);
+        Log::info('Authorization Header:', ['header' => $request->header('Authorization')]);
+
+        $request->validate([
+            'email' => 'required|email',
+            'password' => 'required|string',
+        ]);
+
+        // ✅ تجاوز الـ Global Scope عشان نقدر ندور على المستخدم
+        $user = User::withoutGlobalScope(CompanyScope::class)
+            ->where('email', $request->email)
+            ->first();
+
+        if (!$user || !Hash::check($request->password, $user->password)) {
+            // ✅ Audit Logging
+            event(new \App\Events\FailedLogin(
+                $request->email,
+                $request->ip(),
+                'Invalid credentials'
+            ));
+            return response()->json([
+                'message' => 'Invalid credentials'
+            ], 401);
+        }
+
+        // ✅ بعد ما لاقينا المستخدم، نضبط Tenant Context
+        if (!$user->is_super_admin) {
+            Tenant::setId($user->company_id);
+            Tenant::setIsSuperAdmin(false);
+        } else {
+            Tenant::setId(null);
+            Tenant::setIsSuperAdmin(true);
+        }
+
+        // ✅ التحقق من حالة الشركة
+        if (!$user->is_super_admin && $user->company) {
+            if (in_array($user->company->status, ['suspended', 'cancelled'])) {
+                return response()->json([
+                    'message' => 'Your clinic account has been ' . $user->company->status
+                ], 403);
+            }
+        }
+
+        $token = $user->createToken('API Token')->plainTextToken;
+
+        return response()->json([
+            'user' => $user->only(['id', 'name', 'email', 'role', 'is_super_admin']),
+            'company_id' => $user->company_id,
+            'company_status' => $user->company?->status,
+            'token' => $token
+        ]);
     }
 
     /**

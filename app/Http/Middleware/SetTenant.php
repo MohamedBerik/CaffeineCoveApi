@@ -21,6 +21,9 @@ class SetTenant
             return $next($request);
         }
 
+        // ✅ تحسين #1: قراءة الـ Header مرة واحدة
+        $tenantIdFromHeader = $request->header('X-Tenant-ID');
+
         $user = $request->user();
 
         if (!$user) {
@@ -35,12 +38,12 @@ class SetTenant
             return $next($request);
         }
 
+        // ✅ تحسين #2: تبسيط الشرط
+        $isGlobalMode = !$tenantIdFromHeader || $tenantIdFromHeader === 'global';
+
         // ✅ Early return for ERP requirement
         if ($user->is_super_admin && $this->isErpRoute($request)) {
-            $tenantIdFromHeader = $request->header('X-Tenant-ID');
-
-            // ✅ 2. أضف 'global'
-            if (!filled($tenantIdFromHeader) || $tenantIdFromHeader === 'global') {
+            if ($isGlobalMode) {
                 return response()->json([
                     'message' => 'Tenant ID is required for ERP operations. Please select a clinic.',
                 ], 400);
@@ -51,10 +54,7 @@ class SetTenant
         if ($user->is_super_admin) {
             Tenant::setIsSuperAdmin(true);
 
-            $tenantIdFromHeader = $request->header('X-Tenant-ID');
-
-            // ✅ 3. أضف 'global'
-            if (!filled($tenantIdFromHeader) || $tenantIdFromHeader === 'global') {
+            if ($isGlobalMode) {
                 Tenant::setId(null);
 
                 $this->logDebug('Tenant Check - Super Admin (Global Mode)', [
@@ -123,7 +123,6 @@ class SetTenant
                 Tenant::setId(null);
                 Tenant::setIsSuperAdmin(false);
 
-                // ✅ استخدم TenantException هنا (المستخدم موجود بس شركته مش موجودة)
                 throw new TenantException(
                     'Your company account could not be found. Please contact support.',
                     403,
@@ -176,11 +175,11 @@ class SetTenant
     }
 
     /**
-     * ✅ التحقق إذا كان الـ Route من ERP (تحسين #1)
+     * ✅ تحسين #3: التحقق إذا كان الـ Route من ERP
      */
     private function isErpRoute(Request $request): bool
     {
-        return $request->is('api/erp/*', 'erp/*');
+        return str_contains($request->path(), 'erp/') || $request->is('api/erp/*');
     }
 
     /**
@@ -194,7 +193,7 @@ class SetTenant
     }
 
     /**
-     * ✅ العثور على الشركة مع Cache لتقليل الـ Database Queries
+     * ✅ العثور على الشركة مع Cache (تحسين #5 - مدة أقل)
      */
     private function findCompany($companyId): ?Company
     {
@@ -204,7 +203,7 @@ class SetTenant
 
         $cacheKey = "company_{$companyId}_basic";
 
-        return Cache::remember($cacheKey, 3600, function () use ($companyId) {
+        return Cache::remember($cacheKey, now()->addMinutes(10), function () use ($companyId) {
             return Company::select('id', 'name', 'slug', 'status')->find($companyId);
         });
     }
