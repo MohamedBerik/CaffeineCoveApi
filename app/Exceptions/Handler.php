@@ -82,6 +82,7 @@ class Handler extends ExceptionHandler
      */
     protected function renderApiException($request, Throwable $e): JsonResponse
     {
+
         $statusCode = method_exists($e, 'getStatusCode') ? $e->getStatusCode() : 500;
 
         // ✅ تحديد الـ Status Code
