@@ -437,4 +437,9 @@ Route::prefix('saas')
         // ==================== SETTINGS ====================
         Route::get('/settings', [PlatformSettingsController::class, 'index']);
         Route::put('/settings', [PlatformSettingsController::class, 'update']);
+
+        // ==================== ADMIN POWER TOOLS ====================
+        Route::post('/companies/{id}/force-cancel-subscription', [CompanyManagementController::class, 'forceCancelSubscription']);
+        Route::post('/companies/{id}/adjust-billing', [CompanyManagementController::class, 'adjustBilling']);
+        Route::post('/companies/{id}/impersonate', [CompanyManagementController::class, 'impersonate']);
     });

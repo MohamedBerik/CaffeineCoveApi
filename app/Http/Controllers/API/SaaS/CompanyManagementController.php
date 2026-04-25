@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\API\SaaS;
 
 use App\Http\Controllers\Controller;
+use App\Models\BillingInvoice;
 use App\Models\Company;
 use App\Models\Subscription;
 use App\Models\User;
@@ -280,10 +281,20 @@ class CompanyManagementController extends Controller
         ]);
     }
 
-    // Force Cancel subscription
-    public function forceCancel($id)
+    /**
+     * POST /api/saas/companies/{id}/force-cancel-subscription
+     * إلغاء اشتراك شركة بالقوة (Admin Override)
+     */
+    public function forceCancelSubscription($id)
     {
-        $subscription = Subscription::findOrFail($id);
+        $subscription = Subscription::where('company_id', $id)
+            ->where('status', 'active')
+            ->first();
+
+        if (!$subscription) {
+            return response()->json(['msg' => 'No active subscription found'], 404);
+        }
+
         $subscription->update(['status' => 'cancelled']);
 
         // ✅ Audit Logging
@@ -291,7 +302,7 @@ class CompanyManagementController extends Controller
             auth()->id(),
             'force_cancel_subscription',
             $subscription->id,
-            ['company_id' => $subscription->company_id, 'plan_id' => $subscription->plan_id]
+            ['company_id' => $id, 'plan_id' => $subscription->plan_id]
         ));
 
         event(new \App\Events\SuspiciousActivity(
@@ -300,6 +311,106 @@ class CompanyManagementController extends Controller
             ['action' => 'cancel_subscription', 'subscription_id' => $subscription->id]
         ));
 
-        return response()->json(['msg' => 'Subscription force cancelled']);
+        return response()->json([
+            'msg' => 'Subscription force cancelled successfully',
+            'status' => 200,
+        ]);
+    }
+
+    /**
+     * POST /api/saas/companies/{id}/adjust-billing
+     * تعديل الفوترة يدويًا (Admin Override)
+     */
+    public function adjustBilling(Request $request, $id)
+    {
+        $request->validate([
+            'amount' => ['required', 'numeric', 'min:0'],
+            'reason' => ['required', 'string', 'max:255'],
+        ]);
+
+        $subscription = Subscription::where('company_id', $id)
+            ->where('status', 'active')
+            ->first();
+
+        if (!$subscription) {
+            return response()->json(['msg' => 'No active subscription found'], 404);
+        }
+
+        $oldAmount = $subscription->amount;
+        $newAmount = $request->amount;
+
+        $subscription->update(['amount' => $newAmount]);
+
+        // ✅ إنشاء فاتورة تعديل
+        $invoice = BillingInvoice::create([
+            'company_id' => $id,
+            'subscription_id' => $subscription->id,
+            'number' => BillingInvoice::generateNumber(),
+            'amount' => $newAmount - $oldAmount,
+            'tax' => 0,
+            'total' => $newAmount - $oldAmount,
+            'status' => 'paid',
+            'paid_at' => now(),
+            'transaction_id' => 'manual_adjustment',
+        ]);
+
+        // ✅ Audit Logging
+        event(new \App\Events\AdminOverride(
+            auth()->id(),
+            'adjust_billing',
+            $subscription->id,
+            [
+                'company_id' => $id,
+                'old_amount' => $oldAmount,
+                'new_amount' => $newAmount,
+                'reason' => $request->reason,
+            ]
+        ));
+
+        return response()->json([
+            'msg' => 'Billing adjusted successfully',
+            'status' => 200,
+            'old_amount' => $oldAmount,
+            'new_amount' => $newAmount,
+            'invoice' => $invoice,
+        ]);
+    }
+
+    /**
+     * POST /api/saas/companies/{id}/impersonate
+     * تقمص مستخدم داخل شركة (Admin Override)
+     */
+    public function impersonate(Request $request, $id)
+    {
+        $request->validate([
+            'user_id' => ['required', 'exists:users,id'],
+        ]);
+
+        $user = User::where('company_id', $id)
+            ->where('id', $request->user_id)
+            ->first();
+
+        if (!$user) {
+            return response()->json(['msg' => 'User not found in this company'], 404);
+        }
+
+        // ✅ إنشاء Token للمستخدم المتقمص
+        $token = $user->createToken('impersonation')->plainTextToken;
+
+        // ✅ Audit Logging
+        event(new \App\Events\AdminOverride(
+            auth()->id(),
+            'impersonate_user',
+            $user->id,
+            ['company_id' => $id, 'impersonated_user_id' => $user->id]
+        ));
+
+        return response()->json([
+            'msg' => 'Impersonation token generated',
+            'status' => 200,
+            'token' => $token,
+            'user' => $user->only(['id', 'name', 'email', 'role']),
+            'company_id' => $id,
+        ]);
     }
 }
