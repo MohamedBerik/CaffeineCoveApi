@@ -121,7 +121,14 @@ class AppServiceProvider extends ServiceProvider
         // ✅ Structured Logging for API Requests
         if (app()->environment('production')) {
             $this->app['router']->matched(function ($route) {
-                $name = $route->getName() ?? $route->uri();
+                // ✅ Login/Register Bypass
+                if (request()->is('api/login') || request()->is('api/register')) {
+                    return;
+                }
+
+                $name = method_exists($route, 'getName')
+                    ? ($route->getName() ?? $route->uri())
+                    : $route->uri();
                 Log::channel('api')->info('API Request', [
                     'route' => $name,
                     'method' => request()->method(),
