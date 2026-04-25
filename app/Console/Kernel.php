@@ -90,6 +90,10 @@ class Kernel extends ConsoleKernel
             ->onOneServer()
             ->runInBackground()
             ->appendOutputTo(storage_path('logs/cleanup.log'));
+
+        // ✅ يومياً الساعة 2 صباحاً
+        $schedule->command('billing:check-grace-periods')->dailyAt('02:00');
+        $schedule->command('billing:check-expired')->dailyAt('02:30');
     }
 
     /**
