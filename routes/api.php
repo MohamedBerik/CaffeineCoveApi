@@ -153,7 +153,7 @@ Route::middleware(['auth:sanctum', 'company.user'])->group(function () {
 |--------------------------------------------------------------------------
 */
 Route::prefix('erp')
-    ->middleware(['auth:sanctum', 'company.user', 'throttle:api'])
+    ->middleware(['auth:sanctum', 'company.user', 'subscription.active', 'throttle:api'])
     ->group(function () {
 
         // ==================== DASHBOARD & REPORTS ====================
@@ -180,6 +180,7 @@ Route::prefix('erp')
             Route::get('/billing/invoices', [BillingController::class, 'invoices']);
             Route::get('/billing/plans', [BillingController::class, 'availablePlans']);
             Route::get('/billing/payment-methods', [BillingController::class, 'paymentMethods']);
+            Route::get('/billing/status', [BillingController::class, 'status']);
         });
 
         Route::middleware('throttle:payment')->group(function () {

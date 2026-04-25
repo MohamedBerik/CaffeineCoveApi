@@ -372,4 +372,72 @@ class BillingController extends Controller
             ]);
         });
     }
+
+    // BillingController.php
+
+    /**
+     * GET /api/erp/billing/status
+     * حالة الاشتراك الحالية للشركة
+     */
+    public function status()
+    {
+        $companyId = Tenant::id();
+
+        $subscription = Subscription::where('company_id', $companyId)
+            ->with('plan')
+            ->latest()
+            ->first();
+
+        $company = \App\Models\Company::find($companyId);
+
+        // ✅ حالة الاشتراك
+        $status = 'no_subscription';
+        $message = 'No active subscription';
+        $daysLeft = null;
+        $isExpiringSoon = false;
+        $isPastDue = false;
+
+        if ($subscription) {
+            $status = $subscription->status;
+
+            if ($subscription->ends_at) {
+                $daysLeft = max(0, (int) now()->diffInDays($subscription->ends_at, false));
+                $isExpiringSoon = $daysLeft <= 7 && $daysLeft > 0;
+            }
+
+            $isPastDue = $subscription->status === 'past_due';
+
+            $message = match ($subscription->status) {
+                'active' => $isExpiringSoon ? 'Your plan expires soon' : 'Active',
+                'past_due' => 'Payment past due',
+                'expired' => 'Subscription expired',
+                'cancelled' => 'Cancelled',
+                default => $subscription->status,
+            };
+        } elseif ($company && $company->status === 'trial') {
+            $status = 'trial';
+            $message = 'Trial period';
+            if ($company->trial_ends_at) {
+                $daysLeft = max(0, (int) now()->diffInDays($company->trial_ends_at, false));
+                $isExpiringSoon = $daysLeft <= 3 && $daysLeft > 0;
+            }
+        }
+
+        return response()->json([
+            'msg' => 'Subscription status',
+            'status' => 200,
+            'data' => [
+                'subscription_status' => $status,
+                'message' => $message,
+                'days_left' => $daysLeft,
+                'is_expiring_soon' => $isExpiringSoon,
+                'is_past_due' => $isPastDue,
+                'plan_name' => $subscription?->plan?->name,
+                'amount' => $subscription?->amount,
+                'billing_cycle' => $subscription?->billing_cycle,
+                'ends_at' => $subscription?->ends_at,
+                'trial_ends_at' => $company?->trial_ends_at,
+            ],
+        ]);
+    }
 }
