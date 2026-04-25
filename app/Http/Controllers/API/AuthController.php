@@ -67,56 +67,80 @@ class AuthController extends Controller
      */
     public function login(Request $request)
     {
-        Log::info('Authorization Header:', ['header' => $request->header('Authorization')]);
+        try {
+            Log::info('Login attempt started', ['email' => $request->email]);
 
-        $request->validate([
-            'email' => 'required|email',
-            'password' => 'required|string',
-        ]);
+            $request->validate([
+                'email' => 'required|email',
+                'password' => 'required|string',
+            ]);
 
-        // ✅ تجاوز الـ Global Scope عشان نقدر ندور على المستخدم
-        $user = User::withoutGlobalScope(CompanyScope::class)
-            ->where('email', $request->email)
-            ->first();
+            Log::info('Validation passed');
 
-        if (!$user || !Hash::check($request->password, $user->password)) {
-            // ✅ Audit Logging
-            event(new \App\Events\FailedLogin(
-                $request->email,
-                $request->ip(),
-                'Invalid credentials'
-            ));
-            return response()->json([
-                'message' => 'Invalid credentials'
-            ], 401);
-        }
+            // ✅ تجاوز الـ Global Scope عشان نقدر ندور على المستخدم
+            $user = User::withoutGlobalScope(CompanyScope::class)
+                ->where('email', $request->email)
+                ->first();
 
-        // ✅ بعد ما لاقينا المستخدم، نضبط Tenant Context
-        if (!$user->is_super_admin) {
-            Tenant::setId($user->company_id);
-            Tenant::setIsSuperAdmin(false);
-        } else {
-            Tenant::setId(null);
-            Tenant::setIsSuperAdmin(true);
-        }
+            Log::info('User query done', ['found' => $user ? true : false]);
 
-        // ✅ التحقق من حالة الشركة
-        if (!$user->is_super_admin && $user->company) {
-            if (in_array($user->company->status, ['suspended', 'cancelled'])) {
-                return response()->json([
-                    'message' => 'Your clinic account has been ' . $user->company->status
-                ], 403);
+            if (!$user || !Hash::check($request->password, $user->password)) {
+                Log::info('Invalid credentials');
+                return response()->json(['message' => 'Invalid credentials'], 401);
             }
+
+            Log::info('Password verified');
+
+            // ✅ بعد ما لاقينا المستخدم، نضبط Tenant Context
+            if (!$user->is_super_admin) {
+                Tenant::setId($user->company_id);
+                Tenant::setIsSuperAdmin(false);
+                Log::info('Tenant set for regular user', ['company_id' => $user->company_id]);
+            } else {
+                Tenant::setId(null);
+                Tenant::setIsSuperAdmin(true);
+                Log::info('Tenant set for super admin');
+            }
+
+            // ✅ التحقق من حالة الشركة
+            if (!$user->is_super_admin && $user->company) {
+                Log::info('Checking company status', ['status' => $user->company->status]);
+                if (in_array($user->company->status, ['suspended', 'cancelled'])) {
+                    return response()->json([
+                        'message' => 'Your clinic account has been ' . $user->company->status
+                    ], 403);
+                }
+            }
+
+            Log::info('Creating token');
+            $token = $user->createToken('API Token')->plainTextToken;
+            Log::info('Token created successfully');
+
+            return response()->json([
+                'user' => $user->only(['id', 'name', 'email', 'role', 'is_super_admin']),
+                'company_id' => $user->company_id,
+                'company_status' => $user->company?->status,
+                'token' => $token
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Login Error', [
+                'message' => $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            return response()->json([
+                'message' => 'Something went wrong. Please try again later.',
+                'code' => 'SERVER_ERROR',
+                'status' => 500,
+                'debug' => app()->environment('production') ? null : [
+                    'error' => $e->getMessage(),
+                    'file' => $e->getFile(),
+                    'line' => $e->getLine(),
+                ],
+            ], 500);
         }
-
-        $token = $user->createToken('API Token')->plainTextToken;
-
-        return response()->json([
-            'user' => $user->only(['id', 'name', 'email', 'role', 'is_super_admin']),
-            'company_id' => $user->company_id,
-            'company_status' => $user->company?->status,
-            'token' => $token
-        ]);
     }
 
     /**
