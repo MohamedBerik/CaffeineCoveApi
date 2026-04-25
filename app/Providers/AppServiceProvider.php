@@ -117,6 +117,20 @@ class AppServiceProvider extends ServiceProvider
 
             return Limit::perMinute(30)->by($request->ip());
         });
+
+        // ✅ Structured Logging for API Requests
+        if (app()->environment('production')) {
+            $this->app['router']->matched(function ($route) {
+                $name = $route->getName() ?? $route->uri();
+                Log::channel('api')->info('API Request', [
+                    'route' => $name,
+                    'method' => request()->method(),
+                    'url' => request()->fullUrl(),
+                    'user_id' => auth()->id(),
+                    'tenant_id' => \App\Services\Tenant::id(),
+                ]);
+            });
+        }
     }
 
     /**
