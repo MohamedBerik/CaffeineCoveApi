@@ -11,6 +11,7 @@ use App\Models\BillingInvoice;
 use App\Models\PaymentMethod;
 use App\Services\Tenant;
 use App\Services\PayMobService;
+use App\Services\ProrationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -293,9 +294,9 @@ class BillingController extends Controller
 
     /**
      * POST /api/erp/billing/change
-     * ترقية/تخفيض الاشتراك
+     * ترقية/تخفيض الاشتراك مع Proration
      */
-    public function change(Request $request)
+    public function change(Request $request, \App\Services\ProrationService $proration)
     {
         $request->validate([
             'plan_id' => ['required', 'exists:plans,id'],
@@ -321,9 +322,7 @@ class BillingController extends Controller
             );
         }
 
-        $isYearly = $request->billing_cycle === 'yearly';
-
-        // منع التغيير لنفس الخطة ونفس الدورة
+        // ✅ منع التغيير لنفس الخطة ونفس الدورة
         if (
             $currentSubscription->plan_id == $newPlan->id &&
             $currentSubscription->billing_cycle === $request->billing_cycle
@@ -335,7 +334,10 @@ class BillingController extends Controller
             );
         }
 
-        // حساب السعر الجديد
+        // ✅ حساب Proration
+        $prorationResult = $proration->calculate($currentSubscription, $newPlan);
+
+        $isYearly = $request->billing_cycle === 'yearly';
         if ($isYearly) {
             $newAmount = ($newPlan->price_monthly * 12) * 0.8;
         } else {
@@ -344,9 +346,66 @@ class BillingController extends Controller
 
         $endsAt = $isYearly ? now()->addYear() : now()->addMonth();
 
-        return DB::transaction(function () use ($currentSubscription, $newPlan, $newAmount, $isYearly, $endsAt) {
+        // ✅ لو الترقية تتطلب دفع إضافي
+        if ($prorationResult['type'] === 'charge' && $prorationResult['amount'] > 0) {
+            return DB::transaction(function () use ($companyId, $currentSubscription, $newPlan, $newAmount, $isYearly, $endsAt, $prorationResult) {
+
+                // إنشاء اشتراك جديد معلق
+                $subscription = Subscription::create([
+                    'company_id' => $companyId,
+                    'plan_id' => $newPlan->id,
+                    'starts_at' => now(),
+                    'ends_at' => $endsAt,
+                    'amount' => $newAmount,
+                    'billing_cycle' => $isYearly ? 'yearly' : 'monthly',
+                    'status' => 'pending',
+                    'payment_gateway' => $currentSubscription->payment_gateway,
+                ]);
+
+                // إنشاء فاتورة بالفرق
+                $invoice = BillingInvoice::create([
+                    'company_id' => $companyId,
+                    'subscription_id' => $subscription->id,
+                    'number' => BillingInvoice::generateNumber(),
+                    'amount' => $prorationResult['amount'],
+                    'tax' => 0,
+                    'total' => $prorationResult['amount'],
+                    'status' => 'pending',
+                    'due_date' => now()->addDays(3),
+                    'payment_method' => 'card',
+                ]);
+
+                // إنشاء نية دفع عند PayMob للفرق
+                $paymob = new PayMobService();
+                $intention = $paymob->createIntention([
+                    'amount' => (int) ($prorationResult['amount'] * 100),
+                    'currency' => 'EGP',
+                    'metadata' => [
+                        'subscription_id' => $subscription->id,
+                        'company_id' => $companyId,
+                        'plan_id' => $newPlan->id,
+                        'type' => 'proration_charge',
+                    ],
+                ]);
+
+                $subscription->update(['payment_intent_id' => $intention['id']]);
+
+                return response()->json([
+                    'msg' => 'Payment required for plan upgrade',
+                    'status' => 200,
+                    'proration' => $prorationResult,
+                    'payment_url' => $intention['iframe_url'],
+                    'subscription_id' => $subscription->id,
+                    'invoice_id' => $invoice->id,
+                ]);
+            });
+        }
+
+        // ✅ لو تخفيض (Credit) أو نفس السعر، نغير مباشرة
+        return DB::transaction(function () use ($currentSubscription, $newPlan, $newAmount, $isYearly, $endsAt, $prorationResult) {
             $oldPlanId = $currentSubscription->plan_id;
             $oldAmount = $currentSubscription->amount;
+
             $currentSubscription->update(['status' => 'changed']);
 
             $subscription = Subscription::create([
@@ -364,16 +423,15 @@ class BillingController extends Controller
             event(new \App\Events\SubscriptionChanged($currentSubscription, $subscription));
 
             return response()->json([
-                'msg' => 'Plan changed successfully',
+                'msg' => 'Plan ' . ($prorationResult['type'] === 'credit' ? 'downgraded' : 'changed') . ' successfully',
                 'status' => 200,
                 'data' => $subscription,
+                'proration' => $prorationResult,
                 'old_plan_id' => $oldPlanId,
                 'new_plan_id' => $newPlan->id,
             ]);
         });
     }
-
-    // BillingController.php
 
     /**
      * GET /api/erp/billing/status
