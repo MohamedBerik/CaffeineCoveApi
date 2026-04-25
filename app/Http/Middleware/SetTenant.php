@@ -14,6 +14,13 @@ class SetTenant
 {
     public function handle(Request $request, Closure $next)
     {
+        // ✅ 1. Login/Register Bypass
+        if ($request->is('api/login') || $request->is('api/register')) {
+            Tenant::setId(null);
+            Tenant::setIsSuperAdmin(false);
+            return $next($request);
+        }
+
         $user = $request->user();
 
         if (!$user) {
@@ -32,7 +39,8 @@ class SetTenant
         if ($user->is_super_admin && $this->isErpRoute($request)) {
             $tenantIdFromHeader = $request->header('X-Tenant-ID');
 
-            if (!filled($tenantIdFromHeader)) {
+            // ✅ 2. أضف 'global'
+            if (!filled($tenantIdFromHeader) || $tenantIdFromHeader === 'global') {
                 return response()->json([
                     'message' => 'Tenant ID is required for ERP operations. Please select a clinic.',
                 ], 400);
@@ -45,7 +53,8 @@ class SetTenant
 
             $tenantIdFromHeader = $request->header('X-Tenant-ID');
 
-            if (!filled($tenantIdFromHeader)) {
+            // ✅ 3. أضف 'global'
+            if (!filled($tenantIdFromHeader) || $tenantIdFromHeader === 'global') {
                 Tenant::setId(null);
 
                 $this->logDebug('Tenant Check - Super Admin (Global Mode)', [
