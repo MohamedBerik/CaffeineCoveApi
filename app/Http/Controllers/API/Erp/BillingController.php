@@ -70,6 +70,12 @@ class BillingController extends Controller
         // ✅ التحقق من الخطة (exists validation كفاية)
         $plan = Plan::find($request->plan_id);
         if (!$plan) {
+            // ✅ Audit Logging
+            event(new \App\Events\SuspiciousActivity(
+                auth()->id(),
+                'invalid_plan_access',
+                ['plan_id' => $request->plan_id, 'company_id' => Tenant::id()]
+            ));
             throw new BillingException('Plan not found', 404, 'PLAN_NOT_FOUND');
         }
 

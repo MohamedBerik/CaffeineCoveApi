@@ -36,6 +36,15 @@ class EventServiceProvider extends ServiceProvider
         \App\Events\SubscriptionChanged::class => [
             \App\Listeners\LogSubscriptionActivity::class . '@onSubscriptionChanged',
         ],
+        \App\Events\FailedLogin::class => [
+            \App\Listeners\LogFailedLogin::class,
+        ],
+        \App\Events\SuspiciousActivity::class => [
+            \App\Listeners\LogSuspiciousActivity::class,
+        ],
+        \App\Events\AdminOverride::class => [
+            \App\Listeners\LogAdminOverride::class,
+        ],
     ];
 
     /**

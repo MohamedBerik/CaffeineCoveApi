@@ -279,4 +279,27 @@ class CompanyManagementController extends Controller
             'data' => $subscriptions,
         ]);
     }
+
+    // Force Cancel subscription
+    public function forceCancel($id)
+    {
+        $subscription = Subscription::findOrFail($id);
+        $subscription->update(['status' => 'cancelled']);
+
+        // ✅ Audit Logging
+        event(new \App\Events\AdminOverride(
+            auth()->id(),
+            'force_cancel_subscription',
+            $subscription->id,
+            ['company_id' => $subscription->company_id, 'plan_id' => $subscription->plan_id]
+        ));
+
+        event(new \App\Events\SuspiciousActivity(
+            auth()->id(),
+            'admin_force_action',
+            ['action' => 'cancel_subscription', 'subscription_id' => $subscription->id]
+        ));
+
+        return response()->json(['msg' => 'Subscription force cancelled']);
+    }
 }
