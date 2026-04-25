@@ -119,6 +119,7 @@ class AppServiceProvider extends ServiceProvider
         });
 
         // ✅ Structured Logging for API Requests
+        // ✅ Structured Logging for API Requests
         if (app()->environment('production')) {
             $this->app['router']->matched(function ($route) {
                 // ✅ Login/Register Bypass
@@ -126,11 +127,11 @@ class AppServiceProvider extends ServiceProvider
                     return;
                 }
 
-                $name = method_exists($route, 'getName')
-                    ? ($name = $route->route->uri())
-                    : $route->uri();
+                // ✅ طريقة آمنة لجلب اسم الـ route في Laravel 8
+                $routeName = request()->path();
+
                 Log::channel('api')->info('API Request', [
-                    'route' => $name,
+                    'route' => $routeName,
                     'method' => request()->method(),
                     'url' => request()->fullUrl(),
                     'user_id' => auth()->id(),
