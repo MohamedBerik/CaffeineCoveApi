@@ -128,6 +128,8 @@ class AppServiceProvider extends ServiceProvider
                     'url' => request()->fullUrl(),
                     'user_id' => auth()->id(),
                     'tenant_id' => \App\Services\Tenant::id(),
+                    'ip' => request()->ip(),
+                    'user_agent' => request()->userAgent(),
                 ]);
             });
         }
