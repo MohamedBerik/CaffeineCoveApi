@@ -127,7 +127,7 @@ class AppServiceProvider extends ServiceProvider
                 }
 
                 $name = method_exists($route, 'getName')
-                    ? ($route->getName() ?? $route->uri())
+                    ? ($name = $route->route->uri())
                     : $route->uri();
                 Log::channel('api')->info('API Request', [
                     'route' => $name,
