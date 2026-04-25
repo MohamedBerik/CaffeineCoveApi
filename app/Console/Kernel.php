@@ -101,6 +101,8 @@ class Kernel extends ConsoleKernel
      */
     protected $commands = [
         ResetAccountingForCompany::class,
+        \App\Console\Commands\SystemStats::class,
+        \App\Console\Commands\QueueMonitor::class,
     ];
 
     /**

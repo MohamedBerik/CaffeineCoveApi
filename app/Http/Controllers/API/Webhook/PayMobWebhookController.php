@@ -11,104 +11,51 @@ use App\Services\PayMobService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Mail;
 
 class PayMobWebhookController extends Controller
 {
     /**
-     * Handle PayMob Webhook - Production Ready
-     *
-     * Features:
-     * ✅ Atomic Idempotency (Redis Lock)
-     * ✅ Row-Level Database Lock
-     * ✅ Grace Period Calculation
-     * ✅ Duplicate Prevention
-     * ✅ Concurrent Request Protection
+     * Handle PayMob Webhook - Database-Safe Idempotency
      */
     public function handle(Request $request, PayMobService $paymob)
     {
         $payload = $request->all();
 
-        // استخراج المعرفات الأساسية
         $transactionId = $payload['obj']['id'] ?? null;
         $orderId = $payload['obj']['order']['id'] ?? null;
         $success = $payload['obj']['success'] ?? false;
         $pending = $payload['obj']['pending'] ?? true;
 
-        // ✅ تسجيل الـ Webhook فوراً (قبل أي معالجة)
+        // ✅ تسجيل الـ Webhook فوراً
         $webhookLog = $this->logWebhook($request, $payload);
 
-        // ⚡ منع المعالجة المتزامنة - Atomic Redis Lock
-        $lockKey = "paymob_webhook:{$orderId}:{$transactionId}";
-        $lock = Cache::lock($lockKey, 30); // 30 ثانية timeout
+        // ✅ التحقق من صحة التوقيع
+        if (!$paymob->verifyWebhook($payload)) {
+            Log::warning('PayMob Webhook: Invalid HMAC', ['order_id' => $orderId]);
+            $webhookLog->update(['status' => 'failed', 'error' => 'Invalid HMAC signature']);
+            return response()->json(['status' => 'invalid_signature'], 400);
+        }
 
-        if (!$lock->get()) {
-            Log::warning('PayMob Webhook: Concurrent request blocked', [
-                'order_id' => $orderId,
-                'transaction_id' => $transactionId,
-            ]);
-
-            $webhookLog->update([
-                'status' => 'duplicate_ignored',
-                'error' => 'Concurrent request prevented by lock',
-            ]);
-
-            return response()->json([
-                'status' => 'processing_in_progress',
-                'message' => 'Request is being processed'
-            ], 409);
+        // ✅ التحقق من نجاح الدفع
+        if (!$success || $pending) {
+            Log::info('PayMob Webhook: Payment incomplete', ['order_id' => $orderId]);
+            $webhookLog->update(['status' => 'pending']);
+            return response()->json(['status' => 'payment_pending']);
         }
 
         try {
-            // ✅ التحقق من صحة التوقيع
-            if (!$this->verifyPaymobSignature($payload, $paymob)) {
-                Log::warning('PayMob Webhook: Invalid signature', [
-                    'order_id' => $orderId,
-                    'transaction_id' => $transactionId,
-                ]);
-
-                $webhookLog->update([
-                    'status' => 'failed',
-                    'error' => 'Invalid HMAC signature',
-                ]);
-
-                return response()->json(['status' => 'invalid_signature'], 400);
-            }
-
-            // ✅ التحقق من نجاح الدفع
-            if (!$success || $pending) {
-                Log::info('PayMob Webhook: Payment incomplete', [
-                    'success' => $success,
-                    'pending' => $pending,
-                    'order_id' => $orderId,
-                ]);
-
-                $webhookLog->update(['status' => 'pending']);
-                return response()->json(['status' => 'payment_pending']);
-            }
-
-            // ⚡ المعالجة الرئيسية داخل Transaction
             return DB::transaction(function () use ($payload, $orderId, $transactionId, $webhookLog) {
 
-                // ✅ البحث عن الاشتراك مع قفل الصف (Row-Level Lock)
+                // ✅ البحث عن الاشتراك مع Row-Level Lock
                 $subscription = Subscription::where('payment_intent_id', $orderId)
-                    ->lockForUpdate() // ⚡ يمنع أي تعديل متزامن
+                    ->lockForUpdate()
                     ->first();
 
                 if (!$subscription) {
-                    Log::warning('PayMob Webhook: Subscription not found', [
-                        'order_id' => $orderId,
-                    ]);
-
-                    $webhookLog->update([
-                        'status' => 'failed',
-                        'error' => 'Subscription not found',
-                    ]);
-
-                    return response()->json([
-                        'status' => 'subscription_not_found',
-                        'message' => 'No subscription matches this payment'
-                    ], 404);
+                    Log::warning('PayMob Webhook: Subscription not found', ['order_id' => $orderId]);
+                    $webhookLog->update(['status' => 'failed', 'error' => 'Subscription not found']);
+                    return response()->json(['status' => 'subscription_not_found'], 404);
                 }
 
                 // ✅ Idempotency Check: هل الاشتراك نشط بالفعل؟
@@ -116,54 +63,32 @@ class PayMobWebhookController extends Controller
                     Log::info('PayMob Webhook: Already processed (idempotent)', [
                         'subscription_id' => $subscription->id,
                         'order_id' => $orderId,
-                        'payment_token' => $subscription->payment_token,
                     ]);
-
-                    $webhookLog->update([
-                        'status' => 'duplicate_ignored',
-                        'subscription_id' => $subscription->id,
-                        'error' => 'Subscription already active',
-                    ]);
-
-                    return response()->json([
-                        'status' => 'already_active',
-                        'message' => 'Subscription was already activated'
-                    ]);
+                    $webhookLog->update(['status' => 'duplicate_ignored', 'subscription_id' => $subscription->id]);
+                    return response()->json(['status' => 'already_active']);
                 }
 
-                // ✅ هل تم معالجة نفس الـ Webhook بالضبط من قبل؟
+                // ✅ هل تم معالجة نفس الـ Webhook من قبل؟
                 $duplicateWebhook = WebhookLog::where('order_id', $orderId)
                     ->where('status', 'success')
                     ->where('id', '!=', $webhookLog->id)
                     ->exists();
 
                 if ($duplicateWebhook) {
-                    Log::warning('PayMob Webhook: Duplicate detected via WebhookLog', [
-                        'order_id' => $orderId,
-                    ]);
-
-                    $webhookLog->update([
-                        'status' => 'duplicate_ignored',
-                        'subscription_id' => $subscription->id,
-                        'error' => 'Duplicate webhook transaction',
-                    ]);
-
-                    return response()->json([
-                        'status' => 'duplicate_webhook',
-                        'message' => 'This webhook was already processed'
-                    ]);
+                    Log::warning('PayMob Webhook: Duplicate detected', ['order_id' => $orderId]);
+                    $webhookLog->update(['status' => 'duplicate_ignored', 'subscription_id' => $subscription->id]);
+                    return response()->json(['status' => 'duplicate_webhook']);
                 }
 
-                // ✅ حساب فترة السماح (Grace Period)
+                // ✅ حساب Grace Period
                 $gracePeriodDays = config('billing.grace_period_days', 7);
-                $subscriptionEndsAt = $subscription->ends_at ?? now()->addMonth();
                 $graceEndsAt = now()->addDays($gracePeriodDays);
 
-                // ✅ تحديث الاشتراك (Atomic Update)
+                // ✅ تحديث الاشتراك
                 $subscription->update([
                     'status' => 'active',
                     'starts_at' => $subscription->starts_at ?? now(),
-                    'ends_at' => $subscriptionEndsAt,
+                    'ends_at' => $subscription->ends_at ?? now()->addMonth(),
                     'grace_period_ends_at' => $graceEndsAt,
                     'payment_token' => $transactionId,
                     'transaction_id' => $transactionId,
@@ -174,10 +99,10 @@ class PayMobWebhookController extends Controller
                     $this->savePaymentMethod($subscription, $payload['obj']);
                 }
 
-                // ✅ إنشاء الفاتورة (مع فحص مسبق)
+                // ✅ إنشاء الفاتورة
                 $invoice = $this->createInvoiceSafely($subscription, $transactionId);
 
-                // ✅ إطلاق الحدث
+                // ✅ إطلاق Event
                 event(new \App\Events\PaymentReceived($invoice));
 
                 // ✅ تحديث سجل الـ Webhook
@@ -187,96 +112,75 @@ class PayMobWebhookController extends Controller
                     'invoice_id' => $invoice->id,
                 ]);
 
-                Log::info('PayMob Webhook: Payment processed successfully', [
+                Log::info('PayMob Webhook: Payment processed', [
                     'subscription_id' => $subscription->id,
                     'invoice_id' => $invoice->id,
                     'transaction_id' => $transactionId,
-                    'grace_ends_at' => $graceEndsAt->toDateTimeString(),
                 ]);
 
                 return response()->json([
                     'status' => 'ok',
-                    'message' => 'Payment processed successfully',
                     'subscription_id' => $subscription->id,
                     'invoice_id' => $invoice->id,
                 ]);
-            }); // End DB::transaction
-
+            });
         } catch (\Exception $e) {
-            Log::error('PayMob Webhook: Processing failed', [
+            Log::critical('PayMob Webhook: Processing failed', [
                 'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString(),
                 'order_id' => $orderId,
                 'transaction_id' => $transactionId,
             ]);
 
-            $webhookLog->update([
-                'status' => 'error',
-                'error' => $e->getMessage(),
-            ]);
+            $webhookLog->update(['status' => 'error', 'error' => $e->getMessage()]);
 
-            return response()->json([
-                'status' => 'error',
-                'message' => 'Temporary processing error'
-            ], 500);
-        } finally {
-            // ✅ تحرير القفل دائماً (حتى في حالة الخطأ)
-            optional($lock)->release();
+            // ✅ إرسال إشعار للإدارة في حالة الفشل
+            try {
+                if (app()->environment('production')) {
+                    Mail::raw(
+                        "🚨 PayMob Webhook Failed\n\nError: {$e->getMessage()}\nOrder: {$orderId}\nTime: " . now(),
+                        function ($message) {
+                            $message->to(config('mail.from.address'))
+                                ->subject('🚨 Critical: PayMob Webhook Failed');
+                        }
+                    );
+                }
+            } catch (\Exception $mailException) {
+                Log::error('Failed to send webhook alert email', ['error' => $mailException->getMessage()]);
+            }
+
+            return response()->json(['status' => 'error', 'message' => 'Temporary processing error'], 500);
         }
     }
 
     /**
-     * التحقق من صحة توقيع PayMob
-     */
-    private function verifyPaymobSignature(array $payload, PayMobService $paymob): bool
-    {
-        try {
-            return $paymob->verifyWebhook($payload);
-        } catch (\Exception $e) {
-            Log::error('PayMob signature verification failed', [
-                'error' => $e->getMessage(),
-            ]);
-            return false;
-        }
-    }
-
-    /**
-     * تسجيل الـ Webhook للتدقيق
+     * تسجيل الـ Webhook
      */
     private function logWebhook(Request $request, array $payload): WebhookLog
     {
-        $orderId = $payload['obj']['order']['id'] ?? null;
-        $transactionId = $payload['obj']['id'] ?? null;
-
         return WebhookLog::create([
             'gateway' => 'paymob',
             'event_type' => $payload['type'] ?? 'transaction.processed',
             'payload' => $payload,
-            'order_id' => $orderId,
-            'transaction_id' => $transactionId,
+            'order_id' => $payload['obj']['order']['id'] ?? null,
+            'transaction_id' => $payload['obj']['id'] ?? null,
             'ip_address' => $request->ip(),
             'status' => 'received',
         ]);
     }
 
     /**
-     * إنشاء الفاتورة بشكل آمن (مع فحص التكرار)
+     * إنشاء الفاتورة بشكل آمن
      */
     private function createInvoiceSafely(Subscription $subscription, string $transactionId): BillingInvoice
     {
-        // ✅ فحص وجود فاتورة بنفس رقم العملية
         $existingInvoice = BillingInvoice::where('transaction_id', $transactionId)
             ->where('subscription_id', $subscription->id)
             ->first();
 
         if ($existingInvoice) {
-            Log::info('PayMob Webhook: Using existing invoice', [
-                'invoice_id' => $existingInvoice->id,
-            ]);
             return $existingInvoice;
         }
 
-        // ✅ إنشاء فاتورة جديدة
         return BillingInvoice::create([
             'company_id' => $subscription->company_id,
             'subscription_id' => $subscription->id,
@@ -319,11 +223,7 @@ class PayMobWebhookController extends Controller
                 );
             }
         } catch (\Exception $e) {
-            Log::error('PayMob Webhook: Failed to save payment method', [
-                'error' => $e->getMessage(),
-                'subscription_id' => $subscription->id,
-            ]);
-            // لا نوقف العملية إذا فشل حفظ طريقة الدفع
+            Log::error('Failed to save payment method', ['error' => $e->getMessage()]);
         }
     }
 }
