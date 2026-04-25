@@ -54,14 +54,6 @@ class Handler extends ExceptionHandler
 
     public function render($request, Throwable $e)
     {
-        // ✅ أضف السطر ده مؤقتًا عشان تشوف الـ Error
-        return response()->json([
-            'message' => $e->getMessage(),
-            'file' => $e->getFile(),
-            'line' => $e->getLine(),
-            'code' => 'SERVER_ERROR',
-            'status' => 500,
-        ], 500);
         // ✅ لو الـ Exception بتاعنا (ApiException أو اللي ورث منها)
         if ($e instanceof ApiException) {
             return $e->render();
@@ -90,15 +82,6 @@ class Handler extends ExceptionHandler
      */
     protected function renderApiException($request, Throwable $e): JsonResponse
     {
-        // ✅ أضف السطر ده مؤقتًا عشان تشوف الـ Error
-        return response()->json([
-            'message' => $e->getMessage(),
-            'file' => $e->getFile(),
-            'line' => $e->getLine(),
-            'code' => 'SERVER_ERROR',
-            'status' => 500,
-        ], 500);
-
         $statusCode = method_exists($e, 'getStatusCode') ? $e->getStatusCode() : 500;
 
         // ✅ تحديد الـ Status Code
