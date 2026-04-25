@@ -141,6 +141,21 @@ class AppServiceProvider extends ServiceProvider
                 ]);
             });
         }
+
+        // ✅ تحويل REDIS_PORT إلى integer (إصلاح خطأ Railway)
+        if ($port = env('REDIS_PORT')) {
+            Config::set('database.redis.default.port', (int) $port);
+        }
+
+        // ✅ تحويل REDIS_HOST لو فيه مشكلة
+        if ($host = env('REDIS_HOST')) {
+            Config::set('database.redis.default.host', $host);
+        }
+
+        // ✅ تحويل REDIS_PASSWORD لو موجود
+        if ($password = env('REDIS_PASSWORD')) {
+            Config::set('database.redis.default.password', $password);
+        }
     }
 
     /**
