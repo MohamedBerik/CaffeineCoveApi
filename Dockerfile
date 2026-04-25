@@ -9,6 +9,7 @@ RUN apt-get update && apt-get install -y \
     libxml2-dev \
     zip \
     unzip \
+    nginx \
     supervisor
 
 # Install PHP extensions
@@ -24,12 +25,17 @@ WORKDIR /var/www
 # Copy application
 COPY . .
 
+# Create .env file for build
+RUN cp .env.example .env || echo "APP_KEY=" > .env
+
 # Install dependencies
 RUN composer install --no-dev --optimize-autoloader
 
-# Generate key and storage link
+# Generate key (now .env exists)
 RUN php artisan key:generate
-RUN php artisan storage:link
+
+# Create storage link
+RUN php artisan storage:link || true
 
 # Set permissions
 RUN chown -R www-data:www-data /var/www
@@ -39,5 +45,5 @@ RUN chmod -R 755 /var/www/bootstrap/cache
 # Expose port
 EXPOSE 8080
 
-# Start PHP built-in server
+# Start PHP server
 CMD ["php", "artisan", "serve", "--host=0.0.0.0", "--port=8080"]
