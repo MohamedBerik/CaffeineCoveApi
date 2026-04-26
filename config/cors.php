@@ -1,17 +1,17 @@
 <?php
 
 return [
-
     'paths' => ['api/*'],
 
     'allowed_methods' => ['*'],
 
-    'allowed_origins' => ['*'], // 👈 مؤقتًا للتجربة
+    'allowed_origins' => [
+        'https://caffeine-cove-cafe.vercel.app',
+    ],
 
     'allowed_headers' => ['*'],
 
-    'supports_credentials' => false,
-
+    'supports_credentials' => true,
 ];
 
 // return [
