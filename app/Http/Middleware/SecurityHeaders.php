@@ -9,6 +9,11 @@ class SecurityHeaders
 {
     public function handle(Request $request, Closure $next)
     {
+        // ✅ لو Preflight، مرر فوراً بدون معالجة
+        if ($request->isMethod('OPTIONS')) {
+            return $next($request);
+        }
+
         $response = $next($request);
 
         // ✅ منع MIME-type sniffing
