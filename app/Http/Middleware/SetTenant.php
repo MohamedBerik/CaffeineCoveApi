@@ -14,14 +14,9 @@ class SetTenant
 {
     public function handle(Request $request, Closure $next)
     {
-        // ✅ أول سطرين - قبل أي حاجة
+        // 🔥 لازم يكون أول حاجة قبل أي كود
         if ($request->isMethod('OPTIONS')) {
-            return response('', 200)
-                ->header('Access-Control-Allow-Origin', $request->header('Origin', '*'))
-                ->header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS')
-                ->header('Access-Control-Allow-Headers', 'Authorization, Content-Type, X-Requested-With, X-Tenant-ID')
-                ->header('Access-Control-Allow-Credentials', 'true')
-                ->header('Access-Control-Max-Age', '86400');
+            return response()->json([], 200);
         }
 
         // ✅ 1. Login/Register Bypass
