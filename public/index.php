@@ -15,6 +15,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'OPTIONS') {
     exit(0);
 }
 //.............................................................
+
 use Illuminate\Contracts\Http\Kernel;
 use Illuminate\Http\Request;
 
