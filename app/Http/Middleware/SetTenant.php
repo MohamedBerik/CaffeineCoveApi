@@ -14,6 +14,11 @@ class SetTenant
 {
     public function handle(Request $request, Closure $next)
     {
+        // ✅ السماح بـ OPTIONS Preflight بدون أي معالجة
+        if ($request->getMethod() === 'OPTIONS') {
+            return response()->noContent();
+        }
+
         // ✅ 1. Login/Register Bypass
         if ($request->is('api/login') || $request->is('api/register')) {
             Tenant::setId(null);
