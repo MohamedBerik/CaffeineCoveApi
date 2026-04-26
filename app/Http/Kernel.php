@@ -29,9 +29,9 @@ class Kernel extends HttpKernel
 
         'api' => [
             // \Laravel\Sanctum\Http\Middleware\EnsureFrontendRequestsAreStateful::class,
-            \App\Http\Middleware\SanitizeInput::class, // ✅ أضف هنا
-            \App\Http\Middleware\SecurityHeaders::class,     // ✅ أضف
-            \App\Http\Middleware\ValidateFileUpload::class,   // ✅ أضف
+            \App\Http\Middleware\SanitizeInput::class,
+            \App\Http\Middleware\SecurityHeaders::class,
+            \App\Http\Middleware\ValidateFileUpload::class,
             'throttle:api',
             \Illuminate\Routing\Middleware\SubstituteBindings::class,
             \App\Http\Middleware\SetTenant::class,
