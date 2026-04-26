@@ -32,7 +32,6 @@ class Kernel extends HttpKernel
             \App\Http\Middleware\SanitizeInput::class, // ✅ أضف هنا
             \App\Http\Middleware\SecurityHeaders::class,     // ✅ أضف
             \App\Http\Middleware\ValidateFileUpload::class,   // ✅ أضف
-            \Fruitcake\Cors\HandleCors::class,
             'throttle:api',
             \Illuminate\Routing\Middleware\SubstituteBindings::class,
             \App\Http\Middleware\SetTenant::class,
