@@ -98,24 +98,8 @@ Route::middleware(['auth:sanctum', 'super.admin'])->prefix('admin')->group(funct
 Route::middleware(['auth:sanctum', 'company.user'])->group(function () {
 
     // User Profile
-    Route::get('/me', function (Request $request) {
-        $user = $request->user();
-        $permissions = $user->getAllPermissions()->pluck('name')->toArray();
-
-        if ($user->is_super_admin) {
-            $permissions = ['*'];
-        }
-
-        return response()->json([
-            'id' => $user->id,
-            'name' => $user->name,
-            'email' => $user->email,
-            'role' => $user->role,
-            'roles' => $user->getRoleNames(),
-            'company_id' => Tenant::id(),
-            'is_super_admin' => (bool) $user->is_super_admin,
-            'permissions' => $permissions,
-        ]);
+    Route::get('/test-debug', function () {
+        return response()->json(['message' => 'Backend is working!']);
     });
 
     Route::post('/logout', function (Request $request) {
