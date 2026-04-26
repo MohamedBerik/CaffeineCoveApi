@@ -54,25 +54,37 @@ class Handler extends ExceptionHandler
 
     public function render($request, Throwable $e)
     {
-        // ✅ تسجيل تفاصيل الخطأ
-        Log::error('API Error', [
-            'path' => $request->path(),
-            'method' => $request->getMethod(),
-            'error' => $e->getMessage(),
-            'file' => $e->getFile(),
-            'line' => $e->getLine(),
-            'trace' => $e->getTraceAsString(),
-        ]);
 
-        // ✅ إرجاع JSON مع CORS headers
+        // ✅ أضف السطر ده مؤقتًا عشان تشوف الـ Error
         return response()->json([
-            'error' => 'Server Error',
             'message' => $e->getMessage(),
             'file' => $e->getFile(),
             'line' => $e->getLine(),
-        ], 500)
-            ->header('Access-Control-Allow-Origin', $request->header('Origin', '*'))
-            ->header('Access-Control-Allow-Credentials', 'true');
+            'code' => 'SERVER_ERROR',
+            'status' => 500,
+        ], 500);
+
+        // ✅ لو الـ Exception بتاعنا (ApiException أو اللي ورث منها)
+        if ($e instanceof ApiException) {
+            return $e->render();
+        }
+
+        // ✅ لو Rate Limiting
+        if ($e instanceof \Illuminate\Http\Exceptions\ThrottleRequestsException) {
+            return response()->json([
+                'message' => 'Too many requests. Please try again later.',
+                'code' => 'TOO_MANY_REQUESTS',
+                'status' => 429,
+                'retry_after' => $e->getHeaders()['Retry-After'] ?? 60,
+            ], 429);
+        }
+
+        // ✅ لو الـ Request API
+        if ($request->expectsJson() || $request->is('api/*')) {
+            return $this->renderApiException($request, $e);
+        }
+
+        return parent::render($request, $e);
     }
 
     /**
