@@ -1,4 +1,6 @@
 <?php
+
+//للاختبار فقط :
 if (isset($_SERVER['HTTP_ORIGIN'])) {
     header("Access-Control-Allow-Origin: {$_SERVER['HTTP_ORIGIN']}");
     header('Access-Control-Allow-Credentials: true');
@@ -12,7 +14,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'OPTIONS') {
         header("Access-Control-Allow-Headers: {$_SERVER['HTTP_ACCESS_CONTROL_REQUEST_HEADERS']}");
     exit(0);
 }
-
+//.............................................................
 use Illuminate\Contracts\Http\Kernel;
 use Illuminate\Http\Request;
 
