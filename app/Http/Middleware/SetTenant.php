@@ -14,9 +14,9 @@ class SetTenant
 {
     public function handle(Request $request, Closure $next)
     {
-        // ✅ السماح بـ OPTIONS Preflight بدون أي معالجة
-        if ($request->getMethod() === 'OPTIONS') {
-            return response()->noContent();
+        // 🔥 لازم يكون أول حاجة قبل أي كود
+        if ($request->isMethod('OPTIONS')) {
+            return response()->json([], 200);
         }
 
         // ✅ 1. Login/Register Bypass

@@ -446,7 +446,11 @@ Route::prefix('saas')
         Route::post('/companies/{id}/impersonate', [CompanyManagementController::class, 'impersonate']);
     });
 
-// Health Check
+/*
+|--------------------------------------------------------------------------
+| Health Check
+|--------------------------------------------------------------------------
+*/
 Route::get('/health', function () {
     $checks = [
         'database' => false,
@@ -498,3 +502,12 @@ Route::get('/health', function () {
         'checks' => $checks,
     ], $statusCode);
 });
+
+/*
+|--------------------------------------------------------------------------
+| OPTIONS route fallback
+|--------------------------------------------------------------------------
+*/
+Route::options('{any}', function () {
+    return response()->json([], 200);
+})->where('any', '.*');
