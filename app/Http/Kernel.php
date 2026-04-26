@@ -33,7 +33,7 @@ class Kernel extends HttpKernel
             \App\Http\Middleware\SecurityHeaders::class,
             \App\Http\Middleware\ValidateFileUpload::class,
             \Illuminate\Routing\Middleware\SubstituteBindings::class,
-            \App\Http\Middleware\SetTenant::class,
+            // \App\Http\Middleware\SetTenant::class,
         ],
     ];
 
