@@ -55,6 +55,19 @@ use App\Http\Controllers\API\Webhook\PayMobWebhookController;
 use App\Services\Tenant;
 use Illuminate\Support\Facades\DB;
 
+
+
+/*
+|--------------------------------------------------------------------------
+| OPTIONS route fallback
+|--------------------------------------------------------------------------
+*/
+
+Route::options('{any}', function () {
+    return response()->json([], 200);
+})->where('any', '.*');
+
+
 /*
 |--------------------------------------------------------------------------
 | Public Routes (No Authentication Required)
@@ -502,12 +515,3 @@ Route::get('/health', function () {
         'checks' => $checks,
     ], $statusCode);
 });
-
-/*
-|--------------------------------------------------------------------------
-| OPTIONS route fallback
-|--------------------------------------------------------------------------
-*/
-Route::options('{any}', function () {
-    return response()->json([], 200);
-})->where('any', '.*');
