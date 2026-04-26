@@ -81,11 +81,11 @@ class AuthController extends Controller
 
         if (!$user || !Hash::check($request->password, $user->password)) {
             // ✅ Audit Logging
-            event(new \App\Events\FailedLogin(
-                $request->email,
-                $request->ip(),
-                'Invalid credentials'
-            ));
+            // event(new \App\Events\FailedLogin(
+            //     $request->email,
+            //     $request->ip(),
+            //     'Invalid credentials'
+            // ));
             return response()->json([
                 'message' => 'Invalid credentials'
             ], 401);
