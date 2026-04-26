@@ -34,7 +34,7 @@ class Kernel extends HttpKernel
             \App\Http\Middleware\ValidateFileUpload::class,   // ✅ أضف
             'throttle:api',
             \Illuminate\Routing\Middleware\SubstituteBindings::class,
-            \App\Http\Middleware\SetTenant::class,
+            // \App\Http\Middleware\SetTenant::class,
         ],
     ];
 
