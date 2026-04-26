@@ -79,17 +79,17 @@ class AuthController extends Controller
             ->where('email', $request->email)
             ->first();
 
-        // if (!$user || !Hash::check($request->password, $user->password)) {
-        //     // ✅ Audit Logging
-        //     event(new \App\Events\FailedLogin(
-        //         $request->email,
-        //         $request->ip(),
-        //         'Invalid credentials'
-        //     ));
-        //     return response()->json([
-        //         'message' => 'Invalid credentials'
-        //     ], 401);
-        // }
+        if (!$user || !Hash::check($request->password, $user->password)) {
+            // ✅ Audit Logging
+            event(new \App\Events\FailedLogin(
+                $request->email,
+                $request->ip(),
+                'Invalid credentials'
+            ));
+            return response()->json([
+                'message' => 'Invalid credentials'
+            ], 401);
+        }
 
         // ✅ بعد ما لاقينا المستخدم، نضبط Tenant Context
         if (!$user->is_super_admin) {

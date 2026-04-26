@@ -12,19 +12,25 @@ class LogFailedLogin
 {
     public function handle(FailedLogin $event)
     {
-        ActivityLog::create([
-            'company_id' => null, // مفيش Tenant Context
-            'user_id' => null,    // مش معروف
-            'action' => 'auth.failed_login',
-            'subject_type' => 'User',
-            'subject_id' => null,
-            'properties' => [
-                'email' => $event->email,
-                'ip' => $event->ip,
-                'reason' => $event->reason,
-                'attempted_at' => now(),
-            ],
-        ]);
+        try {
+            ActivityLog::create([
+                'company_id' => null,
+                'user_id' => null,
+                'action' => 'auth.failed_login',
+                'subject_type' => 'User',
+                'subject_id' => null,
+                'properties' => [
+                    'email' => $event->email,
+                    'ip' => $event->ip,
+                    'reason' => $event->reason,
+                    'attempted_at' => now(),
+                ],
+            ]);
+        } catch (\Throwable $e) {
+            Log::error('Failed to log activity', [
+                'error' => $e->getMessage()
+            ]);
+        }
 
         Log::warning('Failed login attempt', [
             'email' => $event->email,
