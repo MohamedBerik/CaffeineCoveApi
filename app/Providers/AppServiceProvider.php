@@ -119,27 +119,27 @@ class AppServiceProvider extends ServiceProvider
         });
 
         // ✅ Structured Logging for API Requests
-        // if (app()->environment('production')) {
-        //     $this->app['router']->matched(function ($route) {
-        //         // ✅ Login/Register Bypass
-        //         if (request()->is('api/login') || request()->is('api/register')) {
-        //             return;
-        //         }
+        if (app()->environment('production')) {
+            $this->app['router']->matched(function ($route) {
+                // ✅ Login/Register Bypass
+                if (request()->is('api/login') || request()->is('api/register')) {
+                    return;
+                }
 
-        //         // ✅ طريقة آمنة لجلب اسم الـ route في Laravel 8
-        //         $routeName = request()->path();
+                // ✅ طريقة آمنة لجلب اسم الـ route في Laravel 8
+                $routeName = request()->path();
 
-        //         Log::channel('api')->info('API Request', [
-        //             'route' => $routeName,
-        //             'method' => request()->method(),
-        //             'url' => request()->fullUrl(),
-        //             'user_id' => auth()->id(),
-        //             'tenant_id' => \App\Services\Tenant::id(),
-        //             'ip' => request()->ip(),
-        //             'user_agent' => request()->userAgent(),
-        //         ]);
-        //     });
-        // }
+                Log::channel('api')->info('API Request', [
+                    'route' => $routeName,
+                    'method' => request()->method(),
+                    'url' => request()->fullUrl(),
+                    'user_id' => auth()->id(),
+                    'tenant_id' => \App\Services\Tenant::id(),
+                    'ip' => request()->ip(),
+                    'user_agent' => request()->userAgent(),
+                ]);
+            });
+        }
     }
 
     /**
@@ -192,16 +192,16 @@ class AppServiceProvider extends ServiceProvider
      */
     protected function configureDoctrineEnumSupport(): void
     {
-        // try {
-        //     if (class_exists(\Doctrine\DBAL\Types\Type::class)) {
-        //         Schema::getConnection()
-        //             ->getDoctrineSchemaManager()
-        //             ->getDatabasePlatform()
-        //             ->registerDoctrineTypeMapping('enum', 'string');
-        //     }
-        // } catch (\Exception $e) {
-        //     Log::info('Database not available for Doctrine mapping: ' . $e->getMessage());
-        // }
+        try {
+            if (class_exists(\Doctrine\DBAL\Types\Type::class)) {
+                Schema::getConnection()
+                    ->getDoctrineSchemaManager()
+                    ->getDatabasePlatform()
+                    ->registerDoctrineTypeMapping('enum', 'string');
+            }
+        } catch (\Exception $e) {
+            Log::info('Database not available for Doctrine mapping: ' . $e->getMessage());
+        }
     }
 
     /**
@@ -209,13 +209,13 @@ class AppServiceProvider extends ServiceProvider
      */
     protected function configureDatabaseStrictMode(): void
     {
-        // try {
-        //     if (app()->environment('local', 'development')) {
-        //         DB::statement("SET SESSION sql_mode = 'STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION'");
-        //     }
-        // } catch (\Exception $e) {
-        //     Log::warning('Failed to set database strict mode: ' . $e->getMessage());
-        // }
+        try {
+            if (app()->environment('local', 'development')) {
+                DB::statement("SET SESSION sql_mode = 'STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION'");
+            }
+        } catch (\Exception $e) {
+            Log::warning('Failed to set database strict mode: ' . $e->getMessage());
+        }
     }
 
     /**
