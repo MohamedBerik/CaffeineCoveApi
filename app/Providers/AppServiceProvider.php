@@ -193,16 +193,16 @@ class AppServiceProvider extends ServiceProvider
      */
     protected function configureDoctrineEnumSupport(): void
     {
-        try {
-            if (class_exists(\Doctrine\DBAL\Types\Type::class)) {
-                Schema::getConnection()
-                    ->getDoctrineSchemaManager()
-                    ->getDatabasePlatform()
-                    ->registerDoctrineTypeMapping('enum', 'string');
-            }
-        } catch (\Exception $e) {
-            Log::info('Database not available for Doctrine mapping: ' . $e->getMessage());
-        }
+        // try {
+        //     if (class_exists(\Doctrine\DBAL\Types\Type::class)) {
+        //         Schema::getConnection()
+        //             ->getDoctrineSchemaManager()
+        //             ->getDatabasePlatform()
+        //             ->registerDoctrineTypeMapping('enum', 'string');
+        //     }
+        // } catch (\Exception $e) {
+        //     Log::info('Database not available for Doctrine mapping: ' . $e->getMessage());
+        // }
     }
 
     /**
@@ -210,13 +210,13 @@ class AppServiceProvider extends ServiceProvider
      */
     protected function configureDatabaseStrictMode(): void
     {
-        try {
-            if (app()->environment('local', 'development')) {
-                DB::statement("SET SESSION sql_mode = 'STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION'");
-            }
-        } catch (\Exception $e) {
-            Log::warning('Failed to set database strict mode: ' . $e->getMessage());
-        }
+        // try {
+        //     if (app()->environment('local', 'development')) {
+        //         DB::statement("SET SESSION sql_mode = 'STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION'");
+        //     }
+        // } catch (\Exception $e) {
+        //     Log::warning('Failed to set database strict mode: ' . $e->getMessage());
+        // }
     }
 
     /**
