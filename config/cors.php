@@ -1,18 +1,5 @@
 <?php
 
-// return [
-//     'paths' => ['api/*'],
-
-//     'allowed_methods' => ['*'],
-
-//     'allowed_origins' => [
-//         'https://caffeine-cove-cafe.vercel.app',
-//     ],
-
-//     'allowed_headers' => ['*'],
-
-//     'supports_credentials' => true,
-// ];
 
 return [
 
