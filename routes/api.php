@@ -458,54 +458,61 @@ Route::prefix('saas')
 | Health Check
 |--------------------------------------------------------------------------
 */
+// Route::get('/health', function () {
+//     $checks = [
+//         'database' => false,
+//         'queue' => false,
+//         'cache' => false,
+//         'storage' => false,
+//     ];
+
+//     // Check Database
+//     try {
+//         DB::connection()->getPdo();
+//         $checks['database'] = true;
+//     } catch (\Exception $e) {
+//         //
+//     }
+
+//     // Check Queue
+//     try {
+//         $pending = DB::table('jobs')->count();
+//         $failed = DB::table('failed_jobs')->count();
+//         $checks['queue'] = $failed < 10; // ✅ مقبول لو أقل من 10 فشل
+//     } catch (\Exception $e) {
+//         //
+//     }
+
+//     // Check Cache
+//     try {
+//         \Illuminate\Support\Facades\Cache::set('health_check', 'ok', 10);
+//         $checks['cache'] = \Illuminate\Support\Facades\Cache::get('health_check') === 'ok';
+//     } catch (\Exception $e) {
+//         //
+//     }
+
+//     // Check Storage
+//     try {
+//         $checks['storage'] = is_writable(storage_path());
+//     } catch (\Exception $e) {
+//         //
+//     }
+
+//     $healthy = !in_array(false, $checks);
+//     $statusCode = $healthy ? 200 : 500;
+
+//     return response()->json([
+//         'status' => $healthy ? 'healthy' : 'unhealthy',
+//         'timestamp' => now()->toIso8601String(),
+//         'version' => app()->version(),
+//         'environment' => app()->environment(),
+//         'checks' => $checks,
+//     ], $statusCode);
+// });
+
 Route::get('/health', function () {
-    $checks = [
-        'database' => false,
-        'queue' => false,
-        'cache' => false,
-        'storage' => false,
-    ];
-
-    // Check Database
-    try {
-        DB::connection()->getPdo();
-        $checks['database'] = true;
-    } catch (\Exception $e) {
-        //
-    }
-
-    // Check Queue
-    try {
-        $pending = DB::table('jobs')->count();
-        $failed = DB::table('failed_jobs')->count();
-        $checks['queue'] = $failed < 10; // ✅ مقبول لو أقل من 10 فشل
-    } catch (\Exception $e) {
-        //
-    }
-
-    // Check Cache
-    try {
-        \Illuminate\Support\Facades\Cache::set('health_check', 'ok', 10);
-        $checks['cache'] = \Illuminate\Support\Facades\Cache::get('health_check') === 'ok';
-    } catch (\Exception $e) {
-        //
-    }
-
-    // Check Storage
-    try {
-        $checks['storage'] = is_writable(storage_path());
-    } catch (\Exception $e) {
-        //
-    }
-
-    $healthy = !in_array(false, $checks);
-    $statusCode = $healthy ? 200 : 500;
-
     return response()->json([
-        'status' => $healthy ? 'healthy' : 'unhealthy',
-        'timestamp' => now()->toIso8601String(),
-        'version' => app()->version(),
-        'environment' => app()->environment(),
-        'checks' => $checks,
-    ], $statusCode);
+        'status' => 'ok',
+        'time' => now(),
+    ]);
 });
