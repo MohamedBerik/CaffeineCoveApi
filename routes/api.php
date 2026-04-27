@@ -516,3 +516,7 @@ Route::get('/health', function () {
         'time' => now(),
     ]);
 });
+
+Route::get('/test', function () {
+    return 'ok';
+});
