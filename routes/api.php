@@ -117,6 +117,7 @@ Route::middleware(['auth:sanctum', 'company.user'])->group(function () {
     //         'permissions' => $permissions,
     //     ]);
     // });
+
     //for testing only
     Route::get('/test-debug', function () {
         return response()->json(['message' => 'Backend is working!']);
