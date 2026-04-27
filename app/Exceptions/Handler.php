@@ -46,14 +46,13 @@ class Handler extends ExceptionHandler
     public function register()
     {
         $this->renderable(function (\Throwable $e, $request) {
-            if ($request->is('api/*')) {
-                return response()->json([
-                    'error_message' => $e->getMessage(),
-                    'file' => $e->getFile(),
-                    'line' => $e->getLine(),
-                    'trace' => $e->getTraceAsString(), // اختياريا لو عايز تفاصيل أكتر
-                ], 500);
-            }
+            // هذا السطر سيقتل الرقم "1" ويجبر السيرفر على إرسال تفاصيل الخطأ
+            return response()->json([
+                'message' => $e->getMessage(),
+                'exception' => get_class($e),
+                'file' => $e->getFile(),
+                'line' => $e->getLine()
+            ], 500);
         });
     }
 
