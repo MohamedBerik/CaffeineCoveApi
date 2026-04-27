@@ -95,10 +95,6 @@ Route::middleware(['auth:sanctum', 'super.admin'])->prefix('admin')->group(funct
 | Authenticated Routes (All Users)
 |--------------------------------------------------------------------------
 */
-
-Route::get('/test-debug', function () {
-    return response()->json(['message' => 'Backend is working!']);
-});
 Route::middleware(['auth:sanctum', 'company.user'])->group(function () {
 
     // User Profile
@@ -121,8 +117,10 @@ Route::middleware(['auth:sanctum', 'company.user'])->group(function () {
     //         'permissions' => $permissions,
     //     ]);
     // });
-
-
+    //for testing only
+    Route::get('/test-debug', function () {
+        return response()->json(['message' => 'Backend is working!']);
+    });
 
     Route::post('/logout', function (Request $request) {
         $request->user()->currentAccessToken()->delete();
