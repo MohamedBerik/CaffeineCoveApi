@@ -9,34 +9,26 @@ use Laravel\Telescope\TelescopeApplicationServiceProvider;
 
 class TelescopeServiceProvider extends TelescopeApplicationServiceProvider
 {
-    // public function register(): void
-    // {
-    //     Telescope::night();
-
-    //     $this->hideSensitiveRequestDetails();
-
-    //     // ✅ تسجيل فقط في البيئات المسموحة
-    //     Telescope::filter(function (IncomingEntry $entry) {
-    //         if ($this->app->environment('local', 'staging')) {
-    //             return true;
-    //         }
-
-    //         // ✅ في الإنتاج: سجل الأخطاء فقط + الطلبات البطيئة
-    //         return $entry->isReportableException() ||
-    //             $entry->isFailedRequest() ||
-    //             $entry->isSlowQuery() ||
-    //             $entry->isFailedJob() ||
-    //             $entry->type === 'exception' ||
-    //             ($entry->type === 'request' && $entry->content['response_status'] >= 500);
-    //     });
-    // }
-
-    public function register()
+    public function register(): void
     {
-        // ✅ منع Telescope من العمل نهائياً
-        if (class_exists(\Laravel\Telescope\Telescope::class)) {
-            \Laravel\Telescope\Telescope::ignoreMigrations();
-        }
+        Telescope::night();
+
+        $this->hideSensitiveRequestDetails();
+
+        // ✅ تسجيل فقط في البيئات المسموحة
+        Telescope::filter(function (IncomingEntry $entry) {
+            if ($this->app->environment('local', 'staging')) {
+                return true;
+            }
+
+            // ✅ في الإنتاج: سجل الأخطاء فقط + الطلبات البطيئة
+            return $entry->isReportableException() ||
+                $entry->isFailedRequest() ||
+                $entry->isSlowQuery() ||
+                $entry->isFailedJob() ||
+                $entry->type === 'exception' ||
+                ($entry->type === 'request' && $entry->content['response_status'] >= 500);
+        });
     }
 
     protected function hideSensitiveRequestDetails(): void
