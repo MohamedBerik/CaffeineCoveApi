@@ -1,32 +1,5 @@
 <?php
 
-namespace App\Http\Middleware;
-
-use Closure;
-use Illuminate\Http\Request;
-
-class SecurityHeaders
-{
-    public function handle(Request $request, Closure $next)
-    {
-        if ($request->isMethod('OPTIONS')) {
-            return $next($request);
-        }
-
-        $response = $next($request);
-
-        // ✅ أضف headers دايماً
-        $response->headers->set('X-Content-Type-Options', 'nosniff');
-        $response->headers->set('X-Frame-Options', 'SAMEORIGIN');
-        $response->headers->set('X-XSS-Protection', '1; mode=block');
-
-        return $response;
-    }
-}
-
-
-//ORIGINAL CODE :
-
 // namespace App\Http\Middleware;
 
 // use Closure;
@@ -36,11 +9,6 @@ class SecurityHeaders
 // {
 //     public function handle(Request $request, Closure $next)
 //     {
-//         // ✅ لو Preflight، مرر فوراً بدون معالجة
-//         if ($request->isMethod('OPTIONS')) {
-//             return $next($request);
-//         }
-
 //         $response = $next($request);
 
 //         // ✅ منع MIME-type sniffing

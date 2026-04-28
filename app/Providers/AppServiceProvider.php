@@ -119,6 +119,7 @@ class AppServiceProvider extends ServiceProvider
         });
 
         // ✅ Structured Logging for API Requests
+        // ✅ Structured Logging for API Requests
         if (app()->environment('production')) {
             $this->app['router']->matched(function ($route) {
                 // ✅ Login/Register Bypass
