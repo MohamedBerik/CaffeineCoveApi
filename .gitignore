@@ -10,7 +10,7 @@
 
 /vendor
 
-.env
+
 .env.*
 !.env.example
 
