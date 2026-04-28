@@ -11,15 +11,18 @@ class Subscription extends Model
         'plan_id',
         'starts_at',
         'ends_at',
+        'grace_period_ends_at',
         'amount',
         'billing_cycle',
         'status',
-        'payment_gateway',      // ✅ أضف
-        'payment_token',        // ✅ أضف
-        'payment_intent_id',    // ✅ أضف
+        'payment_gateway',
+        'payment_token',
+        'payment_intent_id',
         'payment_method',
         'transaction_id',
         'notes',
+        'suspended_at',
+        'suspension_reason',
     ];
 
     protected $casts = [
