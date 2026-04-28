@@ -19,6 +19,7 @@ class WebhookLog extends Model
         'error',
         'subscription_id',
         'invoice_id',
+        'transaction_id',
     ];
 
     protected $casts = [
