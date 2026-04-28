@@ -26,8 +26,10 @@ class Subscription extends Model
     ];
 
     protected $casts = [
-        'starts_at' => 'date',
-        'ends_at' => 'date',
+        'starts_at' => 'datetime',           // الأفضل datetime بدل date
+        'ends_at' => 'datetime',
+        'grace_period_ends_at' => 'datetime', // ✅ أضفناها
+        'suspended_at' => 'datetime',         // ✅ أضفناها
         'amount' => 'decimal:2',
     ];
 
