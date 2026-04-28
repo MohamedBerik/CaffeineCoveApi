@@ -59,6 +59,22 @@ use Illuminate\Support\Facades\DB;
 
 /*
 |--------------------------------------------------------------------------
+| OPTIONS route fallback
+|--------------------------------------------------------------------------
+*/
+
+Route::options('{any}', function () {
+    return response('', 200)
+        ->header('Access-Control-Allow-Origin', '*')
+        ->header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS')
+        ->header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept, X-Tenant-ID')
+        ->header('Access-Control-Allow-Credentials', 'true')
+        ->header('Access-Control-Max-Age', '86400');
+})->where('any', '.*');
+
+
+/*
+|--------------------------------------------------------------------------
 | Public Routes (No Authentication Required)
 |--------------------------------------------------------------------------
 */
@@ -98,29 +114,24 @@ Route::middleware(['auth:sanctum', 'super.admin'])->prefix('admin')->group(funct
 Route::middleware(['auth:sanctum', 'company.user'])->group(function () {
 
     // User Profile
-    // Route::get('/me', function (Request $request) {
-    //     $user = $request->user();
-    //     $permissions = $user->getAllPermissions()->pluck('name')->toArray();
+    Route::get('/me', function (Request $request) {
+        $user = $request->user();
+        $permissions = $user->getAllPermissions()->pluck('name')->toArray();
 
-    //     if ($user->is_super_admin) {
-    //         $permissions = ['*'];
-    //     }
+        if ($user->is_super_admin) {
+            $permissions = ['*'];
+        }
 
-    //     return response()->json([
-    //         'id' => $user->id,
-    //         'name' => $user->name,
-    //         'email' => $user->email,
-    //         'role' => $user->role,
-    //         'roles' => $user->getRoleNames(),
-    //         'company_id' => Tenant::id(),
-    //         'is_super_admin' => (bool) $user->is_super_admin,
-    //         'permissions' => $permissions,
-    //     ]);
-    // });
-
-    //for testing only
-    Route::get('/test-debug', function () {
-        return response()->json(['message' => 'Backend is working!']);
+        return response()->json([
+            'id' => $user->id,
+            'name' => $user->name,
+            'email' => $user->email,
+            'role' => $user->role,
+            'roles' => $user->getRoleNames(),
+            'company_id' => Tenant::id(),
+            'is_super_admin' => (bool) $user->is_super_admin,
+            'permissions' => $permissions,
+        ]);
     });
 
     Route::post('/logout', function (Request $request) {
@@ -458,61 +469,54 @@ Route::prefix('saas')
 | Health Check
 |--------------------------------------------------------------------------
 */
-// Route::get('/health', function () {
-//     $checks = [
-//         'database' => false,
-//         'queue' => false,
-//         'cache' => false,
-//         'storage' => false,
-//     ];
-
-//     // Check Database
-//     try {
-//         DB::connection()->getPdo();
-//         $checks['database'] = true;
-//     } catch (\Exception $e) {
-//         //
-//     }
-
-//     // Check Queue
-//     try {
-//         $pending = DB::table('jobs')->count();
-//         $failed = DB::table('failed_jobs')->count();
-//         $checks['queue'] = $failed < 10; // ✅ مقبول لو أقل من 10 فشل
-//     } catch (\Exception $e) {
-//         //
-//     }
-
-//     // Check Cache
-//     try {
-//         \Illuminate\Support\Facades\Cache::set('health_check', 'ok', 10);
-//         $checks['cache'] = \Illuminate\Support\Facades\Cache::get('health_check') === 'ok';
-//     } catch (\Exception $e) {
-//         //
-//     }
-
-//     // Check Storage
-//     try {
-//         $checks['storage'] = is_writable(storage_path());
-//     } catch (\Exception $e) {
-//         //
-//     }
-
-//     $healthy = !in_array(false, $checks);
-//     $statusCode = $healthy ? 200 : 500;
-
-//     return response()->json([
-//         'status' => $healthy ? 'healthy' : 'unhealthy',
-//         'timestamp' => now()->toIso8601String(),
-//         'version' => app()->version(),
-//         'environment' => app()->environment(),
-//         'checks' => $checks,
-//     ], $statusCode);
-// });
-
 Route::get('/health', function () {
+    $checks = [
+        'database' => false,
+        'queue' => false,
+        'cache' => false,
+        'storage' => false,
+    ];
+
+    // Check Database
+    try {
+        DB::connection()->getPdo();
+        $checks['database'] = true;
+    } catch (\Exception $e) {
+        //
+    }
+
+    // Check Queue
+    try {
+        $pending = DB::table('jobs')->count();
+        $failed = DB::table('failed_jobs')->count();
+        $checks['queue'] = $failed < 10; // ✅ مقبول لو أقل من 10 فشل
+    } catch (\Exception $e) {
+        //
+    }
+
+    // Check Cache
+    try {
+        \Illuminate\Support\Facades\Cache::set('health_check', 'ok', 10);
+        $checks['cache'] = \Illuminate\Support\Facades\Cache::get('health_check') === 'ok';
+    } catch (\Exception $e) {
+        //
+    }
+
+    // Check Storage
+    try {
+        $checks['storage'] = is_writable(storage_path());
+    } catch (\Exception $e) {
+        //
+    }
+
+    $healthy = !in_array(false, $checks);
+    $statusCode = $healthy ? 200 : 500;
+
     return response()->json([
-        'status' => 'ok',
-        'time' => now(),
-    ]);
+        'status' => $healthy ? 'healthy' : 'unhealthy',
+        'timestamp' => now()->toIso8601String(),
+        'version' => app()->version(),
+        'environment' => app()->environment(),
+        'checks' => $checks,
+    ], $statusCode);
 });

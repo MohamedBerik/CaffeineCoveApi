@@ -1,6 +1,5 @@
 <?php
 
-
 return [
 
     'paths' => ['api/*', 'admin/*', 'sanctum/csrf-cookie', 'broadcasting/auth', 'login', 'logout', 'register'],
