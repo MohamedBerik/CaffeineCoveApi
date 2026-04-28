@@ -15,9 +15,9 @@ class SetTenant
     public function handle(Request $request, Closure $next)
     {
         // 🔥 لازم يكون أول حاجة قبل أي كود
-        if ($request->isMethod('OPTIONS')) {
-            return response()->json([], 200);
-        }
+        // if ($request->isMethod('OPTIONS')) {
+        //     return response()->json([], 200);
+        // }
 
         // ✅ 1. Login/Register Bypass
         if ($request->is('api/login') || $request->is('api/register')) {
