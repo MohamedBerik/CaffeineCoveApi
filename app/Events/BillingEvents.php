@@ -8,18 +8,6 @@ use Illuminate\Broadcasting\InteractsWithSockets;
 use Illuminate\Foundation\Events\Dispatchable;
 use Illuminate\Queue\SerializesModels;
 
-class SubscriptionCreated
-{
-    use Dispatchable, InteractsWithSockets, SerializesModels;
-
-    public $subscription;
-
-    public function __construct(Subscription $subscription)
-    {
-        $this->subscription = $subscription;
-    }
-}
-
 class SubscriptionCancelled
 {
     use Dispatchable, InteractsWithSockets, SerializesModels;
@@ -29,21 +17,6 @@ class SubscriptionCancelled
     public function __construct(Subscription $subscription)
     {
         $this->subscription = $subscription;
-    }
-}
-
-// في BillingEvents.php
-class SubscriptionChanged
-{
-    use Dispatchable, InteractsWithSockets, SerializesModels;
-
-    public $oldSubscription;
-    public $newSubscription;
-
-    public function __construct(Subscription $oldSubscription, Subscription $newSubscription)
-    {
-        $this->oldSubscription = $oldSubscription;
-        $this->newSubscription = $newSubscription;
     }
 }
 
