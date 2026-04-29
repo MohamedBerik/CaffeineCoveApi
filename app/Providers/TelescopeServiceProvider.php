@@ -19,8 +19,7 @@ class TelescopeServiceProvider extends TelescopeApplicationServiceProvider
             if ($this->app->environment('local', 'staging')) {
                 return true;
             }
-
-            // في الإنتاج: سجل الأخطاء فقط + الطلبات البطيئة
+            // في الإنتاج: سجل الأخطاء والطلبات الفاشلة فقط
             return $entry->isReportableException() ||
                 $entry->isFailedRequest() ||
                 $entry->isSlowQuery() ||
@@ -35,7 +34,6 @@ class TelescopeServiceProvider extends TelescopeApplicationServiceProvider
         if ($this->app->environment('local', 'staging')) {
             return;
         }
-
         Telescope::hideRequestParameters(['password', 'password_confirmation', 'token', 'api_key', 'secret']);
         Telescope::hideRequestHeaders(['cookie', 'x-csrf-token', 'x-xsrf-token']);
     }
