@@ -9,7 +9,7 @@ use Illuminate\Support\Facades\Log;
 
 class LogSubscriptionActivity
 {
-    public function handle($event)
+    public function __invoke($event)
     {
         $subscription = $event instanceof SubscriptionCreated ? $event->subscription : $event->newSubscription;
         $companyId = $subscription->company_id ?? null;
