@@ -15,6 +15,7 @@ class SetTenant
     public function handle(Request $request, Closure $next)
     {
         // تجاهل تام لطلبات OPTIONS (Preflight) للسماح لـ CORS بالعمل
+        //للتجربة :
         if ($request->isMethod('OPTIONS')) {
             return response('', 200)
                 ->header('Access-Control-Allow-Origin', $request->header('Origin', '*'))
