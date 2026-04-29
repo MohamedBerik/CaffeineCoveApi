@@ -15,13 +15,12 @@ class TelescopeServiceProvider extends TelescopeApplicationServiceProvider
 
         $this->hideSensitiveRequestDetails();
 
-        // ✅ تسجيل فقط في البيئات المسموحة
         Telescope::filter(function (IncomingEntry $entry) {
             if ($this->app->environment('local', 'staging')) {
                 return true;
             }
 
-            // ✅ في الإنتاج: سجل الأخطاء فقط + الطلبات البطيئة
+            // في الإنتاج: سجل الأخطاء فقط + الطلبات البطيئة
             return $entry->isReportableException() ||
                 $entry->isFailedRequest() ||
                 $entry->isSlowQuery() ||
@@ -37,25 +36,14 @@ class TelescopeServiceProvider extends TelescopeApplicationServiceProvider
             return;
         }
 
-        Telescope::hideRequestParameters([
-            'password',
-            'password_confirmation',
-            'token',
-            'api_key',
-            'secret',
-        ]);
-
-        Telescope::hideRequestHeaders([
-            'cookie',
-            'x-csrf-token',
-            'x-xsrf-token',
-        ]);
+        Telescope::hideRequestParameters(['password', 'password_confirmation', 'token', 'api_key', 'secret']);
+        Telescope::hideRequestHeaders(['cookie', 'x-csrf-token', 'x-xsrf-token']);
     }
 
     protected function gate(): void
     {
         Gate::define('viewTelescope', function ($user) {
-            return $user && $user->is_super_admin;
+            return $user->is_super_admin;
         });
     }
 }
