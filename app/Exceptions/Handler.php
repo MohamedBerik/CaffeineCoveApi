@@ -31,11 +31,44 @@ class Handler extends ExceptionHandler
         });
     }
 
+    // public function render($request, Throwable $e)
+    // {
+    //     // ✅ إرجاع تفاصيل الخطأ كاملة في الـ API
+    //     if ($request->expectsJson() || $request->is('api/*')) {
+    //         $statusCode = method_exists($e, 'getStatusCode') ? $e->getStatusCode() : 500;
+    //         if ($statusCode < 100 || $statusCode > 599) {
+    //             $statusCode = 500;
+    //         }
+
+    //         return response()->json([
+    //             'message' => $e->getMessage(),
+    //             'exception' => get_class($e),
+    //             'file' => $e->getFile(),
+    //             'line' => $e->getLine(),
+    //             'status' => $statusCode,
+    //         ], $statusCode);
+    //     }
+
+    //     return parent::render($request, $e);
+    // }
+
     public function render($request, Throwable $e)
     {
-        // ✅ إرجاع تفاصيل الخطأ كاملة في الـ API
+        // ✅ التعامل مع AuthorizationException بشكل صحيح
+        if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
+            $statusCode = method_exists($e, 'status') ? $e->status() : 403;
+            return response()->json([
+                'message' => $e->getMessage() ?: 'This action is unauthorized.',
+                'status' => $statusCode,
+            ], $statusCode);
+        }
+
+        // ✅ لو الـ Request من API
         if ($request->expectsJson() || $request->is('api/*')) {
-            $statusCode = method_exists($e, 'getStatusCode') ? $e->getStatusCode() : 500;
+            $statusCode = method_exists($e, 'getStatusCode')
+                ? $e->getStatusCode()
+                : (method_exists($e, 'status') ? $e->status() : 500);
+
             if ($statusCode < 100 || $statusCode > 599) {
                 $statusCode = 500;
             }
