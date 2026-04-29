@@ -49,6 +49,12 @@ class AuthController extends Controller
             ]);
         });
 
+        // ✅ أضف هذا السطر بعد إنشاء المستخدم مباشرة
+        if ($user->role === 'admin') {
+            $adminRole = \Spatie\Permission\Models\Role::findByName('admin', 'api');
+            $user->assignRole($adminRole);
+        }
+
         // ✅ تعيين Tenant Context للمستخدم الجديد
         Tenant::setId($company->id);
         Tenant::setIsSuperAdmin(false);
