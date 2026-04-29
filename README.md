@@ -180,3 +180,5 @@ Scalable Multi-Tenancy: Ready for hundreds of clinics on a single server.
 Mohamed Berik
 Full Stack Developer
 Laravel | React | REST APIs | ERP Systems | Real-Time Applications
+
+echo "" >> README.md
