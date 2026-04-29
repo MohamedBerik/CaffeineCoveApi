@@ -15,12 +15,19 @@ class Handler extends ExceptionHandler
 
     public function register(): void
     {
-        $this->reportable(function (Throwable $e) {
-            Log::error($e->getMessage(), [
-                'file' => $e->getFile(),
-                'line' => $e->getLine(),
-                'class' => get_class($e),
-            ]);
+        // $this->reportable(function (Throwable $e) {
+        //     Log::error($e->getMessage(), [
+        //         'file' => $e->getFile(),
+        //         'line' => $e->getLine(),
+        //         'class' => get_class($e),
+        //     ]);
+        // });
+
+        $this->renderable(function (\Illuminate\Auth\Access\AuthorizationException $e, $request) {
+            $message = $e->getMessage() ?: 'This action is unauthorized.';
+            return response()->json([
+                'message' => $message,
+            ], 403);
         });
     }
 
