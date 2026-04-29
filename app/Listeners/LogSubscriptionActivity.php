@@ -11,13 +11,16 @@ class LogSubscriptionActivity
 {
     public function handle($event)
     {
+        $subscription = $event instanceof SubscriptionCreated ? $event->subscription : $event->newSubscription;
+        $companyId = $subscription->company_id ?? null;
+
         ActivityLog::create([
-            'company_id' => $event->subscription->company_id ?? ($event->oldSubscription->company_id ?? null),
+            'company_id' => $companyId,
             'user_id' => auth()->id(),
             'action' => 'subscription.' . ($event instanceof SubscriptionCreated ? 'created' : 'changed'),
             'subject_type' => 'Subscription',
-            'subject_id' => $event->subscription->id ?? $event->newSubscription->id,
-            'properties' => ['plan_id' => $event->subscription->plan_id ?? $event->newSubscription->plan_id],
+            'subject_id' => $subscription->id,
+            'properties' => ['plan_id' => $subscription->plan_id],
         ]);
     }
 }
