@@ -10,6 +10,18 @@ class AppointmentPolicy
 {
     use HandlesAuthorization;
 
+    // ✅ أضف viewAny
+    public function viewAny(User $user): bool
+    {
+        // Super Admin يعدي
+        if ($user->is_super_admin) {
+            return true;
+        }
+
+        // أي مستخدم مسجل دخول وله صلاحية 'finance.view' يعدي
+        return $user->hasPermissionTo('finance.view');
+    }
+
     public function view(User $user, Appointment $appointment): bool
     {
         return $user->is_super_admin || $appointment->company_id === $user->company_id;
