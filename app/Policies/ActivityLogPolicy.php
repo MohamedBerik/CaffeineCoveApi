@@ -11,9 +11,20 @@ class ActivityLogPolicy
 {
     use HandlesAuthorization;
 
+    // public function viewAny(User $user): bool
+    // {
+    //     return $this->hasAccess($user);
+    // }
+
     public function viewAny(User $user): bool
     {
-        return $this->hasAccess($user);
+        // Super Admin يعدي
+        if ($user->is_super_admin) {
+            return true;
+        }
+
+        // أي مستخدم مسجل دخول وله صلاحية 'activity_logs.view' يعدي
+        return $user->hasPermissionTo('activity_logs.view');
     }
 
     public function view(User $user, ActivityLog $log): bool
