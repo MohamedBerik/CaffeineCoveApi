@@ -54,34 +54,21 @@ class Handler extends ExceptionHandler
 
     public function render($request, Throwable $e)
     {
-
-        // ✅ أضف السطر ده مؤقتًا عشان تشوف الـ Error
-        return response()->json([
-            'message' => $e->getMessage(),
-            'file' => $e->getFile(),
-            'line' => $e->getLine(),
-            'code' => 'SERVER_ERROR',
-            'status' => 500,
-        ], 500);
-
-        // ✅ لو الـ Exception بتاعنا (ApiException أو اللي ورث منها)
-        if ($e instanceof ApiException) {
-            return $e->render();
-        }
-
-        // ✅ لو Rate Limiting
-        if ($e instanceof \Illuminate\Http\Exceptions\ThrottleRequestsException) {
-            return response()->json([
-                'message' => 'Too many requests. Please try again later.',
-                'code' => 'TOO_MANY_REQUESTS',
-                'status' => 429,
-                'retry_after' => $e->getHeaders()['Retry-After'] ?? 60,
-            ], 429);
-        }
-
-        // ✅ لو الـ Request API
+        // ✅ إرجاع تفاصيل الخطأ كاملة في الـ API
         if ($request->expectsJson() || $request->is('api/*')) {
-            return $this->renderApiException($request, $e);
+            $statusCode = method_exists($e, 'getStatusCode') ? $e->getStatusCode() : 500;
+            if ($statusCode < 100 || $statusCode > 599) {
+                $statusCode = 500;
+            }
+
+            // ✅ إرجاع تفاصيل الخطأ (مش بس 500)
+            return response()->json([
+                'message' => $e->getMessage(),
+                'exception' => get_class($e),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+                'status' => $statusCode,
+            ], $statusCode);
         }
 
         return parent::render($request, $e);
