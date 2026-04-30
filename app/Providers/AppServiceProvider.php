@@ -71,65 +71,41 @@ class AppServiceProvider extends ServiceProvider
         // ✅ Queue tenant reset
         $this->configureQueueTenantReset();
 
-        // ✅ Rate Limiting for Billing endpoints
-        RateLimiter::for('billing', function (Request $request) {
-            $user = $request->user();
-
-            // لو مستخدم مسجل دخول - 10 طلبات في الدقيقة
-            if ($user) {
-                return Limit::perMinute(10)->by($user->id);
-            }
-
-            // لو مش مسجل - 3 طلبات في الدقيقة
-            return Limit::perMinute(3)->by($request->ip());
-        });
-
-        // ✅ Rate Limiting for Payment endpoints (أكثر تشديدًا)
-        RateLimiter::for('payment', function (Request $request) {
-            $user = $request->user();
-
-            if ($user) {
-                return Limit::perMinute(3)->by($user->id);
-            }
-
-            return Limit::perMinute(1)->by($request->ip());
-        });
-
-        // ✅ Rate Limiting for Login (منع brute force)
-        RateLimiter::for('login', function (Request $request) {
-            $email = $request->input('email');
-
-            return Limit::perMinute(5)->by($email ?? $request->ip());
-        });
-
-        // ✅ Rate Limiting for Webhooks
-        RateLimiter::for('webhooks', function (Request $request) {
-            return Limit::perMinute(60)->by($request->ip());
-        });
-
-        // ✅ Rate Limiting for API (عام)
         RateLimiter::for('api', function (Request $request) {
             $user = $request->user();
-
             if ($user) {
                 return Limit::perMinute(120)->by($user->id);
             }
-
             return Limit::perMinute(30)->by($request->ip());
         });
 
-        RateLimiter::for('api', function ($request) {
-            return Limit::perMinute(60)->by(optional($request->user())->id ?: $request->ip());
+        RateLimiter::for('login', function (Request $request) {
+            return Limit::perMinute(5)->by($request->input('email') ?: $request->ip());
         });
 
-        RateLimiter::for('login', function ($request) {
-            return Limit::perMinute(5)->by($request->ip());
-        });
-
-        RateLimiter::for('register', function ($request) {
+        RateLimiter::for('register', function (Request $request) {
             return Limit::perMinute(3)->by($request->ip());
         });
 
+        RateLimiter::for('billing', function (Request $request) {
+            $user = $request->user();
+            if ($user) {
+                return Limit::perMinute(10)->by($user->id);
+            }
+            return Limit::perMinute(3)->by($request->ip());
+        });
+
+        RateLimiter::for('payment', function (Request $request) {
+            $user = $request->user();
+            if ($user) {
+                return Limit::perMinute(3)->by($user->id);
+            }
+            return Limit::perMinute(1)->by($request->ip());
+        });
+
+        RateLimiter::for('webhooks', function (Request $request) {
+            return Limit::perMinute(60)->by($request->ip());
+        });
         // ✅ Structured Logging for API Requests
         if (app()->environment('production')) {
             $this->app['router']->matched(function ($route) {
