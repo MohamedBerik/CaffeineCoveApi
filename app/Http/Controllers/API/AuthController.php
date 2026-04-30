@@ -49,11 +49,14 @@ class AuthController extends Controller
             ]);
         });
 
-        // ✅ أضف هذا السطر بعد إنشاء المستخدم مباشرة
-        // if ($user->role === 'admin') {
-        //     $adminRole = \Spatie\Permission\Models\Role::findByName('admin', 'api');
-        //     $user->assignRole($adminRole);
-        // }
+        // إسناد الدور تلقائيًا
+        if ($user->role === 'admin') {
+            $user->assignRole('admin');
+        } elseif ($user->role === 'doctor') {
+            $user->assignRole('doctor');
+        } elseif ($user->role === 'receptionist') {
+            $user->assignRole('receptionist');
+        }
 
         // ✅ تعيين Tenant Context للمستخدم الجديد
         Tenant::setId($company->id);
