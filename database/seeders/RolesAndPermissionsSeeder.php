@@ -79,7 +79,7 @@ class RolesAndPermissionsSeeder extends Seeder
             'appointments.manage',
             'patients.view',
             'patients.manage',
-            'invoices.view',
+            // 'invoices.view',
         ]);
     }
 }
