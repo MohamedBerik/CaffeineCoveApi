@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Jobs\TestJob;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Log;
 
@@ -12,9 +13,7 @@ class TestQueueJob extends Command
 
     public function handle()
     {
-        dispatch_sync(function () {
-            Log::info('Test job executed successfully!');
-        });
+        TestJob::dispatch();
 
         $this->info('Test job dispatched');
     }
