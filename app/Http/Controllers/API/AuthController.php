@@ -12,6 +12,8 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
+use App\Mail\WelcomeMail;
+use Illuminate\Support\Facades\Mail;
 
 class AuthController extends Controller
 {
@@ -57,6 +59,8 @@ class AuthController extends Controller
         } elseif ($user->role === 'receptionist') {
             $user->assignRole('receptionist');
         }
+
+        Mail::to($user->email)->queue(new WelcomeMail($user));
 
         // ✅ تعيين Tenant Context للمستخدم الجديد
         Tenant::setId($company->id);

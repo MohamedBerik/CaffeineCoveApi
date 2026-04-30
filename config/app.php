@@ -231,6 +231,7 @@ return [
         'URL' => Illuminate\Support\Facades\URL::class,
         'Validator' => Illuminate\Support\Facades\Validator::class,
         'View' => Illuminate\Support\Facades\View::class,
+        'frontend_url' => env('FRONTEND_URL', 'https://caffeine-cove-cafe.vercel.app'),
 
     ],
 
