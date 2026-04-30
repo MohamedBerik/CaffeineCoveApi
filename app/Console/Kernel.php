@@ -94,6 +94,7 @@ class Kernel extends ConsoleKernel
         // ✅ يومياً الساعة 2 صباحاً
         $schedule->command('billing:check-grace-periods')->dailyAt('02:00');
         $schedule->command('billing:check-expired')->dailyAt('02:30');
+        $schedule->command('db:backup')->dailyAt('03:00');
     }
 
     /**
@@ -103,6 +104,7 @@ class Kernel extends ConsoleKernel
         ResetAccountingForCompany::class,
         \App\Console\Commands\SystemStats::class,
         \App\Console\Commands\QueueMonitor::class,
+        \App\Console\Commands\DatabaseBackup::class,
     ];
 
     /**
