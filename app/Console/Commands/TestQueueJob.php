@@ -12,7 +12,7 @@ class TestQueueJob extends Command
 
     public function handle()
     {
-        dispatch(function () {
+        dispatch_sync(function () {
             Log::info('Test job executed successfully!');
         });
 
