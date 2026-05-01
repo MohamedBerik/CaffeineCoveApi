@@ -11,19 +11,12 @@ class BranchScope implements Scope
 {
     public function apply(Builder $builder, Model $model)
     {
-        $branchId = Tenant::branchId();
-
-        // ✅ لو مفيش Branch Context (مدير شركة أو Super Admin في Global Mode) - ما ترجعش بيانات
-        if (!$branchId) {
+        // إذا لم يتم تحديد فرع (أي في وضع المدير العام)، لا تُطبق أي فلترة
+        if (!Tenant::branchId()) {
             return;
         }
 
-        // ✅ لو الـ Model مش عنده branch_id (زي Company أو Plan) - تجاهل الفلترة
-        if (!property_exists(get_class($model), 'hasBranchColumn') || !$model::$hasBranchColumn) {
-            return;
-        }
-
-        // ✅ تطبيق الفلترة
-        $builder->where($model->getTable() . '.branch_id', $branchId);
+        // بخلاف ذلك، فلترة بالـ branch_id الحالي
+        $builder->where($model->getTable() . '.branch_id', Tenant::branchId());
     }
 }

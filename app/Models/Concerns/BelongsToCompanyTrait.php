@@ -20,10 +20,9 @@ trait BelongsToCompanyTrait
     {
         static::addGlobalScope(new CompanyScope);
 
-        // ✅ إضافة BranchScope لو الـ Model بيدعم الفروع
-        if (static::$hasBranchColumn) {
-            static::addGlobalScope(new BranchScope);
-        }
+        // ✅ أضف BranchScope دائمًا - سيقرر بنفسه متى يُفلتر
+        static::addGlobalScope(new BranchScope);
+
         static::creating(function ($model) {
             // ✅ لو الـ Model مش محتاج company_id
             if (!static::$hasCompanyColumn) {
