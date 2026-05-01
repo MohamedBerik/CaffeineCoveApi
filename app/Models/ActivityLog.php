@@ -10,6 +10,7 @@ class ActivityLog extends Model
 {
     use HasFactory;
     use BelongsToCompanyTrait;
+    public static $hasBranchColumn = true; // ✅ تفعيل BranchScope
 
     protected $fillable = [
         'company_id',

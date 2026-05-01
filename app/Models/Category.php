@@ -10,6 +10,7 @@ class Category extends Model
 {
     use HasFactory;
     use BelongsToCompanyTrait;
+    public static $hasBranchColumn = true; // ✅ تفعيل BranchScope
 
     /**
      * ✅ Performance fix
