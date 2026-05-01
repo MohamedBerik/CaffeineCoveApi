@@ -12,10 +12,18 @@ trait BelongsToCompanyTrait
      */
     public static $hasCompanyColumn = true;
 
+    /** @var bool */
+
+    public static $hasBranchColumn = false; // ✅ علامة جديدة
+
     protected static function bootBelongsToCompanyTrait()
     {
         static::addGlobalScope(new CompanyScope);
 
+        // ✅ إضافة BranchScope لو الـ Model بيدعم الفروع
+        if (static::$hasBranchColumn) {
+            static::addGlobalScope(new BranchScope);
+        }
         static::creating(function ($model) {
             // ✅ لو الـ Model مش محتاج company_id
             if (!static::$hasCompanyColumn) {
@@ -68,17 +76,16 @@ trait BelongsToCompanyTrait
     }
 
     /**
-     * ✅ إزالة الـ Scope (لـ Super Admin فقط)
+     * ✅ إزالة BranchScope (لـ Super Admin فقط)
      */
-    public static function withoutCompanyScope()
+    public static function withoutBranchScope()
     {
         if (!Tenant::isSuperAdmin()) {
-            throw new \Exception('Only super admin can remove company scope');
+            throw new \Exception('Only super admin can remove branch scope');
         }
 
-        return static::withoutGlobalScope(CompanyScope::class);
+        return static::withoutGlobalScope(BranchScope::class);
     }
-
     /**
      * ✅ الاستعلام عن كل الشركات (لـ Super Admin فقط)
      */

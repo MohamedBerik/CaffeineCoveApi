@@ -10,6 +10,9 @@ class Customer extends Model
 {
     use HasFactory;
     use BelongsToCompanyTrait;
+    /** @var bool */
+
+    public static $hasBranchColumn = true; // ✅ تفعيل BranchScope
 
     // ✅ Performance fix
     // public static $hasCompanyColumn = true;
