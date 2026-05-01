@@ -11,7 +11,6 @@ class Appointment extends Model
 {
     use HasFactory;
     use BelongsToCompanyTrait;
-    public static $hasBranchColumn = true; // ✅ تفعيل BranchScope
 
     // public static $hasCompanyColumn = true;
 
