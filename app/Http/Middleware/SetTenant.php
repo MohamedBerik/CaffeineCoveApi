@@ -21,6 +21,12 @@ class SetTenant
             return $next($request);
         }
 
+        // ✅ قراءة branch_id من Header (اختياري)
+        $branchIdFromHeader = $request->header('X-Branch-ID');
+        if ($branchIdFromHeader) {
+            Tenant::setBranchId((int) $branchIdFromHeader);
+        }
+
         // ✅ تحسين #1: قراءة الـ Header مرة واحدة
         $tenantIdFromHeader = $request->header('X-Tenant-ID');
 

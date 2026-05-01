@@ -10,6 +10,7 @@ class Tenant
     protected static $currentId = null;
     protected static $isSuperAdmin = null;
     protected static $currentCompany = null;
+    protected static $branchId = null;
 
     /**
      * Set current tenant ID manually (for CLI/Jobs)
@@ -294,5 +295,15 @@ class Tenant
         if (static::isSuspended()) {
             throw new \Exception('Company is suspended');
         }
+    }
+
+    public static function setBranchId(?int $branchId): void
+    {
+        static::$branchId = $branchId;
+    }
+
+    public static function branchId(): ?int
+    {
+        return static::$branchId;
     }
 }

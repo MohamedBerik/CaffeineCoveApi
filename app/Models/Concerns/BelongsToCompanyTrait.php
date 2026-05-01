@@ -47,6 +47,11 @@ trait BelongsToCompanyTrait
 
             // ✅ تعيين company_id تلقائيًا
             $model->company_id = $companyId;
+
+            // ✅ إضافة branch_id تلقائياً (لو موجود في السياق)
+            if (Tenant::branchId()) {
+                $model->branch_id = Tenant::branchId();
+            }
         });
 
         // ✅ منع تغيير company_id بعد الإنشاء
@@ -94,6 +99,10 @@ trait BelongsToCompanyTrait
         return $this->belongsTo(\App\Models\Company::class);
     }
 
+    public function branch()
+    {
+        return $this->belongsTo(\App\Models\Branch::class);
+    }
     /**
      * ✅ Scope: فلترة حسب الشركة الحالية
      */
