@@ -125,7 +125,7 @@ class AuthController extends Controller
         $token = $user->createToken('API Token')->plainTextToken;
 
         return response()->json([
-            'user' => $user->only(['id', 'name', 'email', 'role', 'is_super_admin']),
+            'user' => $user->only(['id', 'name', 'email', 'role', 'is_super_admin', 'branch_id']),
             'company_id' => $user->company_id,
             'company_status' => $user->company?->status,
             'token' => $token
@@ -155,7 +155,7 @@ class AuthController extends Controller
         $user = $request->user();
 
         return response()->json([
-            'user' => $user->only(['id', 'name', 'email', 'role', 'is_super_admin']),
+            'user' => $user->only(['id', 'name', 'email', 'role', 'is_super_admin', 'branch_id']),
             'company_id' => Tenant::id(),
             'company' => $user->is_super_admin ? null : $user->company?->only(['id', 'name', 'slug', 'status']),
             'permissions' => $this->getUserPermissions($user),
