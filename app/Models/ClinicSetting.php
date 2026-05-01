@@ -9,7 +9,6 @@ class ClinicSetting extends Model
 {
     // ✅ الـ Trait - ضروري
     use BelongsToCompanyTrait;
-    public static $hasBranchColumn = true; // ✅ تفعيل BranchScope
 
     // ✅ Performance fix - ضروري
     // public static $hasCompanyColumn = true;
