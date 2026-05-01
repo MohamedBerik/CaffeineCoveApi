@@ -14,23 +14,17 @@ class TestJob implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
-    /**
-     * Create a new job instance.
-     *
-     * @return void
-     */
-    public function __construct()
+    public $tenantId;
+
+    public function __construct($tenantId)
     {
-        //
+        $this->tenantId = $tenantId;
     }
 
-    /**
-     * Execute the job.
-     *
-     * @return void
-     */
     public function handle()
     {
-        Log::info('✅ Test job executed successfully!');
+        Tenant::find($this->tenantId)?->makeCurrent();
+
+        Log::info('Job works');
     }
 }
