@@ -10,7 +10,6 @@ class Order extends Model
 {
     use HasFactory;
     use BelongsToCompanyTrait;
-    public static $hasBranchColumn = true; // ✅ تفعيل BranchScope
 
     // ✅ Performance fix
     // public static $hasCompanyColumn = true;
