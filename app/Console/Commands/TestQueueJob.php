@@ -2,9 +2,8 @@
 
 namespace App\Console\Commands;
 
-use App\Jobs\TestJob;
 use Illuminate\Console\Command;
-use Illuminate\Support\Facades\Log;
+use App\Jobs\TestJob;
 
 class TestQueueJob extends Command
 {
@@ -13,7 +12,8 @@ class TestQueueJob extends Command
 
     public function handle()
     {
-        TestJob::dispatch();
+        // ✅ أرسل المهمة مع معرف مستأجر وهمي (1)
+        TestJob::dispatch(1);
 
         $this->info('Test job dispatched');
     }

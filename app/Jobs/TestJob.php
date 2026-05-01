@@ -4,7 +4,6 @@ namespace App\Jobs;
 
 use App\Services\Tenant;
 use Illuminate\Bus\Queueable;
-use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
@@ -22,12 +21,13 @@ class TestJob implements ShouldQueue
         $this->tenantId = $tenantId;
     }
 
-    // في TestQueueJob.php
     public function handle()
     {
-        // ✅ استخدم dispatch مع tenantId وهمي
-        dispatch(new \App\Jobs\TestJob(1)); // 1 = tenantId وهمي
+        // ✅ تهيئة سياق المستأجر (إذا لزم الأمر)
+        if ($this->tenantId) {
+            Tenant::setId($this->tenantId);
+        }
 
-        $this->info('Test job dispatched');
+        Log::info('Test job executed successfully!', ['tenant_id' => $this->tenantId]);
     }
 }
