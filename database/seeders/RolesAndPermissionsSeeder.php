@@ -8,25 +8,22 @@ use Spatie\Permission\Models\Role;
 
 class RolesAndPermissionsSeeder extends Seeder
 {
-    /**
-     * Run the database seeds.
-     *
-     * @return void
-     */
-
     public function run()
     {
         // Reset cached roles and permissions
         app()[\Spatie\Permission\PermissionRegistrar::class]->forgetCachedPermissions();
 
-        // Create permissions
+        // Complete list of permissions used in routes/api.php
         $permissions = [
             'finance.view',
             'finance.create',
             'orders.view',
             'orders.manage',
+            'orders.confirm',       // 🆕
+            'orders.cancel',        // 🆕
             'appointments.view',
             'appointments.manage',
+            'appointments.complete', // 🆕
             'patients.view',
             'patients.manage',
             'treatment_plans.view',
@@ -54,16 +51,19 @@ class RolesAndPermissionsSeeder extends Seeder
             'radiology.manage',
             'dental_records.view',
             'dental_records.create',
+            'payments.refund',      // 🆕
+            'users.manage',         // 🆕
         ];
 
         foreach ($permissions as $perm) {
             Permission::firstOrCreate(['name' => $perm, 'guard_name' => 'api']);
         }
 
-        // Create roles and assign permissions
+        // Admin – full access
         $adminRole = Role::firstOrCreate(['name' => 'admin', 'guard_name' => 'api']);
         $adminRole->syncPermissions($permissions);
 
+        // Doctor – limited clinical access
         $doctorRole = Role::firstOrCreate(['name' => 'doctor', 'guard_name' => 'api']);
         $doctorRole->syncPermissions([
             'appointments.view',
@@ -73,14 +73,14 @@ class RolesAndPermissionsSeeder extends Seeder
             'dental_records.view',
         ]);
 
+        // Receptionist – front desk & basic patient management
         $receptionistRole = Role::firstOrCreate(['name' => 'receptionist', 'guard_name' => 'api']);
         $receptionistRole->syncPermissions([
             'appointments.view',
             'appointments.manage',
             'patients.view',
             'patients.manage',
-            'treatment_plans.view',
-            // 'invoices.view',
+            'doctors.view',  // ✅ present in current DB (Tinker)
         ]);
     }
 }
