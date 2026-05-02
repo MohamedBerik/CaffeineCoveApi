@@ -59,7 +59,7 @@ class AuthServiceProvider extends ServiceProvider
         SystemAlert::class => SystemAlertPolicy::class,
         ActivityLog::class => ActivityLogPolicy::class,
         DentalRecord::class => DentalRecordPolicy::class,
-        Doctor::class => DoctorPolicy::class,
+        // Doctor::class => DoctorPolicy::class,
         Order::class => OrderPolicy::class,
         Procedure::class => ProcedurePolicy::class,
         PurchaseOrder::class => PurchaseOrderPolicy::class,
