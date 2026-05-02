@@ -18,8 +18,8 @@ class AppointmentPolicy
             return true;
         }
 
-        // أي مستخدم مسجل دخول وله صلاحية 'finance.view' يعدي
-        return $user->hasPermissionTo('finance.view');
+        // ✅ أي مستخدم مسجل دخول وله صلاحية 'appointments.view' أو 'appointments.manage' يعدي
+        return $user->hasPermissionTo('appointments.view') || $user->hasPermissionTo('appointments.manage');
     }
 
     public function view(User $user, Appointment $appointment): bool
