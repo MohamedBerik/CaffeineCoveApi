@@ -6,12 +6,6 @@ use Illuminate\Http\Resources\Json\JsonResource;
 
 class CustomerResource extends JsonResource
 {
-    /**
-     * Transform the resource into an array.
-     *
-     * @param  \Illuminate\Http\Request  $request
-     * @return array
-     */
     public function toArray($request)
     {
         return [
@@ -24,10 +18,14 @@ class CustomerResource extends JsonResource
             'name' => $this->name,
             'email' => $this->email,
             'phone' => $this->phone,
-            'date_of_birth' => $this->date_of_birth?->format('Y-m-d'),
-            'age' => $this->when($this->date_of_birth, fn() => $this->date_of_birth->age),
+            'date_of_birth' => $this->date_of_birth ? $this->date_of_birth->format('Y-m-d') : null,
+            'age' => $this->when($this->date_of_birth, function () {
+                return $this->date_of_birth->age;
+            }),
             'gender' => $this->gender,
-            'gender_label' => $this->when($this->gender, fn() => $this->gender === 'male' ? 'ذكر' : 'أنثى'),
+            'gender_label' => $this->when($this->gender, function () {
+                return $this->gender === 'male' ? 'ذكر' : 'أنثى';
+            }),
             'address' => $this->address,
             'notes' => $this->notes,
 
@@ -37,20 +35,22 @@ class CustomerResource extends JsonResource
             'is_active' => $this->status === '1',
 
             // Timestamps
-            'created_at' => $this->created_at?->toISOString(),
-            'updated_at' => $this->updated_at?->toISOString(),
+            'created_at' => $this->created_at ? $this->created_at->toIso8601String() : null,
+            'updated_at' => $this->updated_at ? $this->updated_at->toIso8601String() : null,
 
             // Relationships (when loaded)
-            'appointments_count' => $this->whenCounted('appointments'),
-            'invoices_count' => $this->whenCounted('invoices'),
-            'total_spent' => $this->whenLoaded('invoices', fn() => $this->invoices->sum('total')),
+            'appointments_count' => $this->whenLoaded('appointments', function () {
+                return $this->appointments->count();
+            }),
+            'invoices_count' => $this->whenLoaded('invoices', function () {
+                return $this->invoices->count();
+            }),
+            'total_spent' => $this->whenLoaded('invoices', function () {
+                return $this->invoices->sum('total');
+            }),
             'last_appointment' => $this->whenLoaded('appointments', function () {
-                return $this->appointments->sortByDesc('appointment_date')->first()?->only([
-                    'id',
-                    'appointment_date',
-                    'appointment_time',
-                    'status'
-                ]);
+                $last = $this->appointments->sortByDesc('appointment_date')->first();
+                return $last ? $last->only(['id', 'appointment_date', 'appointment_time', 'status']) : null;
             }),
 
             // Related Resources
@@ -60,9 +60,6 @@ class CustomerResource extends JsonResource
         ];
     }
 
-    /**
-     * Get additional data that should be returned with the resource array.
-     */
     public function with($request): array
     {
         return [
