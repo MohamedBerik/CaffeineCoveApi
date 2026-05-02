@@ -14,7 +14,7 @@ class CustomerController extends Controller
 {
     public function __construct()
     {
-        $this->authorizeResource(Customer::class, 'customer');
+        $this->authorizeResource(Customer::class, 'customer', ['except' => ['index']]);
     }
 
     public function index(Request $request)
