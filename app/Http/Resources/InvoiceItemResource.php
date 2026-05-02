@@ -6,12 +6,6 @@ use Illuminate\Http\Resources\Json\JsonResource;
 
 class InvoiceItemResource extends JsonResource
 {
-    /**
-     * Transform the resource into an array.
-     *
-     * @param  \Illuminate\Http\Request  $request
-     * @return array
-     */
     public function toArray($request)
     {
         return [
@@ -33,31 +27,32 @@ class InvoiceItemResource extends JsonResource
             'subtotal_formatted' => number_format($this->subtotal, 2) . ' EGP',
 
             // Dates
-            'created_at' => $this->created_at?->toISOString(),
-            'updated_at' => $this->updated_at?->toISOString(),
+            'created_at' => $this->created_at ? $this->created_at->toIso8601String() : null,
+            'updated_at' => $this->updated_at ? $this->updated_at->toIso8601String() : null,
 
             // Relationships (when loaded)
-            'product' => $this->whenLoaded('product', fn() => [
-                'id' => $this->product->id,
-                'title' => $this->product->title_en,
-                'title_ar' => $this->product->title_ar,
-                'unit_price' => $this->product->unit_price,
-                'image_url' => $this->product->product_image
-                    ? asset('img/product/' . $this->product->product_image)
-                    : null,
-            ]),
+            'product' => $this->whenLoaded('product', function () {
+                return [
+                    'id' => $this->product->id,
+                    'title' => $this->product->title_en,
+                    'title_ar' => $this->product->title_ar,
+                    'unit_price' => $this->product->unit_price,
+                    'image_url' => $this->product->product_image
+                        ? asset('img/product/' . $this->product->product_image)
+                        : null,
+                ];
+            }),
 
-            'invoice' => $this->whenLoaded('invoice', fn() => [
-                'id' => $this->invoice->id,
-                'number' => $this->invoice->number,
-                'status' => $this->invoice->status,
-            ]),
+            'invoice' => $this->whenLoaded('invoice', function () {
+                return [
+                    'id' => $this->invoice->id,
+                    'number' => $this->invoice->number,
+                    'status' => $this->invoice->status,
+                ];
+            }),
         ];
     }
 
-    /**
-     * Get additional data that should be returned with the resource array.
-     */
     public function with($request): array
     {
         return [

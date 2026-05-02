@@ -6,12 +6,6 @@ use Illuminate\Http\Resources\Json\JsonResource;
 
 class StockMovementResource extends JsonResource
 {
-    /**
-     * Transform the resource into an array.
-     *
-     * @param  \Illuminate\Http\Request  $request
-     * @return array
-     */
     public function toArray($request)
     {
         return [
@@ -41,30 +35,31 @@ class StockMovementResource extends JsonResource
             'is_out' => $this->isOut(),
 
             // Dates
-            'created_at' => $this->created_at?->toISOString(),
-            'updated_at' => $this->updated_at?->toISOString(),
+            'created_at' => $this->created_at ? $this->created_at->toIso8601String() : null,
+            'updated_at' => $this->updated_at ? $this->updated_at->toIso8601String() : null,
 
             // Relationships (when loaded)
-            'product' => $this->whenLoaded('product', fn() => [
-                'id' => $this->product->id,
-                'title' => $this->product->title_en,
-                'title_ar' => $this->product->title_ar,
-                'current_stock' => $this->product->stock_quantity,
-                'image_url' => $this->product->product_image
-                    ? asset('img/product/' . $this->product->product_image)
-                    : null,
-            ]),
+            'product' => $this->whenLoaded('product', function () {
+                return [
+                    'id' => $this->product->id,
+                    'title' => $this->product->title_en,
+                    'title_ar' => $this->product->title_ar,
+                    'current_stock' => $this->product->stock_quantity,
+                    'image_url' => $this->product->product_image
+                        ? asset('img/product/' . $this->product->product_image)
+                        : null,
+                ];
+            }),
 
-            'creator' => $this->whenLoaded('creator', fn() => [
-                'id' => $this->creator->id,
-                'name' => $this->creator->name,
-            ]),
+            'creator' => $this->whenLoaded('creator', function () {
+                return [
+                    'id' => $this->creator->id,
+                    'name' => $this->creator->name,
+                ];
+            }),
         ];
     }
 
-    /**
-     * Get additional data that should be returned with the resource array.
-     */
     public function with($request): array
     {
         return [
@@ -72,33 +67,30 @@ class StockMovementResource extends JsonResource
         ];
     }
 
-    /**
-     * Get type label in Arabic.
-     */
     private function getTypeLabel(): string
     {
-        return match ($this->type) {
-            'in' => 'وارد',
-            'out' => 'صادر',
-            default => $this->type ?? 'غير معروف',
-        };
+        switch ($this->type) {
+            case 'in':
+                return 'وارد';
+            case 'out':
+                return 'صادر';
+            default:
+                return $this->type ?? 'غير معروف';
+        }
     }
 
-    /**
-     * Get type color for UI.
-     */
     private function getTypeColor(): string
     {
-        return match ($this->type) {
-            'in' => 'green',
-            'out' => 'red',
-            default => 'gray',
-        };
+        switch ($this->type) {
+            case 'in':
+                return 'green';
+            case 'out':
+                return 'red';
+            default:
+                return 'gray';
+        }
     }
 
-    /**
-     * Format quantity with sign.
-     */
     private function formatQuantity(): string
     {
         $sign = $this->type === 'in' ? '+' : '-';

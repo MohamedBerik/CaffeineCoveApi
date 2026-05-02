@@ -6,12 +6,6 @@ use Illuminate\Http\Resources\Json\JsonResource;
 
 class PurchaseOrderResource extends JsonResource
 {
-    /**
-     * Transform the resource into an array.
-     *
-     * @param  \Illuminate\Http\Request  $request
-     * @return array
-     */
     public function toArray($request)
     {
         return [
@@ -45,30 +39,33 @@ class PurchaseOrderResource extends JsonResource
             'can_receive_items' => $this->canReceiveItems(),
 
             // Counts
-            'items_count' => $this->whenCounted('items'),
-            'payments_count' => $this->whenCounted('payments'),
+            'items_count' => $this->whenLoaded('items', function () {
+                return $this->items->count();
+            }),
+            'payments_count' => $this->whenLoaded('payments', function () {
+                return $this->payments->count();
+            }),
 
             // Dates
-            'received_at' => $this->received_at?->toISOString(),
-            'created_at' => $this->created_at?->toISOString(),
-            'updated_at' => $this->updated_at?->toISOString(),
+            'received_at' => $this->received_at ? $this->received_at->toIso8601String() : null,
+            'created_at' => $this->created_at ? $this->created_at->toIso8601String() : null,
+            'updated_at' => $this->updated_at ? $this->updated_at->toIso8601String() : null,
 
             // Relationships (when loaded)
-            'supplier' => $this->whenLoaded('supplier', fn() => [
-                'id' => $this->supplier->id,
-                'name' => $this->supplier->name,
-                'email' => $this->supplier->email,
-                'phone' => $this->supplier->phone,
-            ]),
+            'supplier' => $this->whenLoaded('supplier', function () {
+                return [
+                    'id' => $this->supplier->id,
+                    'name' => $this->supplier->name,
+                    'email' => $this->supplier->email,
+                    'phone' => $this->supplier->phone,
+                ];
+            }),
 
             'items' => PurchaseOrderItemResource::collection($this->whenLoaded('items')),
             'payments' => SupplierPaymentResource::collection($this->whenLoaded('payments')),
         ];
     }
 
-    /**
-     * Get additional data that should be returned with the resource array.
-     */
     public function with($request): array
     {
         return [
@@ -76,37 +73,47 @@ class PurchaseOrderResource extends JsonResource
         ];
     }
 
-    /**
-     * Get status label in Arabic.
-     */
     private function getStatusLabel(): string
     {
-        return match ($this->status) {
-            'ordered' => 'تم الطلب',
-            'partially_paid' => 'مدفوع جزئيًا',
-            'paid' => 'مدفوع',
-            'received' => 'تم الاستلام',
-            'has_return' => 'يوجد مرتجع',
-            'returned' => 'مرتجع',
-            'cancelled' => 'ملغي',
-            default => $this->status ?? 'غير معروف',
-        };
+        switch ($this->status) {
+            case 'ordered':
+                return 'تم الطلب';
+            case 'partially_paid':
+                return 'مدفوع جزئيًا';
+            case 'paid':
+                return 'مدفوع';
+            case 'received':
+                return 'تم الاستلام';
+            case 'has_return':
+                return 'يوجد مرتجع';
+            case 'returned':
+                return 'مرتجع';
+            case 'cancelled':
+                return 'ملغي';
+            default:
+                return $this->status ?? 'غير معروف';
+        }
     }
 
-    /**
-     * Get status color for UI.
-     */
     private function getStatusColor(): string
     {
-        return match ($this->status) {
-            'ordered' => 'blue',
-            'partially_paid' => 'orange',
-            'paid' => 'green',
-            'received' => 'purple',
-            'has_return' => 'orange',
-            'returned' => 'red',
-            'cancelled' => 'red',
-            default => 'gray',
-        };
+        switch ($this->status) {
+            case 'ordered':
+                return 'blue';
+            case 'partially_paid':
+                return 'orange';
+            case 'paid':
+                return 'green';
+            case 'received':
+                return 'purple';
+            case 'has_return':
+                return 'orange';
+            case 'returned':
+                return 'red';
+            case 'cancelled':
+                return 'red';
+            default:
+                return 'gray';
+        }
     }
 }

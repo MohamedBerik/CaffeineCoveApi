@@ -6,12 +6,6 @@ use Illuminate\Http\Resources\Json\JsonResource;
 
 class UserResource extends JsonResource
 {
-    /**
-     * Transform the resource into an array.
-     *
-     * @param  \Illuminate\Http\Request  $request
-     * @return array
-     */
     public function toArray($request)
     {
         return [
@@ -20,9 +14,6 @@ class UserResource extends JsonResource
             'company_id' => $this->company_id,
             'name' => $this->name,
             'email' => $this->email,
-
-            // ❌ متخليش الباسورد يظهر في الـ Response أبدًا
-            // 'password' => $this->password,
 
             // Role & Status
             'role' => $this->role,
@@ -37,30 +28,30 @@ class UserResource extends JsonResource
             // Permissions (if needed)
             'permissions' => $this->when(
                 $this->relationLoaded('roles'),
-                fn() =>
-                $this->getPermissions()
+                function () {
+                    return $this->getPermissions();
+                }
             ),
 
             // Dates
-            'email_verified_at' => $this->email_verified_at?->toISOString(),
-            'created_at' => $this->created_at?->toISOString(),
-            'updated_at' => $this->updated_at?->toISOString(),
+            'email_verified_at' => $this->email_verified_at ? $this->email_verified_at->toIso8601String() : null,
+            'created_at' => $this->created_at ? $this->created_at->toIso8601String() : null,
+            'updated_at' => $this->updated_at ? $this->updated_at->toIso8601String() : null,
 
             // Relationships (when loaded)
-            'company' => $this->whenLoaded('company', fn() => [
-                'id' => $this->company->id,
-                'name' => $this->company->name,
-                'slug' => $this->company->slug,
-                'status' => $this->company->status,
-            ]),
+            'company' => $this->whenLoaded('company', function () {
+                return [
+                    'id' => $this->company->id,
+                    'name' => $this->company->name,
+                    'slug' => $this->company->slug,
+                    'status' => $this->company->status,
+                ];
+            }),
 
             'roles' => RoleResource::collection($this->whenLoaded('roles')),
         ];
     }
 
-    /**
-     * Get additional data that should be returned with the resource array.
-     */
     public function with($request): array
     {
         return [
@@ -68,32 +59,29 @@ class UserResource extends JsonResource
         ];
     }
 
-    /**
-     * Get role label in Arabic.
-     */
     private function getRoleLabel(): string
     {
-        return match ($this->role) {
-            'super_admin' => 'مدير النظام',
-            'admin' => 'مدير',
-            'doctor' => 'طبيب',
-            'receptionist' => 'موظف استقبال',
-            'user' => 'مستخدم',
-            default => $this->role ?? 'غير معروف',
-        };
+        switch ($this->role) {
+            case 'super_admin':
+                return 'مدير النظام';
+            case 'admin':
+                return 'مدير';
+            case 'doctor':
+                return 'طبيب';
+            case 'receptionist':
+                return 'موظف استقبال';
+            case 'user':
+                return 'مستخدم';
+            default:
+                return $this->role ?? 'غير معروف';
+        }
     }
 
-    /**
-     * Get status label in Arabic.
-     */
     private function getStatusLabel(): string
     {
         return $this->isActive() ? 'نشط' : 'غير نشط';
     }
 
-    /**
-     * Get user permissions.
-     */
     private function getPermissions(): array
     {
         if ($this->is_super_admin) {

@@ -6,12 +6,6 @@ use Illuminate\Http\Resources\Json\JsonResource;
 
 class PermissionResource extends JsonResource
 {
-    /**
-     * Transform the resource into an array.
-     *
-     * @param  \Illuminate\Http\Request  $request
-     * @return array
-     */
     public function toArray($request)
     {
         return [
@@ -30,18 +24,17 @@ class PermissionResource extends JsonResource
             'group' => $this->getGroup(),
 
             // Dates
-            'created_at' => $this->created_at?->toISOString(),
-            'updated_at' => $this->updated_at?->toISOString(),
+            'created_at' => $this->created_at ? $this->created_at->toIso8601String() : null,
+            'updated_at' => $this->updated_at ? $this->updated_at->toIso8601String() : null,
 
             // Relationships (when loaded)
             'roles' => RoleResource::collection($this->whenLoaded('roles')),
-            'roles_count' => $this->whenCounted('roles'),
+            'roles_count' => $this->whenLoaded('roles', function () {
+                return $this->roles->count();
+            }),
         ];
     }
 
-    /**
-     * Get additional data that should be returned with the resource array.
-     */
     public function with($request): array
     {
         return [
@@ -49,9 +42,6 @@ class PermissionResource extends JsonResource
         ];
     }
 
-    /**
-     * Get module name from permission name.
-     */
     private function getModuleFromName(): string
     {
         if (str_contains($this->name, '.')) {
@@ -60,9 +50,6 @@ class PermissionResource extends JsonResource
         return 'general';
     }
 
-    /**
-     * Get permission label in Arabic.
-     */
     private function getPermissionLabel(): string
     {
         $labels = [
@@ -113,41 +100,58 @@ class PermissionResource extends JsonResource
         return $labels[$this->name] ?? $this->name;
     }
 
-    /**
-     * Get module label in Arabic.
-     */
     private function getModuleLabel(): string
     {
         $module = $this->module ?? $this->getModuleFromName();
 
-        return match ($module) {
-            'finance' => 'المالية',
-            'orders' => 'الطلبات',
-            'payments' => 'المدفوعات',
-            'purchases' => 'المشتريات',
-            'appointments' => 'المواعيد',
-            'treatment_plans' => 'خطط العلاج',
-            'procedures' => 'الإجراءات',
-            'patients' => 'المرضى',
-            'reports' => 'التقارير',
-            'settings' => 'الإعدادات',
-            'general' => 'عام',
-            default => $module,
-        };
+        switch ($module) {
+            case 'finance':
+                return 'المالية';
+            case 'orders':
+                return 'الطلبات';
+            case 'payments':
+                return 'المدفوعات';
+            case 'purchases':
+                return 'المشتريات';
+            case 'appointments':
+                return 'المواعيد';
+            case 'treatment_plans':
+                return 'خطط العلاج';
+            case 'procedures':
+                return 'الإجراءات';
+            case 'patients':
+                return 'المرضى';
+            case 'reports':
+                return 'التقارير';
+            case 'settings':
+                return 'الإعدادات';
+            case 'general':
+                return 'عام';
+            default:
+                return $module;
+        }
     }
 
-    /**
-     * Get permission group.
-     */
     private function getGroup(): string
     {
-        return match ($this->getModuleFromName()) {
-            'finance', 'orders', 'payments', 'purchases' => 'financial',
-            'appointments', 'treatment_plans', 'procedures' => 'clinical',
-            'patients' => 'patients',
-            'reports' => 'reports',
-            'settings' => 'settings',
-            default => 'general',
-        };
+        switch ($this->getModuleFromName()) {
+            case 'finance':
+            case 'orders':
+            case 'payments':
+            case 'purchases':
+                return 'financial';
+            case 'appointments':
+            case 'treatment_plans':
+            case 'procedures':
+                return 'clinical';
+            case 'patients':
+                return 'patients';
+            case 'reports':
+                return 'reports';
+            case 'settings':
+                return 'settings';
+            default:
+                return 'general';
+        }
     }
 }

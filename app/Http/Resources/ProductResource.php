@@ -30,7 +30,7 @@ class ProductResource extends JsonResource
             'unit_price' => (float) $this->unit_price,
             'unit_price_formatted' => number_format($this->unit_price, 2) . ' EGP',
             'stock_quantity' => (int) $this->stock_quantity,
-            'quantity' => (int) $this->quantity, // ✅ أضف السطر ده
+            'quantity' => (int) $this->quantity,
             'on_hand' => (int) $this->on_hand,
 
             // Inventory Status
@@ -49,20 +49,29 @@ class ProductResource extends JsonResource
             'category_id' => $this->category_id,
 
             // Metadata
-            'created_at' => $this->created_at?->toISOString(),
-            'updated_at' => $this->updated_at?->toISOString(),
+            'created_at' => $this->created_at ? $this->created_at->toIso8601String() : null,
+            'updated_at' => $this->updated_at ? $this->updated_at->toIso8601String() : null,
 
             // Relationships (when loaded)
-            'category' => $this->whenLoaded('category', fn() => [
-                'id' => $this->category->id,
-                'title' => $this->category->title_en,
-                'title_ar' => $this->category->title_ar,
-            ]),
+            'category' => $this->whenLoaded('category', function () {
+                return [
+                    'id' => $this->category->id,
+                    'title' => $this->category->title_en,
+                    'title_ar' => $this->category->title_ar,
+                ];
+            }),
 
-            // ✅ استبدل whenCounted بـ whenLoaded مع count()
-            'order_items_count' => $this->whenLoaded('orderItems', fn() => $this->orderItems->count(), 0),
-            'invoice_items_count' => $this->whenLoaded('invoiceItems', fn() => $this->invoiceItems->count(), 0),
-            'stock_movements_count' => $this->whenLoaded('stockMovements', fn() => $this->stockMovements->count(), 0),
+            'order_items_count' => $this->whenLoaded('orderItems', function () {
+                return $this->orderItems->count();
+            }, 0),
+
+            'invoice_items_count' => $this->whenLoaded('invoiceItems', function () {
+                return $this->invoiceItems->count();
+            }, 0),
+
+            'stock_movements_count' => $this->whenLoaded('stockMovements', function () {
+                return $this->stockMovements->count();
+            }, 0),
 
             'stock_movements' => StockMovementResource::collection($this->whenLoaded('stockMovements')),
         ];
@@ -101,21 +110,29 @@ class ProductResource extends JsonResource
 
     private function getInventoryStatusLabel(): string
     {
-        return match ($this->getInventoryStatus()) {
-            'in_stock' => 'متوفر',
-            'low_stock' => 'مخزون منخفض',
-            'out_of_stock' => 'غير متوفر',
-            default => 'غير معروف',
-        };
+        switch ($this->getInventoryStatus()) {
+            case 'in_stock':
+                return 'متوفر';
+            case 'low_stock':
+                return 'مخزون منخفض';
+            case 'out_of_stock':
+                return 'غير متوفر';
+            default:
+                return 'غير معروف';
+        }
     }
 
     private function getInventoryStatusColor(): string
     {
-        return match ($this->getInventoryStatus()) {
-            'in_stock' => 'green',
-            'low_stock' => 'orange',
-            'out_of_stock' => 'red',
-            default => 'gray',
-        };
+        switch ($this->getInventoryStatus()) {
+            case 'in_stock':
+                return 'green';
+            case 'low_stock':
+                return 'orange';
+            case 'out_of_stock':
+                return 'red';
+            default:
+                return 'gray';
+        }
     }
 }

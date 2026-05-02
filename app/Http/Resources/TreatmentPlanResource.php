@@ -6,12 +6,6 @@ use Illuminate\Http\Resources\Json\JsonResource;
 
 class TreatmentPlanResource extends JsonResource
 {
-    /**
-     * Transform the resource into an array.
-     *
-     * @param  \Illuminate\Http\Request  $request
-     * @return array
-     */
     public function toArray($request)
     {
         return [
@@ -47,31 +41,34 @@ class TreatmentPlanResource extends JsonResource
             'can_be_modified' => $this->canBeModified(),
 
             // Counts
-            'items_count' => $this->whenCounted('items'),
+            'items_count' => $this->whenLoaded('items', function () {
+                return $this->items->count();
+            }),
             'completed_items_count' => (int) ($this->completed_items_count ?? 0),
-            'invoices_count' => $this->whenCounted('invoices'),
+            'invoices_count' => $this->whenLoaded('invoices', function () {
+                return $this->invoices->count();
+            }),
 
             // Dates
-            'created_at' => $this->created_at?->toISOString(),
-            'updated_at' => $this->updated_at?->toISOString(),
+            'created_at' => $this->created_at ? $this->created_at->toIso8601String() : null,
+            'updated_at' => $this->updated_at ? $this->updated_at->toIso8601String() : null,
 
             // Relationships (when loaded)
-            'customer' => $this->whenLoaded('customer', fn() => [
-                'id' => $this->customer->id,
-                'name' => $this->customer->name,
-                'email' => $this->customer->email,
-                'phone' => $this->customer->phone,
-                'patient_code' => $this->customer->patient_code,
-            ]),
+            'customer' => $this->whenLoaded('customer', function () {
+                return [
+                    'id' => $this->customer->id,
+                    'name' => $this->customer->name,
+                    'email' => $this->customer->email,
+                    'phone' => $this->customer->phone,
+                    'patient_code' => $this->customer->patient_code,
+                ];
+            }),
 
             'items' => TreatmentPlanItemResource::collection($this->whenLoaded('items')),
             'invoices' => InvoiceResource::collection($this->whenLoaded('invoices')),
         ];
     }
 
-    /**
-     * Get additional data that should be returned with the resource array.
-     */
     public function with($request): array
     {
         return [
@@ -79,29 +76,31 @@ class TreatmentPlanResource extends JsonResource
         ];
     }
 
-    /**
-     * Get status label in Arabic.
-     */
     private function getStatusLabel(): string
     {
-        return match ($this->status) {
-            'active' => 'نشط',
-            'completed' => 'مكتمل',
-            'cancelled' => 'ملغي',
-            default => $this->status ?? 'غير معروف',
-        };
+        switch ($this->status) {
+            case 'active':
+                return 'نشط';
+            case 'completed':
+                return 'مكتمل';
+            case 'cancelled':
+                return 'ملغي';
+            default:
+                return $this->status ?? 'غير معروف';
+        }
     }
 
-    /**
-     * Get status color for UI.
-     */
     private function getStatusColor(): string
     {
-        return match ($this->status) {
-            'active' => 'green',
-            'completed' => 'blue',
-            'cancelled' => 'red',
-            default => 'gray',
-        };
+        switch ($this->status) {
+            case 'active':
+                return 'green';
+            case 'completed':
+                return 'blue';
+            case 'cancelled':
+                return 'red';
+            default:
+                return 'gray';
+        }
     }
 }

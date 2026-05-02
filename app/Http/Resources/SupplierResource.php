@@ -6,12 +6,6 @@ use Illuminate\Http\Resources\Json\JsonResource;
 
 class SupplierResource extends JsonResource
 {
-    /**
-     * Transform the resource into an array.
-     *
-     * @param  \Illuminate\Http\Request  $request
-     * @return array
-     */
     public function toArray($request)
     {
         return [
@@ -43,12 +37,16 @@ class SupplierResource extends JsonResource
             'has_overpayment' => ($this->balance ?? 0) < 0,
 
             // Counts
-            'purchases_count' => $this->whenCounted('purchaseOrders'),
-            'payments_count' => $this->whenCounted('payments'),
+            'purchases_count' => $this->whenLoaded('purchaseOrders', function () {
+                return $this->purchaseOrders->count();
+            }),
+            'payments_count' => $this->whenLoaded('payments', function () {
+                return $this->payments->count();
+            }),
 
             // Dates
-            'created_at' => $this->created_at?->toISOString(),
-            'updated_at' => $this->updated_at?->toISOString(),
+            'created_at' => $this->created_at ? $this->created_at->toIso8601String() : null,
+            'updated_at' => $this->updated_at ? $this->updated_at->toIso8601String() : null,
 
             // Relationships (when loaded)
             'purchase_orders' => PurchaseOrderResource::collection($this->whenLoaded('purchaseOrders')),
@@ -56,9 +54,6 @@ class SupplierResource extends JsonResource
         ];
     }
 
-    /**
-     * Get additional data that should be returned with the resource array.
-     */
     public function with($request): array
     {
         return [
@@ -66,29 +61,31 @@ class SupplierResource extends JsonResource
         ];
     }
 
-    /**
-     * Get status label in Arabic.
-     */
     private function getStatusLabel(): string
     {
-        return match ($this->status ?? 'settled') {
-            'owed' => 'مستحق عليه',
-            'overpaid' => 'له رصيد',
-            'settled' => 'متوازن',
-            default => 'غير معروف',
-        };
+        switch ($this->status ?? 'settled') {
+            case 'owed':
+                return 'مستحق عليه';
+            case 'overpaid':
+                return 'له رصيد';
+            case 'settled':
+                return 'متوازن';
+            default:
+                return 'غير معروف';
+        }
     }
 
-    /**
-     * Get status color for UI.
-     */
     private function getStatusColor(): string
     {
-        return match ($this->status ?? 'settled') {
-            'owed' => 'red',
-            'overpaid' => 'orange',
-            'settled' => 'green',
-            default => 'gray',
-        };
+        switch ($this->status ?? 'settled') {
+            case 'owed':
+                return 'red';
+            case 'overpaid':
+                return 'orange';
+            case 'settled':
+                return 'green';
+            default:
+                return 'gray';
+        }
     }
 }

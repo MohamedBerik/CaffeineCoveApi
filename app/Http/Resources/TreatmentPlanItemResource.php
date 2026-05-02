@@ -6,12 +6,6 @@ use Illuminate\Http\Resources\Json\JsonResource;
 
 class TreatmentPlanItemResource extends JsonResource
 {
-    /**
-     * Transform the resource into an array.
-     *
-     * @param  \Illuminate\Http\Request  $request
-     * @return array
-     */
     public function toArray($request)
     {
         return [
@@ -58,43 +52,48 @@ class TreatmentPlanItemResource extends JsonResource
             'appointment_id' => $this->appointment_id,
 
             // Dates
-            'started_at' => $this->started_at?->toISOString(),
-            'completed_at' => $this->completed_at?->toISOString(),
-            'created_at' => $this->created_at?->toISOString(),
-            'updated_at' => $this->updated_at?->toISOString(),
+            'started_at' => $this->started_at ? $this->started_at->toIso8601String() : null,
+            'completed_at' => $this->completed_at ? $this->completed_at->toIso8601String() : null,
+            'created_at' => $this->created_at ? $this->created_at->toIso8601String() : null,
+            'updated_at' => $this->updated_at ? $this->updated_at->toIso8601String() : null,
 
             // Relationships (when loaded)
-            'procedure_ref' => $this->whenLoaded('procedureRef', fn() => [
-                'id' => $this->procedureRef->id,
-                'name' => $this->procedureRef->name,
-                'default_price' => $this->procedureRef->default_price,
-            ]),
+            'procedure_ref' => $this->whenLoaded('procedureRef', function () {
+                return [
+                    'id' => $this->procedureRef->id,
+                    'name' => $this->procedureRef->name,
+                    'default_price' => $this->procedureRef->default_price,
+                ];
+            }),
 
-            'treatment_plan' => $this->whenLoaded('plan', fn() => [
-                'id' => $this->plan->id,
-                'title' => $this->plan->title,
-                'customer_id' => $this->plan->customer_id,
-                'status' => $this->plan->status,
-            ]),
+            'treatment_plan' => $this->whenLoaded('plan', function () {
+                return [
+                    'id' => $this->plan->id,
+                    'title' => $this->plan->title,
+                    'customer_id' => $this->plan->customer_id,
+                    'status' => $this->plan->status,
+                ];
+            }),
 
-            'appointment' => $this->whenLoaded('appointment', fn() => [
-                'id' => $this->appointment->id,
-                'appointment_date' => $this->appointment->appointment_date?->format('Y-m-d'),
-                'appointment_time' => $this->appointment->appointment_time,
-                'status' => $this->appointment->status,
-            ]),
+            'appointment' => $this->whenLoaded('appointment', function () {
+                return [
+                    'id' => $this->appointment->id,
+                    'appointment_date' => $this->appointment->appointment_date ? $this->appointment->appointment_date->format('Y-m-d') : null,
+                    'appointment_time' => $this->appointment->appointment_time,
+                    'status' => $this->appointment->status,
+                ];
+            }),
 
-            'dental_record' => $this->whenLoaded('dentalRecord', fn() => [
-                'id' => $this->dentalRecord->id,
-                'tooth_number' => $this->dentalRecord->tooth_number,
-                'status' => $this->dentalRecord->status,
-            ]),
+            'dental_record' => $this->whenLoaded('dentalRecord', function () {
+                return [
+                    'id' => $this->dentalRecord->id,
+                    'tooth_number' => $this->dentalRecord->tooth_number,
+                    'status' => $this->dentalRecord->status,
+                ];
+            }),
         ];
     }
 
-    /**
-     * Get additional data that should be returned with the resource array.
-     */
     public function with($request): array
     {
         return [
@@ -102,29 +101,31 @@ class TreatmentPlanItemResource extends JsonResource
         ];
     }
 
-    /**
-     * Get status label in Arabic.
-     */
     private function getStatusLabel(): string
     {
-        return match ($this->status) {
-            'planned' => 'مخطط',
-            'in_progress' => 'قيد التنفيذ',
-            'completed' => 'مكتمل',
-            default => $this->status ?? 'غير معروف',
-        };
+        switch ($this->status) {
+            case 'planned':
+                return 'مخطط';
+            case 'in_progress':
+                return 'قيد التنفيذ';
+            case 'completed':
+                return 'مكتمل';
+            default:
+                return $this->status ?? 'غير معروف';
+        }
     }
 
-    /**
-     * Get status color for UI.
-     */
     private function getStatusColor(): string
     {
-        return match ($this->status) {
-            'planned' => 'blue',
-            'in_progress' => 'orange',
-            'completed' => 'green',
-            default => 'gray',
-        };
+        switch ($this->status) {
+            case 'planned':
+                return 'blue';
+            case 'in_progress':
+                return 'orange';
+            case 'completed':
+                return 'green';
+            default:
+                return 'gray';
+        }
     }
 }

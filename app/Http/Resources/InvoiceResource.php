@@ -6,12 +6,6 @@ use Illuminate\Http\Resources\Json\JsonResource;
 
 class InvoiceResource extends JsonResource
 {
-    /**
-     * Transform the resource into an array.
-     *
-     * @param  \Illuminate\Http\Request  $request
-     * @return array
-     */
     public function toArray($request)
     {
         return [
@@ -43,9 +37,9 @@ class InvoiceResource extends JsonResource
             'is_unpaid' => $this->isUnpaid(),
 
             // Dates
-            'issued_at' => $this->issued_at?->toISOString(),
-            'created_at' => $this->created_at?->toISOString(),
-            'updated_at' => $this->updated_at?->toISOString(),
+            'issued_at' => $this->issued_at ? $this->issued_at->toIso8601String() : null,
+            'created_at' => $this->created_at ? $this->created_at->toIso8601String() : null,
+            'updated_at' => $this->updated_at ? $this->updated_at->toIso8601String() : null,
 
             // Relations IDs
             'customer_id' => $this->customer_id,
@@ -54,37 +48,44 @@ class InvoiceResource extends JsonResource
             'treatment_plan_id' => $this->treatment_plan_id,
 
             // Relationships (when loaded)
-            'customer' => $this->whenLoaded('customer', fn() => [
-                'id' => $this->customer->id,
-                'name' => $this->customer->name,
-                'email' => $this->customer->email,
-                'phone' => $this->customer->phone,
-            ]),
+            'customer' => $this->whenLoaded('customer', function () {
+                return [
+                    'id' => $this->customer->id,
+                    'name' => $this->customer->name,
+                    'email' => $this->customer->email,
+                    'phone' => $this->customer->phone,
+                ];
+            }),
 
             'items' => InvoiceItemResource::collection($this->whenLoaded('items')),
-            'items_count' => $this->whenCounted('items'),
+            'items_count' => $this->whenLoaded('items', function () {
+                return $this->items->count();
+            }),
 
             'payments' => PaymentResource::collection($this->whenLoaded('payments')),
-            'payments_count' => $this->whenCounted('payments'),
+            'payments_count' => $this->whenLoaded('payments', function () {
+                return $this->payments->count();
+            }),
 
-            'appointment' => $this->whenLoaded('appointment', fn() => [
-                'id' => $this->appointment->id,
-                'appointment_date' => $this->appointment->appointment_date?->format('Y-m-d'),
-                'appointment_time' => $this->appointment->appointment_time,
-                'status' => $this->appointment->status,
-            ]),
+            'appointment' => $this->whenLoaded('appointment', function () {
+                return [
+                    'id' => $this->appointment->id,
+                    'appointment_date' => $this->appointment->appointment_date ? $this->appointment->appointment_date->format('Y-m-d') : null,
+                    'appointment_time' => $this->appointment->appointment_time,
+                    'status' => $this->appointment->status,
+                ];
+            }),
 
-            'treatment_plan' => $this->whenLoaded('treatmentPlan', fn() => [
-                'id' => $this->treatmentPlan->id,
-                'title' => $this->treatmentPlan->title,
-                'status' => $this->treatmentPlan->status,
-            ]),
+            'treatment_plan' => $this->whenLoaded('treatmentPlan', function () {
+                return [
+                    'id' => $this->treatmentPlan->id,
+                    'title' => $this->treatmentPlan->title,
+                    'status' => $this->treatmentPlan->status,
+                ];
+            }),
         ];
     }
 
-    /**
-     * Get additional data that should be returned with the resource array.
-     */
     public function with($request): array
     {
         return [
@@ -92,31 +93,35 @@ class InvoiceResource extends JsonResource
         ];
     }
 
-    /**
-     * Get status label in Arabic.
-     */
     private function getStatusLabel(): string
     {
-        return match ($this->status) {
-            'unpaid' => 'غير مدفوعة',
-            'partially_paid' => 'مدفوعة جزئيًا',
-            'paid' => 'مدفوعة',
-            'cancelled' => 'ملغية',
-            default => $this->status ?? 'غير معروف',
-        };
+        switch ($this->status) {
+            case 'unpaid':
+                return 'غير مدفوعة';
+            case 'partially_paid':
+                return 'مدفوعة جزئيًا';
+            case 'paid':
+                return 'مدفوعة';
+            case 'cancelled':
+                return 'ملغية';
+            default:
+                return $this->status ?? 'غير معروف';
+        }
     }
 
-    /**
-     * Get status color for UI.
-     */
     private function getStatusColor(): string
     {
-        return match ($this->status) {
-            'unpaid' => 'red',
-            'partially_paid' => 'orange',
-            'paid' => 'green',
-            'cancelled' => 'gray',
-            default => 'gray',
-        };
+        switch ($this->status) {
+            case 'unpaid':
+                return 'red';
+            case 'partially_paid':
+                return 'orange';
+            case 'paid':
+                return 'green';
+            case 'cancelled':
+                return 'gray';
+            default:
+                return 'gray';
+        }
     }
 }

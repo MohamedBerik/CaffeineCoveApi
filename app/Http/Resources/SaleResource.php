@@ -6,12 +6,6 @@ use Illuminate\Http\Resources\Json\JsonResource;
 
 class SaleResource extends JsonResource
 {
-    /**
-     * Transform the resource into an array.
-     *
-     * @param  \Illuminate\Http\Request  $request
-     * @return array
-     */
     public function toArray($request)
     {
         return [
@@ -39,21 +33,20 @@ class SaleResource extends JsonResource
             'employee_id' => $this->employee_id,
 
             // Dates
-            'created_at' => $this->created_at?->toISOString(),
-            'updated_at' => $this->updated_at?->toISOString(),
+            'created_at' => $this->created_at ? $this->created_at->toIso8601String() : null,
+            'updated_at' => $this->updated_at ? $this->updated_at->toIso8601String() : null,
 
             // Relationships (when loaded)
-            'employee' => $this->whenLoaded('employee', fn() => [
-                'id' => $this->employee->id,
-                'name' => $this->employee->name,
-                'email' => $this->employee->email,
-            ]),
+            'employee' => $this->whenLoaded('employee', function () {
+                return [
+                    'id' => $this->employee->id,
+                    'name' => $this->employee->name,
+                    'email' => $this->employee->email,
+                ];
+            }),
         ];
     }
 
-    /**
-     * Get additional data that should be returned with the resource array.
-     */
     public function with($request): array
     {
         return [
@@ -61,9 +54,6 @@ class SaleResource extends JsonResource
         ];
     }
 
-    /**
-     * Get localized title.
-     */
     private function getTitleAttribute(): string
     {
         return app()->getLocale() === 'ar'
@@ -71,9 +61,6 @@ class SaleResource extends JsonResource
             : ($this->title_en ?: $this->title_ar);
     }
 
-    /**
-     * Get localized description.
-     */
     private function getDescriptionAttribute(): ?string
     {
         return app()->getLocale() === 'ar'

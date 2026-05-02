@@ -6,12 +6,6 @@ use Illuminate\Http\Resources\Json\JsonResource;
 
 class RoleResource extends JsonResource
 {
-    /**
-     * Transform the resource into an array.
-     *
-     * @param  \Illuminate\Http\Request  $request
-     * @return array
-     */
     public function toArray($request)
     {
         return [
@@ -25,21 +19,22 @@ class RoleResource extends JsonResource
             'label' => $this->getRoleLabel(),
 
             // Dates
-            'created_at' => $this->created_at?->toISOString(),
-            'updated_at' => $this->updated_at?->toISOString(),
+            'created_at' => $this->created_at ? $this->created_at->toIso8601String() : null,
+            'updated_at' => $this->updated_at ? $this->updated_at->toIso8601String() : null,
 
             // Relationships (when loaded)
             'permissions' => PermissionResource::collection($this->whenLoaded('permissions')),
-            'permissions_count' => $this->whenCounted('permissions'),
+            'permissions_count' => $this->whenLoaded('permissions', function () {
+                return $this->permissions->count();
+            }),
 
             'users' => UserResource::collection($this->whenLoaded('users')),
-            'users_count' => $this->whenCounted('users'),
+            'users_count' => $this->whenLoaded('users', function () {
+                return $this->users->count();
+            }),
         ];
     }
 
-    /**
-     * Get additional data that should be returned with the resource array.
-     */
     public function with($request): array
     {
         return [
@@ -47,18 +42,21 @@ class RoleResource extends JsonResource
         ];
     }
 
-    /**
-     * Get role label in Arabic.
-     */
     private function getRoleLabel(): string
     {
-        return match ($this->name) {
-            'super_admin' => 'مدير النظام',
-            'admin' => 'مدير',
-            'doctor' => 'طبيب',
-            'receptionist' => 'موظف استقبال',
-            'user' => 'مستخدم',
-            default => $this->name ?? 'غير معروف',
-        };
+        switch ($this->name) {
+            case 'super_admin':
+                return 'مدير النظام';
+            case 'admin':
+                return 'مدير';
+            case 'doctor':
+                return 'طبيب';
+            case 'receptionist':
+                return 'موظف استقبال';
+            case 'user':
+                return 'مستخدم';
+            default:
+                return $this->name ?? 'غير معروف';
+        }
     }
 }

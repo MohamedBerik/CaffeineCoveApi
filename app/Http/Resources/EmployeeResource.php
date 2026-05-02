@@ -6,12 +6,6 @@ use Illuminate\Http\Resources\Json\JsonResource;
 
 class EmployeeResource extends JsonResource
 {
-    /**
-     * Transform the resource into an array.
-     *
-     * @param  \Illuminate\Http\Request  $request
-     * @return array
-     */
     public function toArray($request)
     {
         return [
@@ -21,27 +15,25 @@ class EmployeeResource extends JsonResource
             'name' => $this->name,
             'email' => $this->email,
 
-            // ❌ متخليش الباسورد يظهر في الـ Response أبدًا
-            // 'password' => $this->password,
-
             // Salary
             'salary' => (float) $this->salary,
             'salary_formatted' => $this->salary ? number_format($this->salary, 2) . ' EGP' : null,
 
             // Metadata
-            'created_at' => $this->created_at?->toISOString(),
-            'updated_at' => $this->updated_at?->toISOString(),
+            'created_at' => $this->created_at ? $this->created_at->toIso8601String() : null,
+            'updated_at' => $this->updated_at ? $this->updated_at->toIso8601String() : null,
 
             // Relationships (when loaded)
-            'sales_count' => $this->whenCounted('sales'),
-            'total_sales' => $this->whenLoaded('sales', fn() => $this->sales->sum('price')),
+            'sales_count' => $this->whenLoaded('sales', function () {
+                return $this->sales->count();
+            }),
+            'total_sales' => $this->whenLoaded('sales', function () {
+                return $this->sales->sum('price');
+            }),
             'sales' => SaleResource::collection($this->whenLoaded('sales')),
         ];
     }
 
-    /**
-     * Get additional data that should be returned with the resource array.
-     */
     public function with($request): array
     {
         return [

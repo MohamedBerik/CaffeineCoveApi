@@ -6,12 +6,6 @@ use Illuminate\Http\Resources\Json\JsonResource;
 
 class PurchaseOrderItemResource extends JsonResource
 {
-    /**
-     * Transform the resource into an array.
-     *
-     * @param  \Illuminate\Http\Request  $request
-     * @return array
-     */
     public function toArray($request)
     {
         return [
@@ -39,32 +33,33 @@ class PurchaseOrderItemResource extends JsonResource
             'is_fully_received' => $this->isFullyReceived(),
 
             // Dates
-            'created_at' => $this->created_at?->toISOString(),
-            'updated_at' => $this->updated_at?->toISOString(),
+            'created_at' => $this->created_at ? $this->created_at->toIso8601String() : null,
+            'updated_at' => $this->updated_at ? $this->updated_at->toIso8601String() : null,
 
             // Relationships (when loaded)
-            'product' => $this->whenLoaded('product', fn() => [
-                'id' => $this->product->id,
-                'title' => $this->product->title_en,
-                'title_ar' => $this->product->title_ar,
-                'stock_quantity' => $this->product->stock_quantity,
-                'image_url' => $this->product->product_image
-                    ? asset('img/product/' . $this->product->product_image)
-                    : null,
-            ]),
+            'product' => $this->whenLoaded('product', function () {
+                return [
+                    'id' => $this->product->id,
+                    'title' => $this->product->title_en,
+                    'title_ar' => $this->product->title_ar,
+                    'stock_quantity' => $this->product->stock_quantity,
+                    'image_url' => $this->product->product_image
+                        ? asset('img/product/' . $this->product->product_image)
+                        : null,
+                ];
+            }),
 
-            'purchase_order' => $this->whenLoaded('purchaseOrder', fn() => [
-                'id' => $this->purchaseOrder->id,
-                'number' => $this->purchaseOrder->number,
-                'status' => $this->purchaseOrder->status,
-                'supplier_id' => $this->purchaseOrder->supplier_id,
-            ]),
+            'purchase_order' => $this->whenLoaded('purchaseOrder', function () {
+                return [
+                    'id' => $this->purchaseOrder->id,
+                    'number' => $this->purchaseOrder->number,
+                    'status' => $this->purchaseOrder->status,
+                    'supplier_id' => $this->purchaseOrder->supplier_id,
+                ];
+            }),
         ];
     }
 
-    /**
-     * Get additional data that should be returned with the resource array.
-     */
     public function with($request): array
     {
         return [

@@ -6,12 +6,6 @@ use Illuminate\Http\Resources\Json\JsonResource;
 
 class PaymentResource extends JsonResource
 {
-    /**
-     * Transform the resource into an array.
-     *
-     * @param  \Illuminate\Http\Request  $request
-     * @return array
-     */
     public function toArray($request)
     {
         return [
@@ -50,31 +44,34 @@ class PaymentResource extends JsonResource
             'received_by' => $this->received_by,
 
             // Dates
-            'paid_at' => $this->paid_at?->toISOString(),
-            'created_at' => $this->created_at?->toISOString(),
-            'updated_at' => $this->updated_at?->toISOString(),
+            'paid_at' => $this->paid_at ? $this->paid_at->toIso8601String() : null,
+            'created_at' => $this->created_at ? $this->created_at->toIso8601String() : null,
+            'updated_at' => $this->updated_at ? $this->updated_at->toIso8601String() : null,
 
             // Relationships (when loaded)
-            'invoice' => $this->whenLoaded('invoice', fn() => [
-                'id' => $this->invoice->id,
-                'number' => $this->invoice->number,
-                'total' => $this->invoice->total,
-                'status' => $this->invoice->status,
-            ]),
+            'invoice' => $this->whenLoaded('invoice', function () {
+                return [
+                    'id' => $this->invoice->id,
+                    'number' => $this->invoice->number,
+                    'total' => $this->invoice->total,
+                    'status' => $this->invoice->status,
+                ];
+            }),
 
-            'receiver' => $this->whenLoaded('receiver', fn() => [
-                'id' => $this->receiver->id,
-                'name' => $this->receiver->name,
-            ]),
+            'receiver' => $this->whenLoaded('receiver', function () {
+                return [
+                    'id' => $this->receiver->id,
+                    'name' => $this->receiver->name,
+                ];
+            }),
 
             'refunds' => PaymentRefundResource::collection($this->whenLoaded('refunds')),
-            'refunds_count' => $this->whenCounted('refunds'),
+            'refunds_count' => $this->whenLoaded('refunds', function () {
+                return $this->refunds->count();
+            }),
         ];
     }
 
-    /**
-     * Get additional data that should be returned with the resource array.
-     */
     public function with($request): array
     {
         return [
@@ -82,18 +79,21 @@ class PaymentResource extends JsonResource
         ];
     }
 
-    /**
-     * Get payment method label in Arabic.
-     */
     private function getMethodLabel(): string
     {
-        return match ($this->method) {
-            'cash' => 'نقدي',
-            'card' => 'بطاقة ائتمان',
-            'bank_transfer' => 'تحويل بنكي',
-            'check' => 'شيك',
-            'other' => 'أخرى',
-            default => $this->method ?? 'غير معروف',
-        };
+        switch ($this->method) {
+            case 'cash':
+                return 'نقدي';
+            case 'card':
+                return 'بطاقة ائتمان';
+            case 'bank_transfer':
+                return 'تحويل بنكي';
+            case 'check':
+                return 'شيك';
+            case 'other':
+                return 'أخرى';
+            default:
+                return $this->method ?? 'غير معروف';
+        }
     }
 }
