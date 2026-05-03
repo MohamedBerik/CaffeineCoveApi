@@ -59,11 +59,49 @@ class RolesAndPermissionsSeeder extends Seeder
             Permission::firstOrCreate(['name' => $perm, 'guard_name' => 'api']);
         }
 
-        // Admin – full access
+        // داخل run()
         $adminRole = Role::firstOrCreate(['name' => 'admin', 'guard_name' => 'api']);
-        $adminRole->syncPermissions($permissions);
+        $adminRole->syncPermissions([
+            'finance.view',
+            'finance.create',
+            'orders.view',
+            'orders.manage',
+            'orders.confirm',
+            'orders.cancel',
+            'appointments.view',
+            'appointments.manage',
+            'appointments.complete',
+            'patients.view',
+            'patients.manage',
+            'treatment_plans.view',
+            'treatment_plans.manage',
+            'procedures.view',
+            'procedures.manage',
+            'reports.view',
+            'activity_logs.view',
+            'inventory.view',
+            'inventory.manage',
+            'purchases.manage',
+            'purchases.receive',
+            'purchases.return',
+            'sales.view',
+            'sales.manage',
+            'reservations.view',
+            'reservations.manage',
+            'doctors.view',
+            'doctors.manage',
+            'employees.view',
+            'employees.manage',
+            'settings.view',
+            'settings.manage',
+            'radiology.view',
+            'radiology.manage',
+            'dental_records.view',
+            'dental_records.create',
+            'payments.refund',
+            'users.manage'
+        ]);
 
-        // Doctor – limited clinical access
         $doctorRole = Role::firstOrCreate(['name' => 'doctor', 'guard_name' => 'api']);
         $doctorRole->syncPermissions([
             'appointments.view',
@@ -73,14 +111,13 @@ class RolesAndPermissionsSeeder extends Seeder
             'dental_records.view',
         ]);
 
-        // Receptionist – front desk & basic patient management
         $receptionistRole = Role::firstOrCreate(['name' => 'receptionist', 'guard_name' => 'api']);
         $receptionistRole->syncPermissions([
             'appointments.view',
             'appointments.manage',
             'patients.view',
             'patients.manage',
-            'doctors.view',  // ✅ present in current DB (Tinker)
+            'doctors.view',
         ]);
     }
 }

@@ -104,6 +104,9 @@ Route::middleware(['auth:sanctum', 'company.user'])->group(function () {
             $permissions = ['*'];
         }
 
+        // تحويل المصفوفة إلى كائن للتحقق السريع في الواجهة
+        $permissionsMap = array_fill_keys($permissions, true);
+
         return response()->json([
             'id' => $user->id,
             'name' => $user->name,
@@ -113,7 +116,8 @@ Route::middleware(['auth:sanctum', 'company.user'])->group(function () {
             'company_id' => Tenant::id(),
             'is_super_admin' => (bool) $user->is_super_admin,
             'can_switch_branch' => !$user->is_super_admin && $user->hasRole('admin'),
-            'permissions' => $permissions,
+            'permissions' => $permissions,          // مصفوفة للتوافق القديم
+            'permissions_map' => $permissionsMap,    // كائن للتحقق السريع
         ]);
     });
 
