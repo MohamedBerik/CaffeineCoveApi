@@ -15,13 +15,6 @@ class Handler extends ExceptionHandler
 
     public function register(): void
     {
-        // $this->reportable(function (Throwable $e) {
-        //     Log::error($e->getMessage(), [
-        //         'file' => $e->getFile(),
-        //         'line' => $e->getLine(),
-        //         'class' => get_class($e),
-        //     ]);
-        // });
 
         $this->renderable(function (\Illuminate\Auth\Access\AuthorizationException $e, $request) {
             $message = $e->getMessage() ?: 'This action is unauthorized.';
@@ -31,46 +24,35 @@ class Handler extends ExceptionHandler
         });
     }
 
-    // public function render($request, Throwable $e)
-    // {
-    //     // ✅ إرجاع تفاصيل الخطأ كاملة في الـ API
-    //     if ($request->expectsJson() || $request->is('api/*')) {
-    //         $statusCode = method_exists($e, 'getStatusCode') ? $e->getStatusCode() : 500;
-    //         if ($statusCode < 100 || $statusCode > 599) {
-    //             $statusCode = 500;
-    //         }
-
-    //         return response()->json([
-    //             'message' => $e->getMessage(),
-    //             'exception' => get_class($e),
-    //             'file' => $e->getFile(),
-    //             'line' => $e->getLine(),
-    //             'status' => $statusCode,
-    //         ], $statusCode);
-    //     }
-
-    //     return parent::render($request, $e);
-    // }
+    protected function invalidJson($request, \Illuminate\Validation\ValidationException $exception)
+    {
+        return response()->json([
+            'message' => $exception->getMessage(),
+            'errors' => $exception->errors(),
+        ], 422);
+    }
 
     public function render($request, Throwable $e)
     {
-        // ✅ التعامل مع AuthorizationException بشكل صحيح
-        if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
-            $statusCode = method_exists($e, 'status') ? $e->status() : 403;
-            return response()->json([
-                'message' => $e->getMessage() ?: 'This action is unauthorized.',
-                'status' => $statusCode,
-            ], $statusCode);
+        // التعامل مع ValidationException
+        if ($e instanceof \Illuminate\Validation\ValidationException) {
+            return $this->invalidJson($request, $e);
         }
 
-        // ✅ لو الـ Request من API
-        if ($request->expectsJson() || $request->is('api/*')) {
-            $statusCode = method_exists($e, 'getStatusCode')
-                ? $e->getStatusCode()
-                : (method_exists($e, 'status') ? $e->status() : 500);
+        // التعامل مع AuthorizationException
+        if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
+            return response()->json([
+                'message' => $e->getMessage() ?: 'This action is unauthorized.',
+            ], 403);
+        }
 
-            if ($statusCode < 100 || $statusCode > 599) {
-                $statusCode = 500;
+        // استجابة عامة للـ API
+        if ($request->expectsJson() || $request->is('api/*')) {
+            $statusCode = 500;
+            if (method_exists($e, 'getStatusCode')) {
+                $statusCode = $e->getStatusCode();
+            } elseif (method_exists($e, 'getCode') && $e->getCode() > 0) {
+                $statusCode = $e->getCode();
             }
 
             return response()->json([
