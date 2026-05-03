@@ -118,6 +118,7 @@ class RolesAndPermissionsSeeder extends Seeder
             'patients.view',
             'patients.manage',
             'doctors.view',
+            'treatment_plans.view',
         ]);
     }
 }
