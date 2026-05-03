@@ -4,6 +4,7 @@ namespace App\Models\Concerns;
 
 use App\Models\Concerns\CompanyScope;
 use App\Services\Tenant;
+use App\Models\Concerns\BranchScope;
 
 trait BelongsToCompanyTrait
 {

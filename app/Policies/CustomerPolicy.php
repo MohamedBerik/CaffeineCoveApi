@@ -23,7 +23,7 @@ class CustomerPolicy
 
     public function create(User $user): bool
     {
-        return $this->hasAccess($user);
+        return $user->hasPermissionTo('patients.manage');
     }
 
     public function update(User $user, Customer $customer): bool
