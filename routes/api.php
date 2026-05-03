@@ -325,12 +325,14 @@ Route::prefix('erp')
         });
 
         // ==================== DENTAL RECORDS ====================
-        Route::middleware('permission:patients.view')->group(function () {
+        Route::middleware('permission:dental_records.view')->group(function () {
             Route::get('/dental-records', [DentalRecordController::class, 'index']);
             Route::get('/dental-records/{id}', [DentalRecordController::class, 'show']);
         });
-        Route::middleware('permission:patients.manage')->group(function () {
+        Route::middleware('permission:dental_records.create')->group(function () {
             Route::post('/dental-records', [DentalRecordController::class, 'store']);
+        });
+        Route::middleware('permission:dental_records.view')->group(function () {
             Route::put('/dental-records/{id}', [DentalRecordController::class, 'update']);
             Route::delete('/dental-records/{id}', [DentalRecordController::class, 'destroy']);
         });
