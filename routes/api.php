@@ -112,7 +112,7 @@ Route::middleware(['auth:sanctum', 'company.user'])->group(function () {
             'roles' => $user->getRoleNames(),
             'company_id' => Tenant::id(),
             'is_super_admin' => (bool) $user->is_super_admin,
-            'can_switch_branch' => !$user->is_super_admin && $user->branch_id === null,
+            'can_switch_branch' => !$user->is_super_admin && $user->hasRole('admin'),
             'permissions' => $permissions,
         ]);
     });
