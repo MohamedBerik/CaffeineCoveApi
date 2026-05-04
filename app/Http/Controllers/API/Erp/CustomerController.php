@@ -84,29 +84,31 @@ class CustomerController extends Controller
             'status' => ['nullable', Rule::in(['0', '1'])],
         ]);
 
-        // ✅ إنشاء العميل مع branch_id الصريح - لا نعتمد على الـ Trait
-        $customer = DB::transaction(function () use ($companyId, $data, $branchId) {
+        // ✅ ضبط سياق الفرع ليأخذه Trait تلقائياً
+        Tenant::setBranchId($branchId);
+
+        $customer = DB::transaction(function () use ($companyId, $data) {
             $patientCode = $this->generateNextPatientCode($companyId);
 
             return Customer::create([
-                'company_id'  => $companyId,
-                'branch_id'   => $branchId,            // <-- التعيين الصريح
-                'name'        => $data['name'],
-                'email'       => $data['email'] ?? null,
+                'company_id' => $companyId,
+                // branch_id سيملأ تلقائياً من Tenant::branchId() داخل BelongsToCompanyTrait
+                'name'       => $data['name'],
+                'email'      => $data['email'] ?? null,
                 'patient_code' => $patientCode,
-                'phone'       => $data['phone'] ?? null,
+                'phone'      => $data['phone'] ?? null,
                 'date_of_birth' => $data['date_of_birth'] ?? null,
-                'gender'      => $data['gender'] ?? null,
-                'address'     => $data['address'] ?? null,
-                'notes'       => $data['notes'] ?? null,
-                'status'      => $data['status'] ?? '1',
+                'gender'     => $data['gender'] ?? null,
+                'address'    => $data['address'] ?? null,
+                'notes'      => $data['notes'] ?? null,
+                'status'     => $data['status'] ?? '1',
             ]);
         });
 
         return response()->json([
-            'msg'    => 'Created successfully',
+            'msg'  => 'Created successfully',
             'status' => 201,
-            'data'   => new CustomerResource($customer)
+            'data' => new CustomerResource($customer)
         ], 201);
     }
 
