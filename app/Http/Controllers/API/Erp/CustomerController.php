@@ -84,59 +84,39 @@ class CustomerController extends Controller
             'status' => ['nullable', Rule::in(['0', '1'])],
         ]);
 
-        // ✅ تسجيل معلومات التصحيح قبل الإنشاء
-        \Log::info('Customer creation attempt', [
-            'company_id' => $companyId,
-            'branch_id' => $branchId,
-            'tenant_branch_id' => Tenant::branchId(),
-            'header_branch_id' => $request->header('X-Branch-ID'),
-            'name' => $data['name'],
-        ]);
-
         try {
             $customer = DB::transaction(function () use ($companyId, $data, $branchId) {
                 $patientCode = $this->generateNextPatientCode($companyId);
 
-                $customer = Customer::create([
-                    'company_id'  => $companyId,
-                    'branch_id'   => $branchId,
-                    'name'        => $data['name'],
-                    'email'       => $data['email'] ?? null,
+                return Customer::create([
+                    'company_id'   => $companyId,
+                    'branch_id'    => $branchId,
+                    'name'         => $data['name'],
+                    'email'        => $data['email'] ?? null,
                     'patient_code' => $patientCode,
-                    'phone'       => $data['phone'] ?? null,
+                    'phone'        => $data['phone'] ?? null,
                     'date_of_birth' => $data['date_of_birth'] ?? null,
-                    'gender'      => $data['gender'] ?? null,
-                    'address'     => $data['address'] ?? null,
-                    'notes'       => $data['notes'] ?? null,
-                    'status'      => $data['status'] ?? '1',
+                    'gender'       => $data['gender'] ?? null,
+                    'address'      => $data['address'] ?? null,
+                    'notes'        => $data['notes'] ?? null,
+                    'status'       => $data['status'] ?? '1',
                 ]);
-
-                \Log::info('Customer created successfully (inside transaction)', [
-                    'id' => $customer->id,
-                    'branch_id' => $customer->branch_id,
-                ]);
-
-                return $customer;
             });
 
             return response()->json([
-                'msg'  => 'Created successfully',
+                'msg'    => 'Created successfully',
                 'status' => 201,
-                'data' => new CustomerResource($customer)
+                'data'   => new CustomerResource($customer)
             ], 201);
         } catch (\Exception $e) {
             \Log::error('Customer creation failed', [
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString(),
+                'error'      => $e->getMessage(),
                 'company_id' => $companyId,
-                'branch_id' => $branchId,
+                'branch_id'  => $branchId,
             ]);
 
             return response()->json([
-                'message' => 'Server error: ' . $e->getMessage(),
-                'exception' => get_class($e),
-                'file' => $e->getFile(),
-                'line' => $e->getLine(),
+                'message' => 'An error occurred while creating the customer.'
             ], 500);
         }
     }
