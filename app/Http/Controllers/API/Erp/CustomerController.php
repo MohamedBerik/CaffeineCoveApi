@@ -4,6 +4,7 @@ namespace App\Http\Controllers\API\Erp;
 
 use App\Http\Controllers\Controller;
 use App\Http\Resources\CustomerResource;
+use App\Models\Concerns\BranchScope;
 use App\Models\Customer;
 use App\Services\Tenant;
 use Illuminate\Http\Request;
@@ -89,7 +90,7 @@ class CustomerController extends Controller
 
             return Customer::create([
                 'company_id' => $companyId,
-                'branch_id'  => $request->user()->branch_id,
+                'branch_id'  => Tenant::branchId() ?? $request->user()->branch_id,   // ✅ أكثر دقة
                 'name' => $data['name'],
                 'email' => $data['email'] ?? null,
                 'patient_code' => $patientCode,
@@ -101,6 +102,7 @@ class CustomerController extends Controller
                 'status' => $data['status'] ?? '1',
             ]);
         });
+        $customer = Customer::withoutGlobalScope(BranchScope::class)->find($customer->id);
 
         return response()->json([
             'msg' => 'Created successfully',
