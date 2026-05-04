@@ -17,7 +17,6 @@ class Procedure extends Model
     protected $fillable = [
         'company_id',
         'branch_id',
-
         'name',
         'default_price',
         'is_active',

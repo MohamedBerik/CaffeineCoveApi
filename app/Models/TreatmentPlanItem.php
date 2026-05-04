@@ -22,7 +22,6 @@ class TreatmentPlanItem extends Model
     protected $fillable = [
         'company_id',
         'branch_id',
-
         'treatment_plan_id',
         'procedure_id',
         'procedure',

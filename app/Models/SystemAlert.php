@@ -31,7 +31,6 @@ class SystemAlert extends Model
     protected $fillable = [
         'company_id',
         'branch_id',
-
         'code',
         'type',
         'priority',

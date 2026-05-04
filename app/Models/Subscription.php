@@ -9,7 +9,6 @@ class Subscription extends Model
     protected $fillable = [
         'company_id',
         'branch_id',
-
         'plan_id',
         'starts_at',
         'ends_at',

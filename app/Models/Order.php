@@ -22,7 +22,6 @@ class Order extends Model
     protected $fillable = [
         'company_id',
         'branch_id',
-
         'customer_id',
         'status',
         'total',
