@@ -28,7 +28,7 @@ class Kernel extends HttpKernel
         ],
 
         'api' => [
-            \App\Http\Middleware\SetBranchContext::class,
+            // \App\Http\Middleware\SetBranchContext::class,
             \App\Http\Middleware\SanitizeInput::class,
             \App\Http\Middleware\SecurityHeaders::class,
             \App\Http\Middleware\ValidateFileUpload::class,
@@ -50,6 +50,7 @@ class Kernel extends HttpKernel
         'throttle' => \Illuminate\Routing\Middleware\ThrottleRequests::class,
         'verified' => \Illuminate\Auth\Middleware\EnsureEmailIsVerified::class,
         'subscription.active' => \App\Http\Middleware\CheckSubscription::class,
+        'branch.context' => \App\Http\Middleware\SetBranchContext::class,
 
         // ✅ New Clean Middleware (API)
         'admin' => \App\Http\Middleware\EnsureAdmin::class,

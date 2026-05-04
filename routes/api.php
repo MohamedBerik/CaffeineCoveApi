@@ -160,6 +160,7 @@ Route::middleware(['auth:sanctum', 'company.user'])->group(function () {
 */
 Route::prefix('erp')
     ->middleware(['auth:sanctum', 'company.user', 'subscription.active', 'throttle:api'])
+    ->middleware(['auth:sanctum', 'branch.context', 'company.user', 'subscription.active', 'throttle:api'])
     ->group(function () {
 
         // ==================== DASHBOARD & REPORTS ====================

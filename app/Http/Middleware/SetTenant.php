@@ -23,7 +23,7 @@ class SetTenant
 
         // ✅ تعيين branch_id تلقائياً من المستخدم (إذا لم يُرسل يدوياً)
         $tenantIdFromHeader = $request->header('X-Tenant-ID');
-        $branchIdFromHeader = $request->header('X-Branch-ID');
+        // $branchIdFromHeader = $request->header('X-Branch-ID');
 
         $user = $request->user();
 
@@ -39,11 +39,11 @@ class SetTenant
             return $next($request);
         }
 
-        if ($branchIdFromHeader) {
-            Tenant::setBranchId((int) $branchIdFromHeader);
-        } elseif (!$user->is_super_admin && $user->branch_id) {
-            Tenant::setBranchId($user->branch_id);
-        }
+        // if ($branchIdFromHeader) {
+        //     Tenant::setBranchId((int) $branchIdFromHeader);
+        // } elseif (!$user->is_super_admin && $user->branch_id) {
+        //     Tenant::setBranchId($user->branch_id);
+        // }
 
         // ✅ تحسين #2: تبسيط الشرط
         $isGlobalMode = !$tenantIdFromHeader || $tenantIdFromHeader === 'global';
