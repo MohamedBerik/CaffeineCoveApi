@@ -80,6 +80,8 @@ class AuthController extends Controller
      */
     public function login(Request $request)
     {
+        \Log::info('Login endpoint hit', ['email' => $request->email]);
+
         Log::info('Authorization Header:', ['header' => $request->header('Authorization')]);
 
         $request->validate([
