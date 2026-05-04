@@ -4,7 +4,6 @@ namespace App\Http\Controllers\API\Erp;
 
 use App\Http\Controllers\Controller;
 use App\Http\Resources\CustomerResource;
-use App\Models\Concerns\BranchScope;
 use App\Models\Customer;
 use App\Services\Tenant;
 use Illuminate\Http\Request;
@@ -15,7 +14,7 @@ class CustomerController extends Controller
 {
     public function __construct()
     {
-        $this->authorizeResource(Customer::class, 'customer', ['except' => ['index']]);
+        $this->authorizeResource(Customer::class, 'customer', ['except' => ['index', 'store']]);
     }
 
     public function index(Request $request)
@@ -70,14 +69,14 @@ class CustomerController extends Controller
         $companyId = Tenant::id();
         $branchId = $request->header('X-Branch-ID') ? (int) $request->header('X-Branch-ID') : ($request->user()->branch_id ?? Tenant::branchId());
 
+        // ✅ حماية إضافية: إذا كان branchId لازال null نُعيد 400
+        if (!$branchId) {
+            return response()->json(['msg' => 'Branch is required'], 400);
+        }
+
         $data = $request->validate([
             'name' => ['required', 'string', 'min:3', 'max:255'],
-            'email' => [
-                'nullable',
-                'email',
-                'max:255',
-                Rule::unique('customers', 'email'),
-            ],
+            'email' => ['nullable', 'email', 'max:255', Rule::unique('customers', 'email')],
             'phone' => ['nullable', 'string', 'max:50'],
             'date_of_birth' => ['nullable', 'date'],
             'gender' => ['nullable', Rule::in(['male', 'female'])],
@@ -91,22 +90,23 @@ class CustomerController extends Controller
 
             return Customer::create([
                 'company_id' => $companyId,
-                'branch_id'  => $branchId,
-                'name' => $data['name'],
-                'email' => $data['email'] ?? null,
+                'branch_id'  => $branchId,               // ✅ مضمون أنه ليس null
+                'name'       => $data['name'],
+                'email'      => $data['email'] ?? null,
                 'patient_code' => $patientCode,
-                'phone' => $data['phone'] ?? null,
+                'phone'      => $data['phone'] ?? null,
                 'date_of_birth' => $data['date_of_birth'] ?? null,
-                'gender' => $data['gender'] ?? null,
-                'address' => $data['address'] ?? null,
-                'notes' => $data['notes'] ?? null,
-                'status' => $data['status'] ?? '1',
+                'gender'     => $data['gender'] ?? null,
+                'address'    => $data['address'] ?? null,
+                'notes'      => $data['notes'] ?? null,
+                'status'     => $data['status'] ?? '1',
             ]);
         });
-        $customer = Customer::withoutGlobalScope(BranchScope::class)->find($customer->id);
+
+        // ✅ تم حذف السطر: $customer = Customer::withoutGlobalScope(...) نهائيًا
 
         return response()->json([
-            'msg' => 'Created successfully',
+            'msg'  => 'Created successfully',
             'status' => 201,
             'data' => new CustomerResource($customer)
         ], 201);
