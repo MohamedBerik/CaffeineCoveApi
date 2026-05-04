@@ -200,7 +200,7 @@ class CustomerController extends Controller
     private function generateNextPatientCode(int $companyId): string
     {
         $lastCustomer = Customer::query()
-            ->where('company_id', $companyId)               // ✅ أضفنا النطاق
+            ->where('company_id', $companyId)
             ->when(Tenant::branchId(), fn($q, $b) => $q->where('branch_id', $b))
             ->whereNotNull('patient_code')
             ->orderByDesc('id')
