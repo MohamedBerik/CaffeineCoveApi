@@ -18,6 +18,7 @@ class Category extends Model
 
     protected $fillable = [
         'company_id',
+        'branch_id',
         'cate_image',
         'title_en',
         'title_ar',

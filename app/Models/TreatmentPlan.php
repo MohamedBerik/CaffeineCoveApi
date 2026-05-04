@@ -21,6 +21,8 @@ class TreatmentPlan extends Model
 
     protected $fillable = [
         'company_id',
+        'branch_id',
+
         'customer_id',
         'title',
         'notes',

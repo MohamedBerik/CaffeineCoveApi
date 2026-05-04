@@ -20,6 +20,8 @@ class PaymentRefund extends Model
 
     protected $fillable = [
         'company_id',
+        'branch_id',
+
         'payment_id',
         'amount',
         'applies_to',

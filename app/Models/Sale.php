@@ -16,6 +16,8 @@ class Sale extends Model
 
     protected $fillable = [
         'company_id',
+        'branch_id',
+
         'title_en',
         'title_ar',
         'description_en',

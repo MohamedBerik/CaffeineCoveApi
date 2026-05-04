@@ -21,6 +21,8 @@ class SupplierLedgerEntry extends Model
 
     protected $fillable = [
         'company_id',
+        'branch_id',
+
         'supplier_id',
         'purchase_order_id',
         'supplier_payment_id',

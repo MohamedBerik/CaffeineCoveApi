@@ -15,6 +15,7 @@ class ClinicSetting extends Model
 
     protected $fillable = [
         'company_id',
+        'branch_id',
         'clinic_name',
         'phone',
         'email',

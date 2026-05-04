@@ -8,6 +8,7 @@ class BillingInvoice extends Model
 {
     protected $fillable = [
         'company_id',
+        'branch_id',
         'subscription_id',
         'number',
         'amount',

@@ -23,6 +23,8 @@ class CustomerLedgerEntry extends Model
 
     protected $fillable = [
         'company_id',
+        'branch_id',
+
         'customer_id',
         'invoice_id',
         'payment_id',

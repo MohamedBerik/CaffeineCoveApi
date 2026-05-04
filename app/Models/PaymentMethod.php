@@ -8,6 +8,8 @@ class PaymentMethod extends Model
 {
     protected $fillable = [
         'company_id',
+        'branch_id',
+
         'gateway',        // ✅ أضف
         'token',          // ✅ أضف (بدل stripe_id)
         'card_brand',

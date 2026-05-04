@@ -16,6 +16,8 @@ class IdempotencyKey extends Model
 
     protected $fillable = [
         'company_id',
+        'branch_id',
+
         'key',
         'endpoint',
         'request_hash',
