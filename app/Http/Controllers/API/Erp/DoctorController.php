@@ -53,6 +53,7 @@ class DoctorController extends Controller
 
         $doctor = Doctor::create([
             'company_id' => $companyId,
+            'branch_id' => Tenant::branchId() ?? $request->user()->branch_id,
             'name' => $data['name'],
             'phone' => $data['phone'] ?? null,
             'email' => $data['email'] ?? null,
@@ -69,6 +70,7 @@ class DoctorController extends Controller
     public function show(Request $request, $id)
     {
         $doctor = Doctor::query()->findOrFail($id);
+        $this->authorize('view', $doctor);
 
         return response()->json(['msg' => 'Doctor details', 'status' => 200, 'data' => $doctor]);
     }
@@ -76,6 +78,7 @@ class DoctorController extends Controller
     public function update(Request $request, $id)
     {
         $doctor = Doctor::query()->findOrFail($id);
+        $this->authorize('update', $doctor);
 
         $data = $request->validate([
             'name' => [
@@ -101,6 +104,7 @@ class DoctorController extends Controller
     public function destroy(Request $request, $id)
     {
         $doctor = Doctor::query()->findOrFail($id);
+        $this->authorize('delete', $doctor);
 
         $hasAppointments = Appointment::query()
             ->where('doctor_id', $doctor->id)
