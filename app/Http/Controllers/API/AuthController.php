@@ -80,8 +80,6 @@ class AuthController extends Controller
      */
     public function login(Request $request)
     {
-        \Log::info('Login endpoint hit', ['email' => $request->email]);
-
         Log::info('Authorization Header:', ['header' => $request->header('Authorization')]);
 
         $request->validate([
@@ -90,15 +88,9 @@ class AuthController extends Controller
         ]);
 
         // ✅ تجاوز الـ Global Scope عشان نقدر ندور على المستخدم
-        $user = User::withoutGlobalScope(CompanyScope::class)
+        $user = User::withoutGlobalScopes()
             ->where('email', $request->email)
             ->first();
-
-        Log::info('Login attempt', [
-            'email' => $request->email,
-            'password_length' => strlen($request->password),
-            'password_hash' => Hash::check($request->password, $user->password ?? ''),
-        ]);
 
         if (!$user || !Hash::check($request->password, $user->password)) {
             // ✅ Audit Logging
