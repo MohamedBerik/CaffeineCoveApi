@@ -120,6 +120,7 @@ class RolesAndPermissionsSeeder extends Seeder
             'doctors.view',
             'treatment_plans.view',
             'radiology.view',
+            'customers.statements.view',
         ]);
     }
 }

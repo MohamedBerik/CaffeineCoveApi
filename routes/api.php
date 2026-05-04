@@ -240,8 +240,11 @@ Route::prefix('erp')
         Route::middleware('permission:purchases.return')->post('/purchase-orders/{id}/return', [PurchaseOrderController::class, 'returnItems']);
 
         // ==================== STATEMENTS ====================
-        Route::middleware('permission:finance.view')->group(function () {
+        Route::middleware('permission:customers.statements.view')->group(function () {
             Route::get('/customers/{customerId}/statement', [CustomerStatementController::class, 'show']);
+        });
+
+        Route::middleware('permission:finance.view')->group(function () {
             Route::get('/suppliers/{supplier}/statement', [SupplierStatementController::class, 'show']);
             Route::get('/customers/{customerId}/credit-balance', [CustomerCreditController::class, 'show']);
         });
