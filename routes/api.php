@@ -308,14 +308,14 @@ Route::prefix('erp')
         // ==================== CUSTOMERS (PATIENTS) ====================
         Route::middleware('permission:patients.view')->group(function () {
             Route::get('/customers', [CustomerController::class, 'index']);
-            Route::get('/customers/{id}', [CustomerController::class, 'show']);
+            Route::get('/customers/{customer}', [CustomerController::class, 'show']);
             Route::get('/customers/{customerId}/profile', [PatientProfileController::class, 'show']);
             Route::get('/customers/{customerId}/timeline', [PatientTimelineController::class, 'index']);
         });
         Route::middleware('permission:patients.manage')->group(function () {
             Route::post('/customers', [CustomerController::class, 'store']);
-            Route::put('/customers/{id}', [CustomerController::class, 'update']);
-            Route::delete('/customers/{id}', [CustomerController::class, 'destroy']);
+            Route::put('/customers/{customer}', [CustomerController::class, 'update']);
+            Route::delete('/customers/{customer}', [CustomerController::class, 'destroy']);
         });
 
         // ==================== RADIOLOGY ====================

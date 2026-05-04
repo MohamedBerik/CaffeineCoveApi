@@ -13,17 +13,14 @@ class CustomerPolicy
 
     public function viewAny(User $user): bool
     {
-        return $this->hasAccess($user);
+        return true; // سيتم الفلترة عبر BranchScope
     }
 
     public function view(User $user, Customer $customer): bool
     {
-        return $user->hasPermissionTo('patients.view') && $this->hasAccess($user, $customer->company_id);
-    }
-
-    public function update(User $user, Customer $customer): bool
-    {
-        return $user->hasPermissionTo('patients.manage') && $this->hasAccess($user, $customer->company_id);
+        return $user->hasPermissionTo('patients.view')
+            && $this->hasCompanyAccess($user, $customer->company_id)
+            && $this->hasBranchAccess($user, $customer->branch_id);
     }
 
     public function create(User $user): bool
@@ -31,24 +28,51 @@ class CustomerPolicy
         return $user->hasPermissionTo('patients.manage');
     }
 
-
+    public function update(User $user, Customer $customer): bool
+    {
+        return $user->hasPermissionTo('patients.manage')
+            && $this->hasCompanyAccess($user, $customer->company_id)
+            && $this->hasBranchAccess($user, $customer->branch_id);
+    }
 
     public function delete(User $user, Customer $customer): bool
     {
-        return $this->hasAccess($user, $customer->company_id);
+        return $user->hasPermissionTo('patients.manage')
+            && $this->hasCompanyAccess($user, $customer->company_id)
+            && $this->hasBranchAccess($user, $customer->branch_id);
     }
 
-    private function hasAccess(User $user, $companyId = null): bool
+    /**
+     * التحقق من أن المستخدم ينتمي لنفس الشركة.
+     */
+    private function hasCompanyAccess(User $user, $companyId): bool
     {
-        // Super Admin
-        if ($user->is_super_admin) {
-            if (Tenant::hasTenant()) {
-                return $companyId == Tenant::id();
-            }
+        // Super Admin في وضع Global يرى الكل
+        if ($user->is_super_admin && !Tenant::hasTenant()) {
             return true;
         }
-
-        // User عادي
+        // غير ذلك، يجب أن يتطابق company_id
         return $companyId == $user->company_id;
+    }
+
+    /**
+     * التحقق من عزل الفروع.
+     */
+    private function hasBranchAccess(User $user, $branchId): bool
+    {
+        // Super Admin يرى الكل
+        if ($user->is_super_admin) {
+            return true;
+        }
+        // إذا لم يكن للمستخدم فرع (مدير شركة)، يرى الكل
+        if ($user->branch_id === null) {
+            return true;
+        }
+        // إذا لم يكن للسجل فرع (بيانات قديمة)، اسمح (أو يمكنك رفض حسب الحاجة)
+        if ($branchId === null) {
+            return true;
+        }
+        // يجب أن يتطابق فرع المستخدم مع فرع المريض
+        return $branchId == $user->branch_id;
     }
 }

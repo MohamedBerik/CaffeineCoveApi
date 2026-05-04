@@ -14,7 +14,7 @@ class CustomerController extends Controller
 {
     public function __construct()
     {
-        $this->authorizeResource(Customer::class, 'customer', ['except' => ['index', 'store', 'update']]);
+        $this->authorizeResource(Customer::class, 'customer');
     }
 
     public function index(Request $request)
@@ -45,18 +45,8 @@ class CustomerController extends Controller
         ]);
     }
 
-    public function show(Request $request, $id)
+    public function show(Customer $customer)
     {
-        $customer = Customer::query()->find($id);
-
-        if (!$customer) {
-            return response()->json([
-                'msg' => 'Customer not found',
-                'status' => 404,
-                'data' => null
-            ], 404);
-        }
-
         return response()->json([
             'msg' => 'Customer details',
             'status' => 200,
@@ -121,18 +111,9 @@ class CustomerController extends Controller
         }
     }
 
-    public function update(Request $request, $id)
+    public function update(Request $request, Customer $customer)
     {
-        $customer = Customer::query()->find($id);
-
-        if (!$customer) {
-            return response()->json([
-                'msg' => 'Customer not found',
-                'status' => 404,
-                'data' => null
-            ], 404);
-        }
-
+        // النموذج موجود، ولا حاجة لـ find يدوي
         $data = $request->validate([
             'name' => ['sometimes', 'required', 'string', 'min:3', 'max:255'],
             'email' => [
@@ -175,21 +156,9 @@ class CustomerController extends Controller
             'data' => new CustomerResource($customer)
         ]);
     }
-
-    public function destroy(Request $request, $id)
+    public function destroy(Customer $customer)
     {
-        $customer = Customer::query()->find($id);
-
-        if (!$customer) {
-            return response()->json([
-                'msg' => 'Customer not found',
-                'status' => 404,
-                'data' => null
-            ], 404);
-        }
-
         $customer->delete();
-
         return response()->json([
             'msg' => 'Deleted successfully',
             'status' => 200,
