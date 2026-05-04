@@ -88,9 +88,11 @@ class AuthController extends Controller
         ]);
 
         // ✅ تجاوز الـ Global Scope عشان نقدر ندور على المستخدم
-        $user = User::withoutGlobalScopes()
-            ->where('email', $request->email)
-            ->first();
+        $user = Tenant::asSuperAdmin(function () use ($request) {
+            return User::withoutGlobalScopes()
+                ->where('email', $request->email)
+                ->first();
+        });
 
         if (!$user || !Hash::check($request->password, $user->password)) {
             // ✅ Audit Logging
