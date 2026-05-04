@@ -93,7 +93,6 @@ class CustomerController extends Controller
             return Customer::create([
                 'company_id' => $companyId,
                 'branch_id'  => $branchId,         // ✅ إضافة هذا السطر
-
                 'name'       => $data['name'],
                 'email'      => $data['email'] ?? null,
                 'patient_code' => $patientCode,
