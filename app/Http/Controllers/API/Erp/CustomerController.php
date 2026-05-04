@@ -69,6 +69,7 @@ class CustomerController extends Controller
         $companyId = Tenant::id();
         $branchId = (int) $request->header('X-Branch-ID') ?: Tenant::branchId();
 
+        // ✅ حماية إضافية
         if (!$branchId) {
             return response()->json(['msg' => 'Branch is required'], 400);
         }
@@ -84,32 +85,63 @@ class CustomerController extends Controller
             'status' => ['nullable', Rule::in(['0', '1'])],
         ]);
 
-        // ✅ ضبط سياق الفرع ليأخذه Trait تلقائياً
-        Tenant::setBranchId($branchId);
+        try {
+            $customer = DB::transaction(function () use ($companyId, $data, $branchId) {
+                $patientCode = $this->generateNextPatientCode($companyId);
 
-        $customer = DB::transaction(function () use ($companyId, $data) {
-            $patientCode = $this->generateNextPatientCode($companyId);
+                // ✅ تسجيل معلومات التصحيح قبل الإنشاء
+                \Log::info('Customer creation attempt', [
+                    'company_id' => $companyId,
+                    'branch_id' => $branchId,
+                    'tenant_branch_id' => Tenant::branchId(),
+                    'header_branch_id' => $request->header('X-Branch-ID'),
+                    'name' => $data['name'],
+                ]);
 
-            return Customer::create([
+                $customer = Customer::create([
+                    'company_id'  => $companyId,
+                    'branch_id'   => $branchId,            // <-- التعيين الصريح
+                    'name'        => $data['name'],
+                    'email'       => $data['email'] ?? null,
+                    'patient_code' => $patientCode,
+                    'phone'       => $data['phone'] ?? null,
+                    'date_of_birth' => $data['date_of_birth'] ?? null,
+                    'gender'      => $data['gender'] ?? null,
+                    'address'     => $data['address'] ?? null,
+                    'notes'       => $data['notes'] ?? null,
+                    'status'      => $data['status'] ?? '1',
+                ]);
+
+                // ✅ تسجيل النجاح مع الـ ID الجديد
+                \Log::info('Customer created successfully', [
+                    'id' => $customer->id,
+                    'branch_id' => $customer->branch_id,
+                ]);
+
+                return $customer;
+            });
+
+            return response()->json([
+                'msg'  => 'Created successfully',
+                'status' => 201,
+                'data' => new CustomerResource($customer)
+            ], 201);
+        } catch (\Exception $e) {
+            // ✅ تسجيل الخطأ بالتفصيل
+            \Log::error('Customer creation failed', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
                 'company_id' => $companyId,
-                // branch_id سيملأ تلقائياً من Tenant::branchId() داخل BelongsToCompanyTrait
-                'name'       => $data['name'],
-                'email'      => $data['email'] ?? null,
-                'patient_code' => $patientCode,
-                'phone'      => $data['phone'] ?? null,
-                'date_of_birth' => $data['date_of_birth'] ?? null,
-                'gender'     => $data['gender'] ?? null,
-                'address'    => $data['address'] ?? null,
-                'notes'      => $data['notes'] ?? null,
-                'status'     => $data['status'] ?? '1',
+                'branch_id' => $branchId,
             ]);
-        });
 
-        return response()->json([
-            'msg'  => 'Created successfully',
-            'status' => 201,
-            'data' => new CustomerResource($customer)
-        ], 201);
+            return response()->json([
+                'message' => 'Server error: ' . $e->getMessage(),
+                'exception' => get_class($e),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+            ], 500);
+        }
     }
 
     public function update(Request $request, $id)
