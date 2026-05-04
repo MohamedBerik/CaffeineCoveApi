@@ -18,7 +18,12 @@ class CustomerPolicy
 
     public function view(User $user, Customer $customer): bool
     {
-        return $this->hasAccess($user, $customer->company_id);
+        return $user->hasPermissionTo('patients.view') && $this->hasAccess($user, $customer->company_id);
+    }
+
+    public function update(User $user, Customer $customer): bool
+    {
+        return $user->hasPermissionTo('patients.manage') && $this->hasAccess($user, $customer->company_id);
     }
 
     public function create(User $user): bool
@@ -26,10 +31,7 @@ class CustomerPolicy
         return $user->hasPermissionTo('patients.manage');
     }
 
-    public function update(User $user, Customer $customer): bool
-    {
-        return $this->hasAccess($user, $customer->company_id);
-    }
+
 
     public function delete(User $user, Customer $customer): bool
     {
