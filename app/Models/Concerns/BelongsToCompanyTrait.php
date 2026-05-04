@@ -57,8 +57,9 @@ trait BelongsToCompanyTrait
             $model->company_id = $companyId;
 
             // ✅ إضافة branch_id تلقائياً (لو موجود في السياق)
-            if (empty($model->branch_id) && Tenant::branchId()) {
-                $model->branch_id = Tenant::branchId();
+            $resolvedBranchId = app()->has('tenant_branch_id') ? app('tenant_branch_id') : Tenant::branchId();
+            if (empty($model->branch_id) && $resolvedBranchId) {
+                $model->branch_id = $resolvedBranchId;
             }
         });
 
