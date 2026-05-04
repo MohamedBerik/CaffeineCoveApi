@@ -18,9 +18,22 @@ class DoctorPolicy
 
     public function view(User $user, Doctor $doctor): bool
     {
-        return $user->hasPermissionTo('doctors.view')
-            && $this->hasCompanyAccess($user, $doctor->company_id)
-            && $this->hasBranchAccess($user, $doctor->branch_id);
+        $hasPerm = $user->hasPermissionTo('doctors.view');
+        $companyOk = $this->hasCompanyAccess($user, $doctor->company_id);
+        $branchOk = $this->hasBranchAccess($user, $doctor->branch_id);
+
+        \Log::info('DoctorPolicy view check', [
+            'user_id' => $user->id,
+            'user_branch' => $user->branch_id,
+            'doctor_id' => $doctor->id,
+            'doctor_branch' => $doctor->branch_id,
+            'dr_company' => $doctor->company_id,
+            'hasPerm' => $hasPerm,
+            'companyOk' => $companyOk,
+            'branchOk' => $branchOk,
+        ]);
+
+        return $hasPerm && $companyOk && $branchOk;
     }
 
     public function create(User $user): bool
