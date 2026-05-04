@@ -69,7 +69,6 @@ class CustomerController extends Controller
         $companyId = Tenant::id();
         $branchId = (int) $request->header('X-Branch-ID') ?: Tenant::branchId();
 
-        // ✅ حماية إضافية
         if (!$branchId) {
             return response()->json(['msg' => 'Branch is required'], 400);
         }
@@ -85,22 +84,22 @@ class CustomerController extends Controller
             'status' => ['nullable', Rule::in(['0', '1'])],
         ]);
 
+        // ✅ تسجيل معلومات التصحيح قبل الإنشاء
+        \Log::info('Customer creation attempt', [
+            'company_id' => $companyId,
+            'branch_id' => $branchId,
+            'tenant_branch_id' => Tenant::branchId(),
+            'header_branch_id' => $request->header('X-Branch-ID'),
+            'name' => $data['name'],
+        ]);
+
         try {
             $customer = DB::transaction(function () use ($companyId, $data, $branchId) {
                 $patientCode = $this->generateNextPatientCode($companyId);
 
-                // ✅ تسجيل معلومات التصحيح قبل الإنشاء
-                \Log::info('Customer creation attempt', [
-                    'company_id' => $companyId,
-                    'branch_id' => $branchId,
-                    'tenant_branch_id' => Tenant::branchId(),
-                    'header_branch_id' => $request->header('X-Branch-ID'),
-                    'name' => $data['name'],
-                ]);
-
                 $customer = Customer::create([
                     'company_id'  => $companyId,
-                    'branch_id'   => $branchId,            // <-- التعيين الصريح
+                    'branch_id'   => $branchId,
                     'name'        => $data['name'],
                     'email'       => $data['email'] ?? null,
                     'patient_code' => $patientCode,
@@ -112,8 +111,7 @@ class CustomerController extends Controller
                     'status'      => $data['status'] ?? '1',
                 ]);
 
-                // ✅ تسجيل النجاح مع الـ ID الجديد
-                \Log::info('Customer created successfully', [
+                \Log::info('Customer created successfully (inside transaction)', [
                     'id' => $customer->id,
                     'branch_id' => $customer->branch_id,
                 ]);
@@ -127,7 +125,6 @@ class CustomerController extends Controller
                 'data' => new CustomerResource($customer)
             ], 201);
         } catch (\Exception $e) {
-            // ✅ تسجيل الخطأ بالتفصيل
             \Log::error('Customer creation failed', [
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
