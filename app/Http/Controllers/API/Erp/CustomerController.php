@@ -68,6 +68,7 @@ class CustomerController extends Controller
     public function store(Request $request)
     {
         $companyId = Tenant::id();
+        $branchId = $request->header('X-Branch-ID') ? (int) $request->header('X-Branch-ID') : ($request->user()->branch_id ?? Tenant::branchId());
 
         $data = $request->validate([
             'name' => ['required', 'string', 'min:3', 'max:255'],
@@ -85,12 +86,12 @@ class CustomerController extends Controller
             'status' => ['nullable', Rule::in(['0', '1'])],
         ]);
 
-        $customer = DB::transaction(function () use ($companyId, $data, $request) {
+        $customer = DB::transaction(function () use ($companyId, $data, $branchId) {
             $patientCode = $this->generateNextPatientCode($companyId);
 
             return Customer::create([
                 'company_id' => $companyId,
-                'branch_id'  => Tenant::branchId() ?? $request->user()->branch_id,   // ✅ أكثر دقة
+                'branch_id'  => $branchId,
                 'name' => $data['name'],
                 'email' => $data['email'] ?? null,
                 'patient_code' => $patientCode,
