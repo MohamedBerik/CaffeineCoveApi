@@ -12,8 +12,11 @@ class BranchScope implements Scope
 {
     public function apply(Builder $builder, Model $model)
     {
-        // لو مفيش Branch Context، خروج من غير فلترة
-        if (!Tenant::branchId()) {
+        $branchId = app()->has('tenant_branch_id')
+            ? app('tenant_branch_id')
+            : Tenant::branchId();
+
+        if (!$branchId) {
             return;
         }
 
@@ -23,6 +26,6 @@ class BranchScope implements Scope
         }
 
         // تطبيق الفلترة
-        $builder->where($model->getTable() . '.branch_id', Tenant::branchId());
+        $builder->where($model->getTable() . '.branch_id', $branchId);
     }
 }

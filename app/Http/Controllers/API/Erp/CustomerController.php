@@ -67,8 +67,7 @@ class CustomerController extends Controller
     public function store(Request $request)
     {
         $companyId = Tenant::id();
-        $branchId = $request->header('X-Branch-ID') ? (int) $request->header('X-Branch-ID') : ($request->user()->branch_id ?? Tenant::branchId());
-
+        $branchId = (int) $request->header('X-Branch-ID') ?: Tenant::branchId();
         // ✅ حماية إضافية: إذا كان branchId لازال null نُعيد 400
         if (!$branchId) {
             return response()->json(['msg' => 'Branch is required'], 400);
@@ -84,6 +83,11 @@ class CustomerController extends Controller
             'notes' => ['nullable', 'string'],
             'status' => ['nullable', Rule::in(['0', '1'])],
         ]);
+
+        // ✅ تثبيت الـ branch في الـ Tenant Context لتفادي أي mismatch
+        if ($branchId) {
+            app()->instance('tenant_branch_id', $branchId);
+        }
 
         $customer = DB::transaction(function () use ($companyId, $data, $branchId) {
             $patientCode = $this->generateNextPatientCode($companyId);
@@ -102,7 +106,8 @@ class CustomerController extends Controller
             ]);
         });
 
-        // ✅ تم حذف السطر: $customer = Customer::withoutGlobalScope(...) نهائيًا
+        // ✅ إعادة تحميل بدون Scopes لتفادي ModelNotFoundException
+        $customer = Customer::withoutGlobalScopes()->find($customer->id);
 
         return response()->json([
             'msg'  => 'Created successfully',
