@@ -92,7 +92,7 @@ class AuthController extends Controller
             ->where('email', $request->email)
             ->first();
 
-        \Log::info('Login attempt', [
+        Log::info('Login attempt', [
             'email' => $request->email,
             'password_length' => strlen($request->password),
             'password_hash' => Hash::check($request->password, $user->password ?? ''),
