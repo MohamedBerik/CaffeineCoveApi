@@ -299,7 +299,7 @@ Route::prefix('erp')
         // ==================== DOCTORS ====================
         Route::middleware('permission:doctors.view')->group(function () {
             Route::get('/doctors', [DoctorController::class, 'index']);
-            Route::get('/doctors/{id}', [DoctorController::class, 'show']);
+            Route::get('/doctors/{doctor}', [DoctorController::class, 'show']);
             Route::get('/doctors/{doctorId}/availability', [DoctorAvailabilityController::class, 'show']);
         });
         Route::middleware('permission:doctors.manage')->group(function () {

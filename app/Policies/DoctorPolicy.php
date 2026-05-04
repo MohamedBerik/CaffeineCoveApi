@@ -13,40 +13,59 @@ class DoctorPolicy
 
     public function viewAny(User $user): bool
     {
-        return $this->hasAccess($user);
+        return $user->hasPermissionTo('doctors.view');
     }
 
     public function view(User $user, Doctor $doctor): bool
     {
-        return $this->hasAccess($user, $doctor->company_id);
+        return $user->hasPermissionTo('doctors.view')
+            && $this->hasCompanyAccess($user, $doctor->company_id)
+            && $this->hasBranchAccess($user, $doctor->branch_id);
     }
 
     public function create(User $user): bool
     {
-        return $this->hasAccess($user);
+        return $user->hasPermissionTo('doctors.manage');
     }
 
     public function update(User $user, Doctor $doctor): bool
     {
-        return $this->hasAccess($user, $doctor->company_id);
+        return $user->hasPermissionTo('doctors.manage')
+            && $this->hasCompanyAccess($user, $doctor->company_id)
+            && $this->hasBranchAccess($user, $doctor->branch_id);
     }
 
     public function delete(User $user, Doctor $doctor): bool
     {
-        return $this->hasAccess($user, $doctor->company_id);
+        return $user->hasPermissionTo('doctors.manage')
+            && $this->hasCompanyAccess($user, $doctor->company_id)
+            && $this->hasBranchAccess($user, $doctor->branch_id);
     }
 
-    private function hasAccess(User $user, $companyId = null): bool
+    private function hasCompanyAccess(User $user, $companyId): bool
     {
-        // Super Admin
-        if ($user->is_super_admin) {
-            if (Tenant::hasTenant()) {
-                return $companyId == Tenant::id();
-            }
+        // Super Admin في وضع Global يرى الكل
+        if ($user->is_super_admin && !Tenant::hasTenant()) {
             return true;
         }
-
-        // User عادي
         return $companyId == $user->company_id;
+    }
+
+    private function hasBranchAccess(User $user, $branchId): bool
+    {
+        // Super Admin يرى الكل
+        if ($user->is_super_admin) {
+            return true;
+        }
+        // مدير الشركة (بدون فرع) يرى الكل
+        if ($user->branch_id === null) {
+            return true;
+        }
+        // بيانات قديمة بدون فرع – اسمح بها (يمكن تغييرها إذا أردت منعها)
+        if ($branchId === null) {
+            return true;
+        }
+        // يجب أن يتطابق فرع المستخدم مع فرع الطبيب
+        return $branchId == $user->branch_id;
     }
 }
