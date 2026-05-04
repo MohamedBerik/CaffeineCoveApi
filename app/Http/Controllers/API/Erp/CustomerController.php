@@ -68,6 +68,7 @@ class CustomerController extends Controller
     {
         $companyId = Tenant::id();
         $branchId = (int) $request->header('X-Branch-ID') ?: Tenant::branchId();
+
         // ✅ حماية إضافية: إذا كان branchId لازال null نُعيد 400
         if (!$branchId) {
             return response()->json(['msg' => 'Branch is required'], 400);
