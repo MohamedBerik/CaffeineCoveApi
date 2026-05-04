@@ -84,7 +84,7 @@ class CustomerController extends Controller
             'status' => ['nullable', Rule::in(['0', '1'])],
         ]);
 
-        $customer = DB::transaction(function () use ($companyId, $data) {
+        $customer = DB::transaction(function () use ($companyId, $data, $request) {
             $patientCode = $this->generateNextPatientCode($companyId);
 
             return Customer::create([
