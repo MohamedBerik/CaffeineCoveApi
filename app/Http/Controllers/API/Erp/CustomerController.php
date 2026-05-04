@@ -74,6 +74,8 @@ class CustomerController extends Controller
             return response()->json(['msg' => 'Branch is required'], 400);
         }
 
+        Tenant::setBranchId($branchId);
+
         $data = $request->validate([
             'name' => ['required', 'string', 'min:3', 'max:255'],
             'email' => ['nullable', 'email', 'max:255', Rule::unique('customers', 'email')],
@@ -84,11 +86,6 @@ class CustomerController extends Controller
             'notes' => ['nullable', 'string'],
             'status' => ['nullable', Rule::in(['0', '1'])],
         ]);
-
-        // ✅ تثبيت الـ branch في الـ Tenant Context لتفادي أي mismatch
-        if ($branchId) {
-            app()->instance('tenant_branch_id', $branchId);
-        }
 
         $customer = DB::transaction(function () use ($companyId, $data, $branchId) {
             $patientCode = $this->generateNextPatientCode($companyId);
@@ -106,9 +103,6 @@ class CustomerController extends Controller
                 'status'     => $data['status'] ?? '1',
             ]);
         });
-
-        // ✅ إعادة تحميل بدون Scopes لتفادي ModelNotFoundException
-        $customer = Customer::withoutGlobalScopes()->find($customer->id);
 
         return response()->json([
             'msg'  => 'Created successfully',
@@ -196,13 +190,14 @@ class CustomerController extends Controller
     private function generateNextPatientCode(int $companyId): string
     {
         $lastCustomer = Customer::query()
+            ->where('company_id', $companyId)               // ✅ أضفنا النطاق
+            ->when(Tenant::branchId(), fn($q, $b) => $q->where('branch_id', $b))
             ->whereNotNull('patient_code')
             ->orderByDesc('id')
             ->lockForUpdate()
             ->first();
 
         $nextNumber = 1;
-
         if ($lastCustomer && preg_match('/(\d+)$/', (string) $lastCustomer->patient_code, $matches)) {
             $nextNumber = ((int) $matches[1]) + 1;
         }

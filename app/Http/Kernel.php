@@ -8,7 +8,6 @@ use Illuminate\Foundation\Http\Kernel as HttpKernel;
 class Kernel extends HttpKernel
 {
     protected $middleware = [
-        // \App\Http\Middleware\TrustHosts::class,
         \App\Http\Middleware\TrustProxies::class,
         \Fruitcake\Cors\HandleCors::class,
         \App\Http\Middleware\PreventRequestsDuringMaintenance::class,
@@ -28,13 +27,13 @@ class Kernel extends HttpKernel
         ],
 
         'api' => [
-            // \App\Http\Middleware\SetBranchContext::class,
             \App\Http\Middleware\SanitizeInput::class,
             \App\Http\Middleware\SecurityHeaders::class,
             \App\Http\Middleware\ValidateFileUpload::class,
             'throttle:api',
             \Illuminate\Routing\Middleware\SubstituteBindings::class,
             \App\Http\Middleware\SetTenant::class,
+            \App\Http\Middleware\SetBranchContext::class,
         ],
     ];
 

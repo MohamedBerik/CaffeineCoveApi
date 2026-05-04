@@ -10,6 +10,8 @@ use Illuminate\Support\Facades\Schema;
 
 class BranchScope implements Scope
 {
+    protected static $hasBranchColumnCache = [];
+
     public function apply(Builder $builder, Model $model)
     {
         $branchId = app()->has('tenant_branch_id')
@@ -20,12 +22,16 @@ class BranchScope implements Scope
             return;
         }
 
-        // ✅ التحقق من وجود عمود branch_id في جدول الـ Model
-        if (!Schema::hasColumn($model->getTable(), 'branch_id')) {
-            return; // تجاهل الـ Model ده
+        $table = $model->getTable();
+
+        if (!isset(self::$hasBranchColumnCache[$table])) {
+            self::$hasBranchColumnCache[$table] = Schema::hasColumn($table, 'branch_id');
         }
 
-        // تطبيق الفلترة
+        if (!self::$hasBranchColumnCache[$table]) {
+            return;
+        }
+
         $builder->where($model->getTable() . '.branch_id', $branchId);
     }
 }
