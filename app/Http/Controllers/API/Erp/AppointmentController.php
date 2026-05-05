@@ -293,6 +293,7 @@ class AppointmentController extends Controller
                 'invoice:id,number,appointment_id,treatment_plan_id,status,total'
             ])
             ->findOrFail($id);
+        $this->authorize('view', $appointment);   // ✅ أضف هذا السطر
 
         // ✅ التحقق من الصلاحية
         $this->authorize('view', $appointment);
@@ -339,6 +340,7 @@ class AppointmentController extends Controller
     public function update(Request $request, $id)
     {
         $appointment = Appointment::query()->findOrFail($id);
+        $this->authorize('update', $appointment); // ✅ أضف هذا السطر
 
         $v = Validator::make($request->all(), [
             'notes'  => ['nullable', 'string'],
@@ -430,6 +432,7 @@ class AppointmentController extends Controller
     public function destroy(Request $request, $id)
     {
         $appointment = Appointment::query()->findOrFail($id);
+        $this->authorize('delete', $appointment); // ✅ أضف هذا السطر
 
         // ✅ أضف Logging قبل الحذف
         ActivityLogger::log(

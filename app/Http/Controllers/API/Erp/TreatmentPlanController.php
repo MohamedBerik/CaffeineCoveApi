@@ -642,6 +642,7 @@ class TreatmentPlanController extends Controller
 
             $appointment = Appointment::create([
                 'company_id' => $companyId,
+                'branch_id' => Tenant::branchId() ?? $request->user()->branch_id,
                 'patient_id' => $plan->customer_id,
                 'doctor_id' => $doctor->id,
                 'doctor_name' => $doctor->name ?? 'Doctor',
