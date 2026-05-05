@@ -24,17 +24,59 @@ class AppointmentPolicy
 
     public function view(User $user, Appointment $appointment): bool
     {
-        return $user->is_super_admin || $appointment->company_id === $user->company_id;
+        if ($user->is_super_admin) {
+            return true;
+        }
+
+        // نفس الشركة
+        if ($appointment->company_id !== $user->company_id) {
+            return false;
+        }
+
+        // ✅ شرط الفرع
+        if (!is_null($user->branch_id)) {
+            return $appointment->branch_id === $user->branch_id;
+        }
+
+        return true;
     }
 
     public function update(User $user, Appointment $appointment): bool
     {
-        return $user->is_super_admin || $appointment->company_id === $user->company_id;
+        if ($user->is_super_admin) {
+            return true;
+        }
+
+        // نفس الشركة
+        if ($appointment->company_id !== $user->company_id) {
+            return false;
+        }
+
+        // ✅ شرط الفرع
+        if (!is_null($user->branch_id)) {
+            return $appointment->branch_id === $user->branch_id;
+        }
+
+        return true;
     }
 
     public function delete(User $user, Appointment $appointment): bool
     {
-        return $user->is_super_admin || $appointment->company_id === $user->company_id;
+        if ($user->is_super_admin) {
+            return true;
+        }
+
+        // نفس الشركة
+        if ($appointment->company_id !== $user->company_id) {
+            return false;
+        }
+
+        // ✅ شرط الفرع
+        if (!is_null($user->branch_id)) {
+            return $appointment->branch_id === $user->branch_id;
+        }
+
+        return true;
     }
 
     public function create(User $user): bool

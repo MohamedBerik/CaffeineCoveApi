@@ -293,7 +293,6 @@ class AppointmentController extends Controller
                 'invoice:id,number,appointment_id,treatment_plan_id,status,total'
             ])
             ->findOrFail($id);
-        $this->authorize('view', $appointment);   // ✅ أضف هذا السطر
 
         // ✅ التحقق من الصلاحية
         $this->authorize('view', $appointment);
