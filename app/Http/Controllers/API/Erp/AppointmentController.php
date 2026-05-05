@@ -42,6 +42,7 @@ class AppointmentController extends Controller
 
     public function index(Request $request)
     {
+        $user = $request->user();
         $query = Appointment::query()
             ->with([
                 'patient:id,name,email,company_id',
@@ -50,6 +51,11 @@ class AppointmentController extends Controller
             ])
             ->orderByDesc('appointment_date')
             ->orderByDesc('appointment_time');
+
+        // ✅ فلترة حسب الفرع للمستخدمين العاديين
+        if (!$user->is_super_admin && $user->branch_id !== null) {
+            $query->where('appointments.branch_id', $user->branch_id);
+        }
 
         if ($search = trim((string) $request->get('search', ''))) {
             $query->where(function ($q) use ($search) {
@@ -227,6 +233,7 @@ class AppointmentController extends Controller
             try {
                 $appointment = Appointment::create([
                     'company_id' => $companyId,
+                    'branch_id'  => Tenant::branchId() ?? $request->user()->branch_id,   // ✅ أضف هذا
                     'patient_id' => $data['patient_id'],
                     'doctor_id' => $doctor->id,
                     'doctor_name' => $doctorName,
@@ -883,6 +890,7 @@ class AppointmentController extends Controller
 
             $appointment = Appointment::create([
                 'company_id' => $companyId,
+                'branch_id'  => Tenant::branchId() ?? $request->user()->branch_id,   // ✅ أضف هذا
                 'patient_id' => $data['patient_id'],
                 'doctor_id' => $doctorId,
                 'doctor_name' => $doctorName,
