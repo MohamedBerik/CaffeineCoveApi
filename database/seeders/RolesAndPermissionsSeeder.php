@@ -115,6 +115,7 @@ class RolesAndPermissionsSeeder extends Seeder
         $receptionistRole->syncPermissions([
             'appointments.view',
             'appointments.manage',
+            'appointments.complete',
             'patients.view',
             'patients.manage',
             'doctors.view',
