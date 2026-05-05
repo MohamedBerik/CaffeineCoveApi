@@ -217,13 +217,13 @@ Route::prefix('erp')
         // 1. قائمة الفواتير، التفاصيل الكاملة، وإدخالات اليومية – محمية للمستخدمين الماليين فقط
         Route::middleware('permission:finance.view')->group(function () {
             Route::get('/invoices', [InvoiceController::class, 'indexErp']);
+            Route::get('/invoices/{id}/full', [InvoiceController::class, 'showFullInvoice']);
             Route::get('/invoices/{invoiceId}/journal-entries', [InvoiceJournalController::class, 'index']);
         });
 
         // 2. عرض الفاتورة الواحدة، تسجيل المدفوعات، تطبيق الأرصدة – متاحة لموظف الاستقبال (invoices.pay)
         Route::middleware('permission:invoices.pay')->group(function () {
             Route::get('/invoices/{invoice}', [InvoiceController::class, 'show']);   // استخدم {invoice} لو تستخدم Route Model Binding
-            Route::get('/invoices/{id}/full', [InvoiceController::class, 'showFullInvoice']);
             Route::post('/invoices/{invoice}/payments', [InvoicePaymentController::class, 'store']);
             Route::post('/invoices/{invoice}/apply-credit', [InvoicePaymentController::class, 'applyCustomerCredit']);
         });
