@@ -30,6 +30,8 @@ use App\Traits\HandlesAppointmentReminders;
 use App\Events\DashboardUpdated;
 use App\Services\InsightService;
 use App\Events\InsightGenerated;
+use App\Models\Concerns\BranchScope;
+
 
 class AppointmentController extends Controller
 {
@@ -258,6 +260,8 @@ class AppointmentController extends Controller
 
                 throw $e;
             }
+
+            $this->createConsultationInvoiceIfMissing($appointment, $request);
 
             ActivityLogger::log(
                 $companyId,
@@ -1054,17 +1058,28 @@ class AppointmentController extends Controller
             ]);
 
             if ($appointmentType === 'consultation') {
-                $existingConsultationInvoice = Invoice::query()
+                // ابحث عن الفاتورة مع تجاهل BranchScope (لأن الفاتورة قد تكون بدون فرع أو من فرع آخر)
+                $existingConsultationInvoice = Invoice::withoutGlobalScope(\App\Models\Concerns\BranchScope::class)
                     ->where('appointment_id', $appointment->id)
                     ->lockForUpdate()
                     ->first();
 
+                // إذا لم توجد فاتورة، قم بإنشائها الآن
+                if (!$existingConsultationInvoice) {
+                    $this->createConsultationInvoiceIfMissing($appointment, $request);
+                    // حاول مرة أخرى
+                    $existingConsultationInvoice = Invoice::withoutGlobalScope(\App\Models\Concerns\BranchScope::class)
+                        ->where('appointment_id', $appointment->id)
+                        ->first();
+                }
+
+                // إذا ما زالت غير موجودة، أبلغ بخطأ
                 if (!$existingConsultationInvoice) {
                     return response()->json([
-                        'msg' => 'Consultation invoice not found for this appointment',
+                        'msg' => 'Consultation invoice could not be found or created.',
                         'status' => 422,
                         'errors' => [
-                            'appointment' => ['This consultation appointment has no linked invoice.'],
+                            'appointment' => ['This consultation appointment has no linked invoice and we were unable to create one.'],
                         ],
                     ], 422);
                 }
@@ -1181,7 +1196,7 @@ class AppointmentController extends Controller
                     ], 422);
                 }
 
-                $treatmentServiceProduct = \App\Models\Product::query()
+                $treatmentServiceProduct = \App\Models\Product::withoutGlobalScope(\App\Models\Concerns\BranchScope::class)
                     ->where('title_en', 'Appointment Service')
                     ->first();
 
