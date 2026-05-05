@@ -53,23 +53,13 @@ class DoctorPolicy
 
     private function hasBranchAccess(User $user, $branchId): bool
     {
-        // Super Admin يرى الكل
         if ($user->is_super_admin) {
             return true;
         }
-
-        // مدير الشركة (بدون فرع) يرى جميع الأطباء في جميع الفروع
         if ($user->branch_id === null) {
-            return true;
+            return true; // مدير الشركة يرى الكل
         }
-
-        // إذا كان الطبيب بدون فرع (بيانات قديمة)، يمكنك إما السماح أو الرفض حسب سياسة الشركة
-        // هنا نسمح بها مؤقتًا (يمكن تغييرها لاحقًا)
-        if ($branchId === null) {
-            return true;
-        }
-
-        // المستخدم العادي (طبيب، موظف استقبال) لا يرى إلا الأطباء في نفس فرعه
+        // مستخدم عادي: يجب أن يتطابق فرع الطبيب مع فرع المستخدم
         return $branchId == $user->branch_id;
     }
 }

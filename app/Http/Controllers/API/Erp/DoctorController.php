@@ -19,7 +19,17 @@ class DoctorController extends Controller
 
     public function index(Request $request)
     {
+        $user = $request->user();
         $q = Doctor::query()->orderByDesc('id');
+
+        // فلترة حسب الشركة (احتياطي)
+        $q->where('company_id', Tenant::id());
+
+        // فلترة حسب الفرع للمستخدمين العاديين (غير المشرفين)
+        if (!$user->is_super_admin && $user->branch_id !== null) {
+            $q->where('branch_id', $user->branch_id);
+        }
+        // مدير الشركة (branch_id = null) يرى الجميع
 
         if ($search = trim((string)$request->get('search', ''))) {
             $q->where('name', 'like', "%{$search}%");
