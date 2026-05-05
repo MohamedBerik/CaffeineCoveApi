@@ -99,7 +99,8 @@ class RolesAndPermissionsSeeder extends Seeder
             'dental_records.view',
             'dental_records.create',
             'payments.refund',
-            'users.manage'
+            'users.manage',
+            'invoices.pay',
         ]);
 
         $doctorRole = Role::firstOrCreate(['name' => 'doctor', 'guard_name' => 'api']);
@@ -123,6 +124,7 @@ class RolesAndPermissionsSeeder extends Seeder
             'radiology.view',
             'customers.statements.view',
             'finance.create',
+            'invoices.pay',
         ]);
     }
 }

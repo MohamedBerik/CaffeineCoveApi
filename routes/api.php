@@ -213,13 +213,17 @@ Route::prefix('erp')
         Route::middleware('permission:orders.cancel')->post('/orders/{id}/cancel', [OrderController::class, 'cancel']);
 
         // ==================== INVOICES ====================
+
+        // 1. قائمة الفواتير، التفاصيل الكاملة، وإدخالات اليومية – محمية للمستخدمين الماليين فقط
         Route::middleware('permission:finance.view')->group(function () {
             Route::get('/invoices', [InvoiceController::class, 'indexErp']);
-            Route::get('/invoices/{id}', [InvoiceController::class, 'show']);
             Route::get('/invoices/{id}/full', [InvoiceController::class, 'showFullInvoice']);
             Route::get('/invoices/{invoiceId}/journal-entries', [InvoiceJournalController::class, 'index']);
         });
-        Route::middleware('permission:finance.create')->group(function () {
+
+        // 2. عرض الفاتورة الواحدة، تسجيل المدفوعات، تطبيق الأرصدة – متاحة لموظف الاستقبال (invoices.pay)
+        Route::middleware('permission:invoices.pay')->group(function () {
+            Route::get('/invoices/{invoice}', [InvoiceController::class, 'show']);   // استخدم {invoice} لو تستخدم Route Model Binding
             Route::post('/invoices/{invoice}/payments', [InvoicePaymentController::class, 'store']);
             Route::post('/invoices/{invoice}/apply-credit', [InvoicePaymentController::class, 'applyCustomerCredit']);
         });
