@@ -946,7 +946,7 @@ class AppointmentController extends Controller
 
         if ($exists) return;
 
-        $product = Product::query()
+        $product = Product::withoutGlobalScope(\App\Models\Concerns\BranchScope::class)
             ->where('title_en', 'Consultation')
             ->first();
 
