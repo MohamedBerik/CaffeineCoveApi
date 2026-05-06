@@ -13,7 +13,7 @@ class ProcedureController extends Controller
     public function __construct()
     {
         $this->authorizeResource(Procedure::class, 'procedure', [
-            'except' => ['show']
+            'except' => ['show', 'index']
         ]);
     }
     public function index(Request $request)
