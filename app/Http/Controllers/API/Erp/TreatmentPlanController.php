@@ -82,6 +82,7 @@ class TreatmentPlanController extends Controller
 
         $plan = TreatmentPlan::create([
             'company_id' => $companyId,
+            'branch_id'  => Tenant::branchId() ?? $request->user()->branch_id,
             'customer_id' => $data['customer_id'],
             'title' => $data['title'],
             'notes' => $data['notes'] ?? null,
