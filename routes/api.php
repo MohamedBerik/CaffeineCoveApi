@@ -278,13 +278,22 @@ Route::prefix('erp')
             Route::get('/treatment-plans/{id}/cash-summary', [TreatmentPlanController::class, 'cashSummary']);
             Route::get('/treatment-plans/{itemId}/items', [TreatmentPlanController::class, 'items']);
         });
-        Route::middleware('permission:treatment_plans.manage')->group(function () {
+        // إنشاء خطة علاج جديدة ← تسمح بها create
+        Route::middleware('permission:treatment_plans.create')->group(function () {
             Route::post('/treatment-plans', [TreatmentPlanController::class, 'store']);
+        });
+
+        // تعديل وحذف الخطط والعناصر ← إدارية بحتة
+        Route::middleware('permission:treatment_plans.manage')->group(function () {
             Route::put('/treatment-plans/{id}', [TreatmentPlanController::class, 'update']);
             Route::delete('/treatment-plans/{id}', [TreatmentPlanController::class, 'destroy']);
             Route::post('/treatment-plans/{itemId}/items', [TreatmentPlanController::class, 'addItem']);
             Route::put('/treatment-plan-items/{itemId}', [TreatmentPlanController::class, 'updateItem']);
             Route::delete('/treatment-plan-items/{itemId}', [TreatmentPlanController::class, 'deleteItem']);
+        });
+
+        // بدء جلسة علاج وربط المواعيد ← من صلاحيات إدارة المواعيد
+        Route::middleware('permission:appointments.manage')->group(function () {
             Route::post('/treatment-plan-items/{itemId}/start', [TreatmentPlanController::class, 'startItem']);
             Route::post('/treatment-plan-items/{itemId}/attach-appointment', [TreatmentPlanController::class, 'attachAppointment']);
         });

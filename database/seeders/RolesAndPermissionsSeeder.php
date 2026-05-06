@@ -125,6 +125,7 @@ class RolesAndPermissionsSeeder extends Seeder
             'customers.statements.view',
             'finance.create',
             'invoices.pay',
+            'treatment_plans.create',
         ]);
     }
 }
