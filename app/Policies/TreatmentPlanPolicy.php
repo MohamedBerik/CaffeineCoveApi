@@ -6,6 +6,7 @@ use App\Models\TreatmentPlan;
 use App\Models\User;
 use App\Services\Tenant;
 use Illuminate\Auth\Access\HandlesAuthorization;
+use App\Models\TreatmentPlanItem;
 
 class TreatmentPlanPolicy
 {
@@ -34,6 +35,21 @@ class TreatmentPlanPolicy
     public function delete(User $user, TreatmentPlan $treatmentPlan): bool
     {
         return $this->hasAccess($user, $treatmentPlan->company_id);
+    }
+
+    public function startItem(User $user, TreatmentPlan $plan): bool
+    {
+        // السماح إذا كان المستخدم يملك صلاحية إدارة المواعيد أو إدارة الخطط العلاجية
+        if ($user->hasPermissionTo('appointments.manage') || $user->hasPermissionTo('treatment_plans.manage')) {
+            return $this->hasAccess($user, $plan->company_id);
+        }
+        return false;
+    }
+
+    public function attachAppointment(User $user, TreatmentPlan $plan): bool
+    {
+        // نفس شرط startItem
+        return $this->startItem($user, $plan);
     }
 
     private function hasAccess(User $user, $companyId = null): bool

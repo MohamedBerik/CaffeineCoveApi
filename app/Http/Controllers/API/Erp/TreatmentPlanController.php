@@ -569,6 +569,7 @@ class TreatmentPlanController extends Controller
 
     public function startItem(Request $request, $itemId)
     {
+
         $companyId = Tenant::id();
 
         $data = $request->validate([
@@ -599,6 +600,8 @@ class TreatmentPlanController extends Controller
             }
 
             $plan = TreatmentPlan::query()->findOrFail($item->treatment_plan_id);
+
+            $this->authorize('startItem', $plan);
 
             if (!empty($data['doctor_id'])) {
                 $doctor = Doctor::query()
@@ -727,6 +730,8 @@ class TreatmentPlanController extends Controller
         ]);
 
         $appointment = Appointment::query()->findOrFail($data['appointment_id']);
+
+        $this->authorize('attachAppointment', $item->plan);
 
         if (!$item->plan) {
             return response()->json([
