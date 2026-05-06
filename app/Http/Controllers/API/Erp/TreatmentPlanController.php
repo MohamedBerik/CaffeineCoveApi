@@ -24,7 +24,9 @@ class TreatmentPlanController extends Controller
 
     public function __construct()
     {
-        $this->authorizeResource(TreatmentPlan::class, 'treatmentPlan', ['except' => ['index']]);
+        $this->authorizeResource(TreatmentPlan::class, 'treatmentPlan', [
+            'except' => ['index', 'startItem', 'attachAppointment']
+        ]);
     }
 
     public function index(Request $request)
