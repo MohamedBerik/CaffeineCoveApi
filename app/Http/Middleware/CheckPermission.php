@@ -35,7 +35,7 @@ class CheckPermission
         $missingPermissions = [];
 
         foreach ($permissions as $permission) {
-            if ($user->hasPermissionTo($permission, 'api')) {
+            if ($user->hasPermissionTo($permission)) {
                 $hasPermission = true;
                 break;
             }
