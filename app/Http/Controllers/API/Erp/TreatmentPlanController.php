@@ -25,7 +25,7 @@ class TreatmentPlanController extends Controller
     public function __construct()
     {
         $this->authorizeResource(TreatmentPlan::class, 'treatmentPlan', [
-            'except' => ['index', 'startItem', 'attachAppointment', 'store']
+            'except' => ['index', 'show', 'startItem', 'attachAppointment', 'store']
         ]);
     }
 
@@ -62,6 +62,8 @@ class TreatmentPlanController extends Controller
                 },
             ])
             ->findOrFail($id);
+
+        $this->authorize('view', $plan);
 
         return response()->json($this->planResponse($plan, $companyId, true));
     }
