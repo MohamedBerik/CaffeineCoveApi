@@ -80,9 +80,15 @@ class AccountingService
             }
 
             // ✅ تسجيل النشاط
+            // ✅ تسجيل النشاط – نجلب كائن المستخدم إذا كان موجوداً
+            $user = null;
+            if ($userId) {
+                $user = \App\Models\User::find($userId);
+            }
+
             ActivityLogger::log(
                 $companyId,
-                $userId,
+                $user,
                 'journal_entry.created',
                 JournalEntry::class,
                 $entry->id,
@@ -94,7 +100,6 @@ class AccountingService
                     'source_id' => $sourceModel?->id,
                 ]
             );
-
             return $entry;
         });
     }
