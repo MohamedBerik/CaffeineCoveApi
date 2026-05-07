@@ -14,7 +14,9 @@ class InvoiceController extends Controller
 {
     public function __construct()
     {
-        $this->authorizeResource(Invoice::class, 'invoice');
+        $this->authorizeResource(Invoice::class, 'invoice', [
+            'except' => ['indexErp', 'show', 'showFullInvoice']
+        ]);
     }
 
     public function indexErp(Request $request)
@@ -33,6 +35,8 @@ class InvoiceController extends Controller
             'customer',
             'items.product',
         ])->findOrFail($id);
+
+        $this->authorize('view', $invoice);
 
         return response()->json(
             $this->buildInvoiceResponse($invoice)
@@ -54,6 +58,8 @@ class InvoiceController extends Controller
                     ]);
             },
         ])->findOrFail($id);
+
+        $this->authorize('view', $invoice);
 
         return response()->json(
             $this->buildInvoiceResponse($invoice)
