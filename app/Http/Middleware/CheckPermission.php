@@ -19,13 +19,6 @@ class CheckPermission
     {
         $user = $request->user();
 
-        // ✅ سجل التتبع
-        \Log::info('CheckPermission middleware hit', [
-            'path' => $request->path(),
-            'user_id' => $user->id ?? null,
-            'permissions_required' => $permissions,
-        ]);
-
         if (!$user) {
             return response()->json([
                 'message' => 'Unauthenticated'
