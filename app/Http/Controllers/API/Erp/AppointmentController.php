@@ -44,12 +44,6 @@ class AppointmentController extends Controller
 
     public function index(Request $request)
     {
-        \Log::info('Appointment index hit', [
-            'user' => $request->user()->id,
-            'branch' => $request->user()->branch_id,
-            'permissions' => $request->user()->getPermissionsViaRoles()->pluck('name')->toArray(),
-        ]);
-
         $user = $request->user();
         $query = Appointment::query()
             ->with([
