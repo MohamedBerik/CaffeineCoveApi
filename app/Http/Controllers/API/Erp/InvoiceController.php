@@ -32,10 +32,13 @@ class InvoiceController extends Controller
 
     public function show(Request $request, $id)
     {
-        $invoice = Invoice::with([
-            'customer',
-            'items.product',
-        ])->findOrFail($id);
+        $invoice = Invoice::withoutGlobalScope(BranchScope::class)
+            ->with([
+                'customer',
+                'items' => function ($q) {
+                    $q->withoutGlobalScope(BranchScope::class)->with('product');
+                },
+            ])->findOrFail($id);
 
         $this->authorize('view', $invoice);
 
@@ -46,19 +49,22 @@ class InvoiceController extends Controller
 
     public function showFullInvoice(Request $request, $id)
     {
-        $invoice = Invoice::with([
-            'customer',
-            'items.product',
-            'journalEntries' => function ($q) {
-                $q->orderBy('id')
-                    ->with([
-                        'lines' => function ($q2) {
-                            $q2->orderBy('id')
-                                ->with(['account']);
-                        }
-                    ]);
-            },
-        ])->findOrFail($id);
+        $invoice = Invoice::withoutGlobalScope(BranchScope::class)
+            ->with([
+                'customer',
+                'items' => function ($q) {
+                    $q->withoutGlobalScope(BranchScope::class)->with('product');
+                },
+                'journalEntries' => function ($q) {
+                    $q->orderBy('id')
+                        ->with([
+                            'lines' => function ($q2) {
+                                $q2->orderBy('id')
+                                    ->with(['account']);
+                            }
+                        ]);
+                },
+            ])->findOrFail($id);
 
         $this->authorize('view', $invoice);
 
