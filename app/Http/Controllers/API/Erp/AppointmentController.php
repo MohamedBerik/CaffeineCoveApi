@@ -943,6 +943,7 @@ class AppointmentController extends Controller
     private function createConsultationInvoiceIfMissing($appointment, $request)
     {
         $companyId = $appointment->company_id;
+        $branchId = Tenant::branchId() ?? $request->user()->branch_id;
 
         $exists = Invoice::query()
             ->where('appointment_id', $appointment->id)
@@ -961,6 +962,7 @@ class AppointmentController extends Controller
 
         $order = Order::create([
             'company_id' => $companyId,
+            'branch_id'  => $branchId,
             'customer_id' => $appointment->patient_id,
             'title_en' => 'Consultation Visit',
             'status' => 'confirmed',
@@ -979,6 +981,7 @@ class AppointmentController extends Controller
 
         $invoice = Invoice::create([
             'company_id' => $companyId,
+            'branch_id'  => $branchId,
             'number' => app(InvoiceNumberService::class)->generate($companyId),
             'order_id' => $order->id,
             'appointment_id' => $appointment->id,
