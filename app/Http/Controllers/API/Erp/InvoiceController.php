@@ -9,6 +9,7 @@ use App\Services\Tenant;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use App\Events\DashboardUpdated;
+use App\Models\Concerns\BranchScope;
 
 class InvoiceController extends Controller
 {
@@ -70,7 +71,7 @@ class InvoiceController extends Controller
     {
         $companyId = Tenant::id();
 
-        $payments = Payment::query()
+        $payments = Payment::withoutGlobalScope(\App\Models\Concerns\BranchScope::class)
             ->where('invoice_id', $invoice->id)
             ->select([
                 'id',

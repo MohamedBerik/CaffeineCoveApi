@@ -83,6 +83,7 @@ class InvoicePaymentController extends Controller
 
             $payment = Payment::create([
                 'company_id'     => $companyId,
+                'branch_id'      => Tenant::branchId() ?? $request->user()->branch_id,
                 'invoice_id'     => $invoice->id,
                 'amount'         => $amount,
                 'applied_amount' => $applied,
