@@ -42,7 +42,9 @@ class AccountingService
             $lines,
             $userId,
             $date,
-            $companyId
+            $companyId,
+            $totalDebit,
+            $totalCredit,
         ) {
 
             $entry = JournalEntry::create([
