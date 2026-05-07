@@ -471,7 +471,8 @@ class TreatmentPlanController extends Controller
             'planned_sessions' => ['nullable', 'integer', 'min:1', 'max:20'],
         ]);
 
-        $procedure = Procedure::query()->findOrFail($data['procedure_id']);
+        $procedure = Procedure::withoutGlobalScope(\App\Models\Concerns\BranchScope::class)
+            ->findOrFail($data['procedure_id']);
 
         $price = $data['price'] ?? $procedure->default_price;
         $plannedSessions = (int) ($data['planned_sessions'] ?? 1);
@@ -515,7 +516,9 @@ class TreatmentPlanController extends Controller
         ]);
 
         if (isset($data['procedure_id'])) {
-            $procedure = Procedure::query()->findOrFail($data['procedure_id']);
+            $procedure = Procedure::withoutGlobalScope(\App\Models\Concerns\BranchScope::class)
+                ->findOrFail($data['procedure_id']);
+
             $item->procedure_id = $procedure->id;
             $item->procedure = $procedure->name;
 
