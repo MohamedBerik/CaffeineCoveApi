@@ -18,7 +18,9 @@ class ProcedureController extends Controller
     }
     public function index(Request $request)
     {
-        $q = Procedure::query()->orderByDesc('id');
+        // ✅ تجاهل BranchScope لعرض جميع الإجراءات (مشتركة بين الفروع)
+        $q = Procedure::withoutGlobalScope(\App\Models\Concerns\BranchScope::class)
+            ->orderByDesc('id');
 
         if ($request->has('is_active')) {
             $isActive = filter_var(
