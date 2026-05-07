@@ -45,7 +45,7 @@ class AppointmentController extends Controller
     public function index(Request $request)
     {
         $user = $request->user();
-        $query = Appointment::query()
+        $query = Appointment::withoutGlobalScope(BranchScope::class) // ✅ تجاهل Scope
             ->with([
                 'patient:id,name,email,company_id',
                 'doctor:id,name,company_id,work_start,work_end,slot_minutes',
