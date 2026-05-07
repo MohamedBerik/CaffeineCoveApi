@@ -44,8 +44,14 @@ class AppointmentController extends Controller
 
     public function index(Request $request)
     {
+        \Log::info('Appointment index hit', [
+            'user' => $request->user()->id,
+            'branch' => $request->user()->branch_id,
+            'permissions' => $request->user()->getPermissionsViaRoles()->pluck('name')->toArray(),
+        ]);
+
         $user = $request->user();
-        $query = Appointment::withoutGlobalScope(BranchScope::class) // ✅ تجاهل Scope
+        $query = Appointment::query()
             ->with([
                 'patient:id,name,email,company_id',
                 'doctor:id,name,company_id,work_start,work_end,slot_minutes',
