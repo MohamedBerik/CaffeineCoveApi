@@ -256,6 +256,12 @@ class User extends Authenticatable
         });
 
         static::created(function ($user) {
+            // ✅ إسناد الدور تلقائياً للمستخدمين غير السوبر آدمين
+            if (!$user->is_super_admin && !empty($user->role)) {
+                $user->assignRole($user->role);
+            }
+
+            // (اختياري) الاحتفاظ بسجل النشاط القديم
             ActivityLog::create([
                 'company_id' => $user->company_id,
                 'user_id' => auth()->id(),
