@@ -190,9 +190,13 @@ class InvoicePaymentController extends Controller
                 ]
             ));
 
-            $insight = app(InsightService::class)->revenueInsight($companyId);
-            if ($insight) {
-                event(new InsightGenerated($companyId, $insight));
+            try {
+                $insight = app(InsightService::class)->revenueInsight($companyId);
+                if ($insight) {
+                    event(new InsightGenerated($companyId, $insight));
+                }
+            } catch (\Exception $e) {
+                \Log::error('Failed to generate revenue insight', ['error' => $e->getMessage()]);
             }
 
             return response()->json([
