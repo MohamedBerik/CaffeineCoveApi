@@ -39,7 +39,7 @@ class AppointmentController extends Controller
 
     public function __construct()
     {
-        $this->authorizeResource(Appointment::class, 'appointment');
+        $this->authorizeResource(Appointment::class, 'appointment', ['except' => ['index', 'show']]);
     }
 
     public function index(Request $request)
