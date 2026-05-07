@@ -1017,6 +1017,7 @@ class AppointmentController extends Controller
     public function complete(Request $request, $id)
     {
         $companyId = Tenant::id();
+        $branchId = Tenant::branchId() ?? $request->user()->branch_id;
 
         $appointment = Appointment::query()->findOrFail($id);
 
@@ -1028,7 +1029,7 @@ class AppointmentController extends Controller
             'next_step' => ['nullable', 'string'],
         ]);
 
-        return DB::transaction(function () use ($request, $companyId, $data, $appointment) {
+        return DB::transaction(function () use ($request, $companyId, $data, $appointment, $branchId) {
             $appointment = Appointment::query()
                 ->lockForUpdate()
                 ->findOrFail($appointment->id);
@@ -1215,6 +1216,7 @@ class AppointmentController extends Controller
 
                 $order = \App\Models\Order::create([
                     'company_id' => $companyId,
+                    'branch_id'   => $branchId,
                     'customer_id' => $appointment->patient_id,
                     'title_en' => 'Appointment Service',
                     'title_ar' => 'خدمة موعد',
@@ -1236,6 +1238,7 @@ class AppointmentController extends Controller
 
                 $invoice = \App\Models\Invoice::create([
                     'company_id' => $companyId,
+                    'branch_id'   => $branchId,
                     'number' => $number,
                     'order_id' => $order->id,
                     'appointment_id' => $appointment->id,
