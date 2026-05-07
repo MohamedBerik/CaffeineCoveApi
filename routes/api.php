@@ -281,13 +281,13 @@ Route::prefix('erp')
         // إنشاء خطة علاج جديدة ← تسمح بها create
         Route::middleware('permission:treatment_plans.create')->group(function () {
             Route::post('/treatment-plans', [TreatmentPlanController::class, 'store']);
+            Route::post('/treatment-plans/{itemId}/items', [TreatmentPlanController::class, 'addItem']);
         });
 
         // تعديل وحذف الخطط والعناصر ← إدارية بحتة
         Route::middleware('permission:treatment_plans.manage')->group(function () {
             Route::put('/treatment-plans/{id}', [TreatmentPlanController::class, 'update']);
             Route::delete('/treatment-plans/{id}', [TreatmentPlanController::class, 'destroy']);
-            Route::post('/treatment-plans/{itemId}/items', [TreatmentPlanController::class, 'addItem']);
             Route::put('/treatment-plan-items/{itemId}', [TreatmentPlanController::class, 'updateItem']);
             Route::delete('/treatment-plan-items/{itemId}', [TreatmentPlanController::class, 'deleteItem']);
         });
