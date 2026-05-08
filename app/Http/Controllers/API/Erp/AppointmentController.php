@@ -45,6 +45,21 @@ class AppointmentController extends Controller
     public function index(Request $request)
     {
         $user = $request->user();
+
+        if ($user->role === 'doctor') {
+
+            $doctor = Doctor::where('user_id', $user->id)->first();
+
+            if (!$doctor) {
+                return response()->json([
+                    'msg' => 'Doctor profile not linked to this user',
+                    'status' => 422,
+                ], 422);
+            }
+
+            $query->where('doctor_id', $doctor->id);
+        }
+
         $query = Appointment::query()
             ->with([
                 'patient:id,name,email,company_id',

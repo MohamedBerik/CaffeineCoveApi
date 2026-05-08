@@ -64,6 +64,11 @@ class User extends Authenticatable
         return $this->belongsTo(Company::class);
     }
 
+    public function doctorProfile()
+    {
+        return $this->hasOne(Doctor::class, 'user_id');
+    }
+
     // public function roles()
     // {
     //     return $this->belongsToMany(
@@ -79,10 +84,10 @@ class User extends Authenticatable
         return $this->hasMany(Appointment::class, 'created_by');
     }
 
-    public function doctorAppointments()
-    {
-        return $this->hasMany(Appointment::class, 'doctor_id');
-    }
+    // public function doctorAppointments()
+    // {
+    //     return $this->hasMany(Appointment::class, 'doctor_id');
+    // }
 
     public function createdOrders()
     {
