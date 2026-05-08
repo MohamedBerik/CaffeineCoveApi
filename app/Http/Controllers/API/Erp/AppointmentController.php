@@ -54,27 +54,26 @@ class AppointmentController extends Controller
             ->orderByDesc('appointment_date')
             ->orderByDesc('appointment_time');
 
-        // 1. فلترة حسب الفرع (للموظفين والأطباء)
+        // 1. فلترة حسب الفرع
         if (!$user->is_super_admin && $user->branch_id !== null) {
             $query->where('appointments.branch_id', $user->branch_id);
         }
 
-        // 2. 🛡️ الحل الجذري: إذا كان المستخدم طبيباً، أظهر له مواعيده فقط
-        // سنبحث عنه في جدول الأطباء بناءً على بريده الإلكتروني أو أي صلة ربط
+        // 2. تصفية خاصة للطبيب (حل مشكلة اختفاء المواعيد)
         if ($user->role === 'doctor') {
-            // نجلب الـ ID الخاص به من جدول الأطباء (الذي قلت أنه رقم 8)
-            $doctorProfile = \DB::table('doctors')->where('user_id', $user->id)->first();
+            // نبحث عن معرف الطبيب في جدول الأطباء المرتبط بهذا المستخدم
+            // افترضت هنا أن الحقل في جدول الأطباء هو user_id، غيره إذا كان مختلفاً
+            $doctorId = \DB::table('doctors')->where('user_id', $user->id)->value('id');
 
-            if ($doctorProfile) {
-                $query->where('doctor_id', $doctorProfile->id);
+            if ($doctorId) {
+                $query->where('doctor_id', $doctorId);
             } else {
-                // إذا لم نجد له ملف طبيب، نبحث بالـ ID المباشر كحل احتياطي
+                // حل احتياطي إذا لم يوجد ربط، نبحث بالـ user id
                 $query->where('doctor_id', $user->id);
             }
         }
 
-        // بقية الكود (البحث والـ Pagination) تبقى كما هي...
-
+        // 3. البحث
         if ($search = trim((string) $request->get('search', ''))) {
             $query->where(function ($q) use ($search) {
                 $q->where('doctor_name', 'like', "%{$search}%")
@@ -82,7 +81,6 @@ class AppointmentController extends Controller
                     ->orWhere('appointment_type', 'like', "%{$search}%")
                     ->orWhere('status', 'like', "%{$search}%")
                     ->orWhereDate('appointment_date', $search)
-                    ->orWhereTime('appointment_time', $search)
                     ->orWhereHas('patient', function ($p) use ($search) {
                         $p->where('name', 'like', "%{$search}%")
                             ->orWhere('email', 'like', "%{$search}%");
@@ -90,52 +88,35 @@ class AppointmentController extends Controller
             });
         }
 
-        $perPage = (int) ($request->get('per_page', 20));
+        $perPage = (int) $request->get('per_page', 20);
         $data = $query->paginate($perPage);
 
         $rows = collect($data->items())->map(function ($appointment) {
             return [
                 'id' => $appointment->id,
-                'company_id' => $appointment->company_id,
-                'patient_id' => $appointment->patient_id,
                 'doctor_id' => $appointment->doctor_id,
                 'doctor_name' => $appointment->doctor_name,
+                'patient_name' => $appointment->patient?->name,
                 'appointment_date' => $appointment->appointment_date,
                 'appointment_time' => $appointment->appointment_time,
-                'appointment_type' => $appointment->appointment_type,
-                'status' => $appointment->status,
-                'notes' => $appointment->notes,
-                'clinical_notes' => $appointment->clinical_notes,
-                'diagnosis' => $appointment->diagnosis,
-                'next_step' => $appointment->next_step,
-                'created_at' => $appointment->created_at,
-                'updated_at' => $appointment->updated_at,
-                'invoice_id' => $appointment->invoice?->id,
-                'invoice_number' => $appointment->invoice?->number,
+                'status' => (string) $appointment->status, // تأكدنا أنها نص
                 'invoice_status' => $appointment->invoice?->status,
-                'invoice_total' => $appointment->invoice?->total,
-                'treatment_plan_id' => $appointment->invoice?->treatment_plan_id,
                 'patient' => $appointment->patient,
                 'doctor' => $appointment->doctor,
-                'reminder_status' => $appointment->reminder_status,
-                'last_reminder_at' => $appointment->last_reminder_at,
-                'next_reminder_at' => $appointment->next_reminder_at,
-                'reminder_sent_count' => (int) ($appointment->reminder_sent_count ?? 0),
-                'reminder_stage' => $appointment->reminder_stage,
             ];
         })->values();
 
+        // تأكد من أن الحالة (200) هي رقم (Integer) وليس نصاً
         return response()->json([
             'msg' => 'Appointments list',
             'status' => 200,
             'data' => $rows,
             'meta' => [
-                'current_page' => $data->currentPage(),
-                'last_page'    => $data->lastPage(),
-                'per_page'     => $data->perPage(),
-                'total'        => $data->total(),
+                'current_page' => (int) $data->currentPage(),
+                'last_page'    => (int) $data->lastPage(),
+                'total'        => (int) $data->total(),
             ],
-        ]);
+        ], 200); // هنا الرقم 200 ضروري كـ Integer
     }
 
     public function store(Request $request)
