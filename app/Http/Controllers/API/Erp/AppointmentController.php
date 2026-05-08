@@ -54,10 +54,26 @@ class AppointmentController extends Controller
             ->orderByDesc('appointment_date')
             ->orderByDesc('appointment_time');
 
-        // ✅ فلترة حسب الفرع للمستخدمين العاديين
+        // 1. فلترة حسب الفرع (للموظفين والأطباء)
         if (!$user->is_super_admin && $user->branch_id !== null) {
             $query->where('appointments.branch_id', $user->branch_id);
         }
+
+        // 2. 🛡️ الحل الجذري: إذا كان المستخدم طبيباً، أظهر له مواعيده فقط
+        // سنبحث عنه في جدول الأطباء بناءً على بريده الإلكتروني أو أي صلة ربط
+        if ($user->role === 'doctor') {
+            // نجلب الـ ID الخاص به من جدول الأطباء (الذي قلت أنه رقم 8)
+            $doctorProfile = \DB::table('doctors')->where('user_id', $user->id)->first();
+
+            if ($doctorProfile) {
+                $query->where('doctor_id', $doctorProfile->id);
+            } else {
+                // إذا لم نجد له ملف طبيب، نبحث بالـ ID المباشر كحل احتياطي
+                $query->where('doctor_id', $user->id);
+            }
+        }
+
+        // بقية الكود (البحث والـ Pagination) تبقى كما هي...
 
         if ($search = trim((string) $request->get('search', ''))) {
             $query->where(function ($q) use ($search) {
