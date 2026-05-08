@@ -46,7 +46,7 @@ class AppointmentController extends Controller
     {
         $user = $request->user();
 
-        $query = Appointment::query()
+        $query = Appointment::withoutGlobalScope(\App\Models\Concerns\BranchScope::class)
             ->with([
                 'patient:id,name,email,company_id',
                 'doctor:id,name,company_id,branch_id,work_start,work_end,slot_minutes,user_id',
