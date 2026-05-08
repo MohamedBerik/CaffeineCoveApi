@@ -45,6 +45,7 @@ class AppointmentController extends Controller
     public function index(Request $request)
     {
         $user = $request->user();
+
         $query = Appointment::query()
             ->with([
                 'patient:id,name,email,company_id',
@@ -54,74 +55,39 @@ class AppointmentController extends Controller
             ->orderByDesc('appointment_date')
             ->orderByDesc('appointment_time');
 
-        // ✅ فلترة حسب الفرع للمستخدمين العاديين
+        // تصفية الفرع
         if (!$user->is_super_admin && $user->branch_id !== null) {
             $query->where('appointments.branch_id', $user->branch_id);
         }
 
+        // تصفية الطبيب (الربط بين المستخدم رقم 9 والطبيب رقم 8)
+        if ($user->role === 'doctor') {
+            $doctorId = \DB::table('doctors')->where('user_id', $user->id)->value('id');
+            if ($doctorId) {
+                $query->where('doctor_id', $doctorId);
+            } else {
+                $query->where('doctor_id', $user->id);
+            }
+        }
+
+        // البحث
         if ($search = trim((string) $request->get('search', ''))) {
             $query->where(function ($q) use ($search) {
                 $q->where('doctor_name', 'like', "%{$search}%")
-                    ->orWhere('notes', 'like', "%{$search}%")
-                    ->orWhere('appointment_type', 'like', "%{$search}%")
                     ->orWhere('status', 'like', "%{$search}%")
-                    ->orWhereDate('appointment_date', $search)
-                    ->orWhereTime('appointment_time', $search)
                     ->orWhereHas('patient', function ($p) use ($search) {
-                        $p->where('name', 'like', "%{$search}%")
-                            ->orWhere('email', 'like', "%{$search}%");
+                        $p->where('name', 'like', "%{$search}%");
                     });
             });
         }
 
-        $perPage = (int) ($request->get('per_page', 20));
+        $perPage = (int) $request->get('per_page', 20);
         $data = $query->paginate($perPage);
 
-        $rows = collect($data->items())->map(function ($appointment) {
-            return [
-                'id' => $appointment->id,
-                'company_id' => $appointment->company_id,
-                'patient_id' => $appointment->patient_id,
-                'doctor_id' => $appointment->doctor_id,
-                'doctor_name' => $appointment->doctor_name,
-                'appointment_date' => $appointment->appointment_date,
-                'appointment_time' => $appointment->appointment_time,
-                'appointment_type' => $appointment->appointment_type,
-                'status' => $appointment->status,
-                'notes' => $appointment->notes,
-                'clinical_notes' => $appointment->clinical_notes,
-                'diagnosis' => $appointment->diagnosis,
-                'next_step' => $appointment->next_step,
-                'created_at' => $appointment->created_at,
-                'updated_at' => $appointment->updated_at,
-                'invoice_id' => $appointment->invoice?->id,
-                'invoice_number' => $appointment->invoice?->number,
-                'invoice_status' => $appointment->invoice?->status,
-                'invoice_total' => $appointment->invoice?->total,
-                'treatment_plan_id' => $appointment->invoice?->treatment_plan_id,
-                'patient' => $appointment->patient,
-                'doctor' => $appointment->doctor,
-                'reminder_status' => $appointment->reminder_status,
-                'last_reminder_at' => $appointment->last_reminder_at,
-                'next_reminder_at' => $appointment->next_reminder_at,
-                'reminder_sent_count' => (int) ($appointment->reminder_sent_count ?? 0),
-                'reminder_stage' => $appointment->reminder_stage,
-            ];
-        })->values();
-
-        return response()->json([
-            'msg' => 'Appointments list',
-            'status' => 200,
-            'data' => $rows,
-            'meta' => [
-                'current_page' => $data->currentPage(),
-                'last_page'    => $data->lastPage(),
-                'per_page'     => $data->perPage(),
-                'total'        => $data->total(),
-            ],
-        ]);
+        // ✅ نستخدم return response()->json($data) مباشرة
+        // هذا سيجعل Laravel يتعامل مع الـ Pagination تلقائياً وبأمان
+        return response()->json($data);
     }
-
     public function store(Request $request)
     {
         $companyId = Tenant::id();
