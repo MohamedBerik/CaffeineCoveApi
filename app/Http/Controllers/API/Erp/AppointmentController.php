@@ -46,27 +46,30 @@ class AppointmentController extends Controller
     {
         $user = $request->user();
 
-        if ($user->role === 'doctor') {
-
-            $doctor = Doctor::where('user_id', $user->id)->first();
-
-            if (!$doctor) {
-                return response()->json([
-                    'msg' => 'Doctor profile not linked to this user',
-                    'status' => 422,
-                ], 422);
-            }
-
-            $query->where('doctor_id', $doctor->id);
-        }
-
         $query = Appointment::query()
             ->with([
                 'patient:id,name,email,company_id',
-                'doctor:id,name,company_id,work_start,work_end,slot_minutes',
+                'doctor:id,name,company_id,branch_id,work_start,work_end,slot_minutes,user_id',
                 'invoice:id,appointment_id,treatment_plan_id,number,status,total',
-            ])
-            ->orderByDesc('appointment_date')
+            ]);
+
+        // فلترة الدكتور
+        if ($user->role === 'doctor') {
+
+            $doctor = \App\Models\Doctor::where('user_id', $user->id)->first();
+
+            if ($doctor) {
+                $query->where('appointments.doctor_id', $doctor->id);
+            } else {
+
+                return response()->json([
+                    'msg' => 'Doctor profile not found',
+                    'status' => 403,
+                ], 403);
+            }
+        }
+
+        $query->orderByDesc('appointment_date')
             ->orderByDesc('appointment_time');
 
         // ✅ فلترة حسب الفرع للمستخدمين العاديين
