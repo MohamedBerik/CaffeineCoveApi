@@ -88,10 +88,13 @@ class AppointmentController extends Controller
             });
         }
 
+        // ... الجزء العلوي من الكود كما هو
+
         $perPage = (int) $request->get('per_page', 20);
         $data = $query->paginate($perPage);
 
-        $rows = collect($data->items())->map(function ($appointment) {
+        // نستخدم transform لتحويل البيانات مباشرة داخل الـ paginator
+        $data->getCollection()->transform(function ($appointment) {
             return [
                 'id' => $appointment->id,
                 'doctor_id' => $appointment->doctor_id,
@@ -99,25 +102,16 @@ class AppointmentController extends Controller
                 'patient_name' => $appointment->patient?->name,
                 'appointment_date' => $appointment->appointment_date,
                 'appointment_time' => $appointment->appointment_time,
-                'status' => (string) $appointment->status, // تأكدنا أنها نص
-                'invoice_status' => $appointment->invoice?->status,
+                'status' => $appointment->status,
                 'patient' => $appointment->patient,
                 'doctor' => $appointment->doctor,
             ];
-        })->values();
+        });
 
-        // تأكد من أن الحالة (200) هي رقم (Integer) وليس نصاً
-        return response()->json([
-            'msg' => 'Appointments list',
-            'status' => 200,
-            'data' => $rows,
-            'meta' => [
-                'current_page' => (int) $data->currentPage(),
-                'last_page'    => (int) $data->lastPage(),
-                'total'        => (int) $data->total(),
-            ],
-        ], 200); // هنا الرقم 200 ضروري كـ Integer
+        // الرد يجب أن يكون بسيطاً جداً وبدون تمرير متغيرات مشكوك في نوعها
+        return response()->json($data, 200);
     }
+
 
     public function store(Request $request)
     {
