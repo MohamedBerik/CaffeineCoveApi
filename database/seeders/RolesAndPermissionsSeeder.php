@@ -128,6 +128,7 @@ class RolesAndPermissionsSeeder extends Seeder
             'invoices.pay',
             'treatment_plans.create',
             'procedures.view',
+            'dental_records.create',
         ]);
     }
 }

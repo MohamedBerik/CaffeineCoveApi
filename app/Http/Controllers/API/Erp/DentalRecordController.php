@@ -83,6 +83,7 @@ class DentalRecordController extends Controller
 
         $record = DentalRecord::create([
             'company_id' => $companyId,
+            'branch_id' => Tenant::branchId() ?? $request->user()->branch_id,
             'customer_id' => $data['customer_id'],
             'appointment_id' => $data['appointment_id'] ?? null,
             'doctor_id' => $data['doctor_id'] ?? null,
