@@ -23,17 +23,17 @@ class PatientProfileController extends Controller
         $customer = Customer::query()->findOrFail($customerId);
         $this->authorize('view', $customer);
 
-        $appointments = Appointment::query()
+        // Appointments
+        $appointments = Appointment::withoutGlobalScope(\App\Models\Concerns\BranchScope::class)
             ->where('patient_id', $customer->id)
-            ->with([
-                'doctor:id,name,company_id',
-            ])
+            ->with(['doctor:id,name,company_id'])
             ->orderByDesc('appointment_date')
             ->orderByDesc('appointment_time')
             ->limit(10)
-            ->get();
+            ->get(['id', 'company_id', 'patient_id', 'doctor_id', 'doctor_name', 'appointment_date', 'appointment_time', 'appointment_type', 'status', 'notes', 'created_at', 'updated_at']);
 
-        $dentalRecords = DentalRecord::query()
+        // Dental Records
+        $dentalRecords = DentalRecord::withoutGlobalScope(\App\Models\Concerns\BranchScope::class)
             ->where('customer_id', $customer->id)
             ->with([
                 'appointment:id,company_id,appointment_date,appointment_time,status',
@@ -41,36 +41,23 @@ class PatientProfileController extends Controller
                 'treatmentPlanItem:id,treatment_plan_id,appointment_id,procedure_id,tooth_number,surface,status,completed_sessions,planned_sessions',
             ])
             ->orderByDesc('id')
-            ->get();
+            ->get(['id', 'company_id', 'customer_id', 'appointment_id', 'doctor_id', 'procedure_id', 'tooth_number', 'surface', 'status', 'notes', 'treatment_plan_item_id', 'created_at', 'updated_at']);
 
-        $treatmentPlans = TreatmentPlan::query()
+        // Treatment Plans
+        $treatmentPlans = TreatmentPlan::withoutGlobalScope(\App\Models\Concerns\BranchScope::class)
             ->where('customer_id', $customer->id)
-            ->with([
-                'items:id,company_id,treatment_plan_id,procedure_id,procedure,tooth_number,surface,notes,price',
-            ])
+            ->with(['items:id,company_id,treatment_plan_id,procedure_id,procedure,tooth_number,surface,notes,price'])
             ->orderByDesc('id')
             ->limit(10)
-            ->get();
+            ->get(['id', 'company_id', 'customer_id', 'title', 'notes', 'total_cost', 'status', 'created_at', 'updated_at']);
 
-        $invoices = Invoice::query()
+        // Invoices
+        $invoices = Invoice::withoutGlobalScope(\App\Models\Concerns\BranchScope::class)
             ->where('customer_id', $customer->id)
             ->orderByDesc('issued_at')
             ->orderByDesc('id')
             ->limit(10)
-            ->get([
-                'id',
-                'company_id',
-                'number',
-                'order_id',
-                'appointment_id',
-                'treatment_plan_id',
-                'customer_id',
-                'total',
-                'status',
-                'issued_at',
-                'created_at',
-                'updated_at',
-            ]);
+            ->get(['id', 'company_id', 'number', 'order_id', 'appointment_id', 'treatment_plan_id', 'customer_id', 'total', 'status', 'issued_at', 'created_at', 'updated_at']);
 
         // Customer Credit Balance
         $creditIssued = (float) DB::table('customer_credits')
