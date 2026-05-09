@@ -116,6 +116,7 @@ class EmployeeController extends Controller
             'password'   => Hash::make($request->password),
             'salary'     => $request->salary ?? 0,
             'phone' => $request->phone,
+            'is_active' => true,
         ]);
 
         return response()->json([

@@ -11,9 +11,18 @@ class EmployeeResource extends JsonResource
         return [
             // Basic Info
             'id' => $this->id,
-            'company_id' => $this->company_id,
             'name' => $this->name,
             'email' => $this->email,
+            'phone' => $this->phone,
+            'salary' => $this->salary,
+            'branch_id' => $this->branch_id,
+            'is_active' => $this->is_active,
+
+            'branch' => $this->branch ? [
+                'id' => $this->branch->id,
+                'name' => $this->branch->name,
+            ] : null,
+
 
             // Salary
             'salary' => (float) $this->salary,
