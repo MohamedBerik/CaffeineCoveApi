@@ -20,8 +20,10 @@ class Employee extends Model
         'user_id',
         'name',
         'email',
+        'phone',
         'password',
         'salary',
+        'is_active',
     ];
 
     protected $hidden = [
@@ -30,6 +32,7 @@ class Employee extends Model
 
     protected $casts = [
         'salary' => 'decimal:2',
+        'is_active' => 'boolean',
     ];
 
     // ============ Relationships ============
