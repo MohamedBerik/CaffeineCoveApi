@@ -18,13 +18,9 @@ class DentalRecordPolicy
 
     public function view(User $user, DentalRecord $record): bool
     {
-        if (
-            $user->hasPermissionTo('dental_records.view') ||
-            $user->hasPermissionTo('dental_records.create')
-        ) {
-            return $record->company_id == $user->company_id;
-        }
-        return false;
+        return ($user->hasPermissionTo('dental_records.view') ||
+            $user->hasPermissionTo('dental_records.create')) &&
+            $record->company_id == $user->company_id;
     }
 
     public function create(User $user): bool
@@ -34,13 +30,15 @@ class DentalRecordPolicy
 
     public function update(User $user, DentalRecord $record): bool
     {
-        return $user->hasPermissionTo('dental_records.view')
-            && $record->company_id == $user->company_id;
+        return ($user->hasPermissionTo('dental_records.view') ||
+            $user->hasPermissionTo('dental_records.create')) &&
+            $record->company_id == $user->company_id;
     }
 
     public function delete(User $user, DentalRecord $record): bool
     {
-        return $user->hasPermissionTo('dental_records.view')
-            && $record->company_id == $user->company_id;
+        return ($user->hasPermissionTo('dental_records.view') ||
+            $user->hasPermissionTo('dental_records.create')) &&
+            $record->company_id == $user->company_id;
     }
 }
