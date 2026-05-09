@@ -315,6 +315,7 @@ Route::prefix('erp')
             Route::get('/doctors', [DoctorController::class, 'index']);
             Route::get('/doctors/{doctor}', [DoctorController::class, 'show']);
             Route::get('/doctors/{doctorId}/availability', [DoctorAvailabilityController::class, 'show']);
+            Route::get('/doctors/by-user/{userId}', [DoctorController::class, 'byUser']);
         });
         Route::middleware('permission:doctors.manage')->group(function () {
             Route::post('/doctors', [DoctorController::class, 'store']);

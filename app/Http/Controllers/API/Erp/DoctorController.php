@@ -184,4 +184,11 @@ class DoctorController extends Controller
             ]
         ]);
     }
+
+    // في DoctorController
+    public function byUser(Request $request, $userId)
+    {
+        $doctor = Doctor::where('user_id', $userId)->firstOrFail();
+        return response()->json(['data' => $doctor]);
+    }
 }
