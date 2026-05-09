@@ -135,7 +135,6 @@ class EmployeeController extends Controller
             ], 404);
         }
 
-        // ✅ حماية: لا يمكن تحديث employees بدون user مرتبط (لأننا نزامن)
         if (!$employee->user) {
             return response()->json([
                 "msg"    => "This employee is not linked to a user account",
@@ -146,9 +145,10 @@ class EmployeeController extends Controller
 
         $rules = [
             "name"   => "required|min:3|max:255",
-            "email"  => "required|email|unique:users,email," . $employee->user->id, // ✅ التحقق على users
+            "email"  => "required|email|unique:users,email," . $employee->user->id,
             "salary" => "nullable|numeric|min:0",
             "branch_id" => "nullable|integer|exists:branches,id",
+            "is_active" => "nullable|boolean",                     // ✅ إضافة
         ];
 
         if ($request->filled('password')) {
@@ -165,19 +165,22 @@ class EmployeeController extends Controller
             ], 422);
         }
 
-        // 1. تحديث بيانات User المرتبط
+        // تحديث User
         $user = $employee->user;
         $user->name  = $request->name;
         $user->email = $request->email;
         if ($request->filled('branch_id')) {
             $user->branch_id = $request->branch_id;
         }
+        if ($request->has('is_active')) {
+            $user->status = $request->is_active ? 1 : 0;         // ✅ تعيين status في users
+        }
         if ($request->filled('password')) {
             $user->password = Hash::make($request->password);
         }
         $user->save();
 
-        // 2. تحديث بيانات Employee
+        // تحديث Employee
         $employee->name  = $request->name;
         $employee->email = $request->email;
         if ($request->filled('branch_id')) {
@@ -186,6 +189,9 @@ class EmployeeController extends Controller
         $employee->salary = $request->salary ?? $employee->salary;
         if ($request->filled('password')) {
             $employee->password = Hash::make($request->password);
+        }
+        if ($request->has('is_active')) {
+            $employee->is_active = $request->is_active ? true : false;  // ✅ تعيين is_active في employees
         }
         $employee->save();
 
