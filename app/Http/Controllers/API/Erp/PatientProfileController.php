@@ -133,7 +133,7 @@ class PatientProfileController extends Controller
 
         $invoicesRemaining = max(0, $invoicesTotal - $invoicesPaid);
 
-        $procedures = Procedure::query()
+        $procedures = Procedure::withoutGlobalScope(\App\Models\Concerns\BranchScope::class)
             ->orderBy('name', 'asc')
             ->get(['id', 'company_id', 'name', 'default_price']);
 
