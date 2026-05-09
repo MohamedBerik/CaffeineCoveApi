@@ -16,7 +16,7 @@ class EmployeeController extends Controller
 {
     public function __construct()
     {
-        $this->authorizeResource(Employee::class, 'employee');
+        $this->authorizeResource(Employee::class, 'employee', ['except' => ['index', 'show', 'update']]);
     }
 
     public function index(Request $request)
