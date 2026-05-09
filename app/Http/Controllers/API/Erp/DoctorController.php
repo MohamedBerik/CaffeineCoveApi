@@ -5,6 +5,7 @@ namespace App\Http\Controllers\API\Erp;
 use App\Http\Controllers\Controller;
 use App\Models\Doctor;
 use App\Models\Appointment;
+use App\Models\User;
 use App\Services\Tenant;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -45,33 +46,46 @@ class DoctorController extends Controller
     public function store(Request $request)
     {
         $companyId = Tenant::id();
+        $branchId = $request->branch_id ?? Tenant::branchId() ?? $request->user()->branch_id;
 
         $data = $request->validate([
-            'name' => [
-                'required',
-                'string',
-                'max:190',
-                Rule::unique('doctors', 'name')
-            ],
-            'phone' => ['nullable', 'string', 'max:50'],
+            'name' => ['required', 'string', 'max:190'],
             'email' => ['nullable', 'email', 'max:190'],
+            'phone' => ['nullable', 'string', 'max:50'],
+            'password' => ['required', 'min:6', 'max:255'],          // ✅ كلمة مرور
+            'branch_id' => ['nullable', 'integer', 'exists:branches,id'],
             'work_start' => ['nullable', 'date_format:H:i'],
             'work_end' => ['nullable', 'date_format:H:i'],
             'slot_minutes' => ['nullable', 'integer', 'min:5', 'max:240'],
             'is_active' => ['nullable', 'boolean'],
         ]);
 
-        $doctor = Doctor::create([
+        // ✅ إنشاء المستخدم أولاً
+        $user = User::create([
             'company_id' => $companyId,
-            'branch_id' => Tenant::branchId() ?? $request->user()->branch_id,
-            'name' => $data['name'],
-            'phone' => $data['phone'] ?? null,
-            'email' => $data['email'] ?? null,
-            'work_start' => $data['work_start'] ?? '09:00',
-            'work_end' => $data['work_end'] ?? '21:00',
+            'branch_id'  => $branchId,
+            'name'       => $data['name'],
+            'email'      => $data['email'] ?? ($data['name'] . '@temp.com'),
+            'password'   => bcrypt($data['password']),
+            'role'       => 'doctor',
+            'status'     => 1,
+            'is_super_admin' => false,
+        ]);
+
+        // ✅ إنشاء سجل الطبيب (لأن الحدث في User سيقوم بذلك تلقائياً، لكن قد تحتاج إلى التأكد من عدم التكرار)
+        // إذا أردت التحكم الكامل، يمكنك إنشائه هنا:
+        $doctor = Doctor::create([
+            'user_id'      => $user->id,
+            'company_id'   => $companyId,
+            'branch_id'    => $branchId,
+            'name'         => $data['name'],
+            'email'        => $data['email'] ?? null,
+            'phone'        => $data['phone'] ?? null,
+            'is_active'    => $data['is_active'] ?? true,
+            'work_start'   => $data['work_start'] ?? '09:00',
+            'work_end'     => $data['work_end'] ?? '21:00',
             'slot_minutes' => $data['slot_minutes'] ?? 30,
-            'is_active' => $data['is_active'] ?? true,
-            'created_by' => $request->user()->id ?? null,
+            'created_by'   => $request->user()->id ?? null,
         ]);
 
         return response()->json(['msg' => 'Doctor created', 'status' => 201, 'data' => $doctor], 201);
