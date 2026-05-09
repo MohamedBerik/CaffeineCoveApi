@@ -17,6 +17,7 @@ class Employee extends Model
     protected $fillable = [
         'company_id',
         'branch_id',
+        'user_id',
         'name',
         'email',
         'password',
@@ -36,6 +37,11 @@ class Employee extends Model
     public function company()
     {
         return $this->belongsTo(Company::class);
+    }
+
+    public function user()
+    {
+        return $this->belongsTo(User::class);
     }
 
     public function sales()
