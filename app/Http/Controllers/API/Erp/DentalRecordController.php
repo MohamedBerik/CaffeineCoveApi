@@ -14,7 +14,9 @@ class DentalRecordController extends Controller
 {
     public function __construct()
     {
-        $this->authorizeResource(DentalRecord::class, 'dentalRecord');
+        $this->authorizeResource(DentalRecord::class, 'dentalRecord', [
+            'except' => ['toTreatmentPlanItem']
+        ]);
     }
 
     public function index(Request $request)
