@@ -81,6 +81,7 @@ class EmployeeController extends Controller
             'password'  => 'required|min:6|max:255',
             'salary'    => 'nullable|numeric|min:0',
             'branch_id' => 'nullable|integer|exists:branches,id',   // ✅ اختيار الفرع
+            'phone' => 'nullable|string|max:30',
         ]);
 
         if ($validate->fails()) {
@@ -114,6 +115,7 @@ class EmployeeController extends Controller
             'email'      => $request->email,
             'password'   => Hash::make($request->password),
             'salary'     => $request->salary ?? 0,
+            'phone' => $request->phone,
         ]);
 
         return response()->json([
@@ -149,6 +151,7 @@ class EmployeeController extends Controller
             "salary" => "nullable|numeric|min:0",
             "branch_id" => "nullable|integer|exists:branches,id",
             "is_active" => "nullable|boolean",                     // ✅ إضافة
+            'phone' => 'nullable|string|max:30',
         ];
 
         if ($request->filled('password')) {
@@ -169,7 +172,7 @@ class EmployeeController extends Controller
         $user = $employee->user;
         $user->name  = $request->name;
         $user->email = $request->email;
-        if ($request->filled('branch_id')) {
+        if ($request->has('branch_id')) {
             $user->branch_id = $request->branch_id;
         }
         if ($request->has('is_active')) {
@@ -183,7 +186,7 @@ class EmployeeController extends Controller
         // تحديث Employee
         $employee->name  = $request->name;
         $employee->email = $request->email;
-        if ($request->filled('branch_id')) {
+        if ($request->has('branch_id')) {
             $employee->branch_id = $request->branch_id;
         }
         $employee->salary = $request->salary ?? $employee->salary;
