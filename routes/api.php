@@ -350,14 +350,13 @@ Route::prefix('erp')
         Route::middleware('permission:dental_records.view')->group(function () {
             Route::get('/dental-records', [DentalRecordController::class, 'index']);
             Route::get('/dental-records/{id}', [DentalRecordController::class, 'show']);
+            Route::put('/dental-records/{id}', [DentalRecordController::class, 'update']);
+            Route::delete('/dental-records/{id}', [DentalRecordController::class, 'destroy']);
         });
         Route::middleware('permission:dental_records.create')->group(function () {
             Route::post('/dental-records', [DentalRecordController::class, 'store']);
         });
-        Route::middleware('permission:dental_records.view')->group(function () {
-            Route::put('/dental-records/{id}', [DentalRecordController::class, 'update']);
-            Route::delete('/dental-records/{id}', [DentalRecordController::class, 'destroy']);
-        });
+
         Route::middleware('permission:appointments.manage')
             ->post('/dental-records/{id}/to-treatment-plan-item', [DentalRecordController::class, 'toTreatmentPlanItem']);
 
