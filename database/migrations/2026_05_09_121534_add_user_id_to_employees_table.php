@@ -13,7 +13,7 @@ class AddUserIdToEmployeesTable extends Migration
      */
     public function up()
     {
-        \Schema::table('employees', function ($table) {
+        Schema::table('employees', function ($table) {
             $table->unsignedBigInteger('user_id')->nullable()->after('branch_id');
             $table->foreign('user_id')->references('id')->on('users')->onDelete('set null');
         });
