@@ -358,9 +358,8 @@ Route::prefix('erp')
             Route::put('/dental-records/{id}', [DentalRecordController::class, 'update']);
             Route::delete('/dental-records/{id}', [DentalRecordController::class, 'destroy']);
         });
-        // Route::middleware('permission:appointments.manage')
-        //     ->post('/dental-records/{id}/to-treatment-plan-item', [DentalRecordController::class, 'toTreatmentPlanItem']);
-        Route::post('/dental-records/{id}/to-treatment-plan-item', [DentalRecordController::class, 'toTreatmentPlanItem']);
+        Route::middleware('permission:appointments.manage')
+            ->post('/dental-records/{id}/to-treatment-plan-item', [DentalRecordController::class, 'toTreatmentPlanItem']);
 
         // ==================== CLINIC SETTINGS ====================
         Route::middleware('permission:settings.view')->get('/clinic-settings', [ClinicSettingController::class, 'show']);

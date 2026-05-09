@@ -18,8 +18,13 @@ class DentalRecordPolicy
 
     public function view(User $user, DentalRecord $record): bool
     {
-        return $user->hasPermissionTo('dental_records.view')
-            && $record->company_id == $user->company_id;
+        if (
+            $user->hasPermissionTo('dental_records.view') ||
+            $user->hasPermissionTo('dental_records.create')
+        ) {
+            return $record->company_id == $user->company_id;
+        }
+        return false;
     }
 
     public function create(User $user): bool
