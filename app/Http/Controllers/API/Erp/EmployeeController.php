@@ -123,10 +123,9 @@ class EmployeeController extends Controller
         ], 201);
     }
 
-    public function update(Request $request)
+    public function update(Request $request, $id)
     {
-        $old_id = $request->old_id;
-        $employee = Employee::query()->with('user')->find($old_id);
+        $employee = Employee::query()->with('user')->find($id);
 
         if (!$employee) {
             return response()->json([
