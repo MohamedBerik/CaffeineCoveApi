@@ -198,7 +198,7 @@ class EmployeeController extends Controller
         return response()->json([
             "msg"    => "Updated Successfully",
             "status" => 200,
-            "data"   => $employee->fresh()->load('user')
+            "data"   => new EmployeeResource($employee->fresh()->load('user'))
         ]);
     }
 }
