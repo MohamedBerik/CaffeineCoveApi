@@ -77,10 +77,10 @@ class EmployeeController extends Controller
     {
         $validate = Validator::make($request->all(), [
             'name'      => 'required|min:3|max:255',
-            'email'     => 'required|email|unique:users,email',     // ✅ تحقق على users
+            'email'     => 'required|email|unique:users,email',
             'password'  => 'required|min:6|max:255',
             'salary'    => 'nullable|numeric|min:0',
-            'branch_id' => 'nullable|integer|exists:branches,id',   // ✅ اختيار الفرع
+            'branch_id' => 'nullable|integer|exists:branches,id',
             'phone' => 'nullable|string|max:30',
         ]);
 
@@ -110,7 +110,7 @@ class EmployeeController extends Controller
         $employee = Employee::create([
             'company_id' => $companyId,
             'branch_id'  => $branchId,
-            'user_id'    => $user->id,          // ✅ الربط مع users
+            'user_id'    => $user->id,
             'name'       => $request->name,
             'email'      => $request->email,
             'password'   => Hash::make($request->password),
