@@ -180,6 +180,8 @@ class DentalRecordController extends Controller
             ->with('procedure')
             ->findOrFail($id);
 
+        $this->authorize('view', $record);
+
         if ($record->treatment_plan_item_id) {
             return response()->json([
                 'msg' => 'Dental record already converted to treatment plan item',
