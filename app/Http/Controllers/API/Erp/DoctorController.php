@@ -15,7 +15,7 @@ class DoctorController extends Controller
 {
     public function __construct()
     {
-        $this->authorizeResource(Doctor::class, 'doctor', ['except' => ['index', "update"]]);
+        $this->authorizeResource(Doctor::class, 'doctor', ['except' => ['index', 'show', 'update']]);
     }
 
     public function index(Request $request)
