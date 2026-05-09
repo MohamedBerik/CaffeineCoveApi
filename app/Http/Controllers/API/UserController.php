@@ -99,10 +99,11 @@ class UserController extends Controller
     public function store(Request $request)
     {
         $validate = Validator::make($request->all(), [
-            'name' => 'required|min:3|max:255',
-            'email' => 'required|email|unique:users,email',
+            'name'     => 'required|min:3|max:255',
+            'email'    => 'required|email|unique:users,email',
             'password' => 'required|min:6|max:255',
-            'role' => ['nullable', Rule::in(['admin', 'user'])],
+            'role'     => ['nullable', Rule::in(['admin', 'doctor', 'receptionist', 'user'])],
+            'branch_id' => 'nullable|integer|exists:branches,id',
         ]);
 
         if ($validate->fails()) {
@@ -130,12 +131,13 @@ class UserController extends Controller
         }
 
         $user = User::create([
-            "name" => $request->name,
-            "email" => $request->email,
-            "password" => Hash::make($request->password),
-            "company_id" => $companyId,
-            "role" => $request->role ?? 'user',
-            "is_super_admin" => false,
+            "name"            => $request->name,
+            "email"           => $request->email,
+            "password"        => Hash::make($request->password),
+            "company_id"      => $companyId,
+            "branch_id"       => $request->branch_id ?? null,
+            "role"            => $request->role ?? 'user',
+            "is_super_admin"  => false,
         ]);
 
         return response()->json([
