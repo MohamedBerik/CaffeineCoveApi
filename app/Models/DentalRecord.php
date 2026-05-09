@@ -53,7 +53,8 @@ class DentalRecord extends Model
 
     public function procedure()
     {
-        return $this->belongsTo(Procedure::class);
+        return $this->belongsTo(Procedure::class)
+            ->withoutGlobalScope(\App\Models\Concerns\BranchScope::class);
     }
 
     public function doctor()
