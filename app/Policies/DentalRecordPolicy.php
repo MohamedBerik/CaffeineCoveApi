@@ -13,40 +13,29 @@ class DentalRecordPolicy
 
     public function viewAny(User $user): bool
     {
-        return $this->hasAccess($user);
+        return $user->hasPermissionTo('dental_records.view');
     }
 
     public function view(User $user, DentalRecord $record): bool
     {
-        return $this->hasAccess($user, $record->company_id);
+        return $user->hasPermissionTo('dental_records.view')
+            && $record->company_id == $user->company_id;
     }
 
     public function create(User $user): bool
     {
-        return $this->hasAccess($user);
+        return $user->hasPermissionTo('dental_records.create');
     }
 
     public function update(User $user, DentalRecord $record): bool
     {
-        return $this->hasAccess($user, $record->company_id);
+        return $user->hasPermissionTo('dental_records.view')
+            && $record->company_id == $user->company_id;
     }
 
     public function delete(User $user, DentalRecord $record): bool
     {
-        return $this->hasAccess($user, $record->company_id);
-    }
-
-    private function hasAccess(User $user, $companyId = null): bool
-    {
-        // Super Admin
-        if ($user->is_super_admin) {
-            if (Tenant::hasTenant()) {
-                return $companyId == Tenant::id();
-            }
-            return true;
-        }
-
-        // User عادي
-        return $companyId == $user->company_id;
+        return $user->hasPermissionTo('dental_records.view')
+            && $record->company_id == $user->company_id;
     }
 }
