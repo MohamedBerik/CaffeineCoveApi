@@ -7,7 +7,7 @@ use Illuminate\Http\Resources\Json\JsonResource;
 
 class PatientProfileResource extends JsonResource
 {
-    public function toArray(Request $request): array
+    public function toArray($request): array
     {
         return [
 
