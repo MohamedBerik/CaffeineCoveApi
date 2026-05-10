@@ -72,7 +72,7 @@ class Appointment extends Model
     ];
 
     protected $casts = [
-        'appointment_date' => 'date',
+        'appointment_date' => 'date:Y-m-d',
         'doctor_id' => 'integer',
         'patient_id' => 'integer',
         'last_reminder_at' => 'datetime',

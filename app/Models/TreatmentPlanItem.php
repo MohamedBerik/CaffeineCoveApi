@@ -53,8 +53,8 @@ class TreatmentPlanItem extends Model
 
     protected $appends = [
         'remaining_sessions',
-        'is_completed',
         'progress_percentage',
+        'is_completed',
     ];
 
     // ============ Relationships ============
@@ -113,24 +113,24 @@ class TreatmentPlanItem extends Model
 
     // ============ Accessors ============
 
-    public function getRemainingSessionsAttribute(): int
-    {
-        $planned = (int) ($this->planned_sessions ?? 1);
-        $completed = (int) ($this->completed_sessions ?? 0);
-        return max($planned - $completed, 0);
-    }
+    // public function getRemainingSessionsAttribute(): int
+    // {
+    //     $planned = (int) ($this->planned_sessions ?? 1);
+    //     $completed = (int) ($this->completed_sessions ?? 0);
+    //     return max($planned - $completed, 0);
+    // }
 
-    public function getIsCompletedAttribute(): bool
-    {
-        return $this->status === self::STATUS_COMPLETED || $this->remaining_sessions === 0;
-    }
+    // public function getIsCompletedAttribute(): bool
+    // {
+    //     return $this->status === self::STATUS_COMPLETED || $this->remaining_sessions === 0;
+    // }
 
-    public function getProgressPercentageAttribute(): float
-    {
-        $planned = max(1, (int) ($this->planned_sessions ?? 1));
-        $completed = (int) ($this->completed_sessions ?? 0);
-        return min(100, ($completed / $planned) * 100);
-    }
+    // public function getProgressPercentageAttribute(): float
+    // {
+    //     $planned = max(1, (int) ($this->planned_sessions ?? 1));
+    //     $completed = (int) ($this->completed_sessions ?? 0);
+    //     return min(100, ($completed / $planned) * 100);
+    // }
 
     public function getTotalPriceAttribute(): float
     {
@@ -164,6 +164,34 @@ class TreatmentPlanItem extends Model
             default => 'gray',
         };
     }
+
+    public function getRemainingSessionsAttribute(): int
+    {
+        return max(
+            0,
+            $this->planned_sessions - $this->completed_sessions
+        );
+    }
+
+    public function getProgressPercentageAttribute(): int
+    {
+        if ($this->planned_sessions <= 0) {
+            return 0;
+        }
+
+        return min(
+            100,
+            round(
+                ($this->completed_sessions / $this->planned_sessions) * 100
+            )
+        );
+    }
+
+    public function getIsCompletedAttribute(): bool
+    {
+        return $this->remaining_sessions === 0;
+    }
+
 
     // ============ Helpers ============
 
