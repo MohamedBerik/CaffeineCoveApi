@@ -90,6 +90,8 @@ class Appointment extends Model
         'is_upcoming',
         'is_past',
         'can_be_modified',
+        'status_label',   // ✅ جديد
+        'status_color',   // ✅ جديد
     ];
 
     // ============ Relationships ============

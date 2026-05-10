@@ -112,7 +112,6 @@ class RolesAndPermissionsSeeder extends Seeder
             'dental_records.view',
             'dental_records.create',
             'radiology.view',
-
         ]);
 
         $receptionistRole = Role::firstOrCreate(['name' => 'receptionist', 'guard_name' => 'api']);
