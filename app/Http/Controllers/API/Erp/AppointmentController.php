@@ -53,15 +53,23 @@ class AppointmentController extends Controller
 
     public function store(Request $request)
     {
-        return $this->appointmentService->store($request);
+        $appointment = $this->appointmentService->store($request);
+        return response()->json(['msg' => 'Appointment created', 'status' => 201, 'data' => new AppointmentResource($appointment)], 201);
     }
+
     public function update(Request $request, $id)
     {
-        return $this->appointmentService->update($request, $id);
+        $appointment = $this->appointmentService->update($request, $id);
+        $this->authorize('update', $appointment);
+        return response()->json(['msg' => 'Appointment updated', 'status' => 200, 'data' => new AppointmentResource($appointment)]);
     }
+
     public function destroy(Request $request, $id)
     {
-        return $this->appointmentService->destroy($request, $id);
+        $appointment = Appointment::findOrFail($id);
+        $this->authorize('delete', $appointment);
+        $this->appointmentService->destroy($request, $id);
+        return response()->json(['msg' => 'Appointment deleted', 'status' => 200, 'data' => null]);
     }
     public function book(Request $request)
     {

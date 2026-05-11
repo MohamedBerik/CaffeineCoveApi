@@ -87,6 +87,187 @@ class AppointmentService
             ->findOrFail($id);
     }
 
+    public function store(Request $request)
+    {
+        $companyId = Tenant::id();
+
+        $v = \Validator::make($request->all(), [
+            'patient_id' => ['required', 'integer', \Illuminate\Validation\Rule::exists('customers', 'id')],
+            'doctor_id' => ['required', 'integer', \Illuminate\Validation\Rule::exists('doctors', 'id')->where('is_active', true)],
+            'doctor_name' => ['nullable', 'string', 'max:190'],
+            'appointment_date' => ['required', 'date'],
+            'appointment_time' => ['required', 'date_format:H:i'],
+            'status' => ['nullable', \Illuminate\Validation\Rule::in(['scheduled', 'completed', 'cancelled', 'no_show'])],
+            'notes' => ['nullable', 'string'],
+        ]);
+
+        if ($v->fails()) {
+            return response()->json(['msg' => 'Validation required', 'status' => 422, 'errors' => $v->errors()], 422);
+        }
+
+        $data = $v->validated();
+        $date = Carbon::parse($data['appointment_date'])->toDateString();
+        $time = $data['appointment_time'];
+
+        $doctor = Doctor::query()->where('is_active', true)->findOrFail((int) $data['doctor_id']);
+        $doctorName = trim((string) ($data['doctor_name'] ?? '')) ?: ($doctor->name ?? 'Doctor');
+        $requestedStatus = $data['status'] ?? 'scheduled';
+        $blockedStatuses = ['scheduled', 'completed', 'no_show'];
+
+        $this->validateAppointmentDateTime($doctor, $date, $time);
+
+        return DB::transaction(function () use ($request, $companyId, $data, $date, $time, $doctor, $doctorName, $blockedStatuses, $requestedStatus) {
+            $existing = Appointment::query()
+                ->where('doctor_id', $doctor->id)
+                ->whereDate('appointment_date', $date)
+                ->whereTime('appointment_time', $time)
+                ->lockForUpdate()
+                ->first();
+
+            if ($existing) {
+                if (in_array($existing->status, $blockedStatuses, true)) {
+                    throw ValidationException::withMessages(['appointment_time' => ['This time slot is already booked for this doctor.']]);
+                }
+
+                if ($existing->status === 'cancelled') {
+                    $existing->update([
+                        'patient_id' => $data['patient_id'],
+                        'doctor_name' => $doctorName,
+                        'status' => $requestedStatus,
+                        'notes' => $data['notes'] ?? null,
+                        'created_by' => $request->user()->id,
+                        'appointment_date' => $date,
+                        'appointment_time' => $time,
+                        'appointment_type' => 'consultation',
+                        ...$this->buildPendingReminder($date, $time),
+                    ]);
+
+                    ActivityLogger::log($companyId, $request->user(), 'appointment.rebooked', Appointment::class, $existing->id, [
+                        'doctor_id' => $existing->doctor_id,
+                        'patient_id' => $existing->patient_id,
+                        'date' => $date,
+                        'time' => substr((string) $time, 0, 5),
+                    ]);
+
+                    return $existing->fresh();
+                }
+            }
+
+            try {
+                $appointment = Appointment::create([
+                    'company_id' => $companyId,
+                    'branch_id' => Tenant::branchId() ?? $request->user()->branch_id,
+                    'patient_id' => $data['patient_id'],
+                    'doctor_id' => $doctor->id,
+                    'doctor_name' => $doctorName,
+                    'appointment_date' => $date,
+                    'appointment_time' => $time,
+                    'status' => $requestedStatus,
+                    'notes' => $data['notes'] ?? null,
+                    'created_by' => $request->user()->id,
+                    'appointment_type' => 'consultation',
+                    ...$this->buildPendingReminder($date, $time),
+                ]);
+            } catch (QueryException $e) {
+                if ((string) $e->getCode() === '23000') {
+                    throw ValidationException::withMessages(['appointment_time' => ['This time slot is already booked for this doctor.']]);
+                }
+                throw $e;
+            }
+
+            $this->createConsultationInvoiceIfMissing($appointment, $request);
+
+            ActivityLogger::log($companyId, $request->user(), 'appointment.created', Appointment::class, $appointment->id, [
+                'doctor_id' => $appointment->doctor_id,
+                'patient_id' => $appointment->patient_id,
+                'date' => $date,
+                'time' => substr((string) $time, 0, 5),
+                'status' => $appointment->status,
+            ]);
+
+            return $appointment;
+        });
+    }
+
+    public function update(Request $request, $id)
+    {
+        $appointment = Appointment::query()->findOrFail($id);
+
+        $v = \Validator::make($request->all(), [
+            'notes' => ['nullable', 'string'],
+            'status' => ['sometimes', \Illuminate\Validation\Rule::in(['scheduled', 'cancelled', 'no_show'])],
+            'clinical_notes' => ['nullable', 'string'],
+            'diagnosis' => ['nullable', 'string'],
+            'next_step' => ['nullable', 'string'],
+        ]);
+
+        if ($v->fails()) {
+            return response()->json(['msg' => 'Validation required', 'status' => 422, 'errors' => $v->errors()], 422);
+        }
+
+        $data = $v->validated();
+
+        if ($appointment->status === 'completed' && array_key_exists('status', $data)) {
+            throw ValidationException::withMessages(['status' => ['Completed appointments status cannot be changed.']]);
+        }
+
+        $track = ['notes', 'clinical_notes', 'diagnosis', 'next_step', 'status'];
+        $before = $appointment->only($track);
+
+        $updateData = [];
+        foreach (['notes', 'clinical_notes', 'diagnosis', 'next_step'] as $field) {
+            if (array_key_exists($field, $data)) {
+                $updateData[$field] = $data[$field];
+            }
+        }
+        if ($appointment->status !== 'completed' && array_key_exists('status', $data)) {
+            $updateData['status'] = $data['status'];
+        }
+
+        $appointment->update($updateData);
+        $appointment->refresh();
+        $after = $appointment->only($track);
+
+        $changedFields = [];
+        foreach ($track as $k) {
+            if ((string) ($before[$k] ?? '') !== (string) ($after[$k] ?? '')) {
+                $changedFields[] = $k;
+            }
+        }
+
+        ActivityLogger::log(Tenant::id(), $request->user(), 'appointment.updated', Appointment::class, $appointment->id, [
+            'changed_fields' => $changedFields,
+            'doctor_id' => $appointment->doctor_id,
+            'patient_id' => $appointment->patient_id,
+            'date' => Carbon::parse($appointment->appointment_date)->toDateString(),
+            'time' => substr((string) $appointment->appointment_time, 0, 5),
+            'status' => $appointment->status,
+            'clinical_notes' => $appointment->clinical_notes,
+            'diagnosis' => $appointment->diagnosis,
+            'next_step' => $appointment->next_step,
+        ]);
+
+        return $appointment->load(['patient:id,name,email,company_id', 'doctor:id,name,company_id,work_start,work_end,slot_minutes']);
+    }
+
+    public function destroy(Request $request, $id)
+    {
+        $appointment = Appointment::query()->findOrFail($id);
+
+        ActivityLogger::log(Tenant::id(), $request->user(), 'appointment.deleted', Appointment::class, $appointment->id, [
+            'doctor_id' => $appointment->doctor_id,
+            'patient_id' => $appointment->patient_id,
+            'date' => Carbon::parse($appointment->appointment_date)->toDateString(),
+            'time' => substr((string) $appointment->appointment_time, 0, 5),
+            'status' => $appointment->status,
+            'appointment_type' => $appointment->appointment_type,
+        ]);
+
+        $appointment->delete();
+
+        return null; // success, no data
+    }
+
     public function book(Request $request)
     {
         $companyId = Tenant::id();
