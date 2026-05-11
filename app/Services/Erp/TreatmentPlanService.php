@@ -133,7 +133,7 @@ class TreatmentPlanService
                 'total_paid' => (float) $invoiceRows->sum('total_paid'),
                 'total_refunded' => (float) $invoiceRows->sum('total_refunded'),
                 'net_paid' => (float) $invoiceRows->sum('net_paid'),
-                'remaining_on_plan' => max(0, (float) $plan->total_cost - (float) $invoiceRows->sum('net_paid')),
+                'remaining_on_plan' => max(0, (float) $invoices->sum('total') - (float) $invoiceRows->sum('net_paid')),
             ],
             'invoices' => $invoiceRows->values(),
         ];
