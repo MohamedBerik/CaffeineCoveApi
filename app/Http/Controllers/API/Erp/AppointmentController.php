@@ -71,26 +71,32 @@ class AppointmentController extends Controller
         $this->appointmentService->destroy($request, $id);
         return response()->json(['msg' => 'Appointment deleted', 'status' => 200, 'data' => null]);
     }
+
     public function book(Request $request)
     {
         return $this->appointmentService->book($request);
     }
+
     public function cancel(Request $request, $id)
     {
         return $this->appointmentService->cancel($request, $id);
     }
+
     public function noShow(Request $request, $id)
     {
         return $this->appointmentService->noShow($request, $id);
     }
+
     public function reschedule(Request $request, $id)
     {
         return $this->appointmentService->reschedule($request, $id);
     }
+
     public function sendReminder(Request $request, $id)
     {
         return $this->appointmentService->sendReminder($request, $id);
     }
+    
     public function complete(Request $request, $id)
     {
         return $this->appointmentService->complete($request, $id);
