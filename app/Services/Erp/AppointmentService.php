@@ -555,6 +555,7 @@ class AppointmentService
         if (!CustomerLedgerEntry::query()->where('invoice_id', $invoice->id)->where('type', 'invoice')->exists()) {
             CustomerLedgerEntry::create([
                 'company_id'  => $companyId,
+                'branch_id'  => $branchId,   // ✅ أضف هذا السطر
                 'customer_id' => $invoice->customer_id,
                 'invoice_id'  => $invoice->id,
                 'payment_id'  => null,
@@ -920,6 +921,7 @@ class AppointmentService
 
         CustomerLedgerEntry::create([
             'company_id' => $companyId,
+            'branch_id'  => $branchId,   // ✅ أضف هذا السطر
             'customer_id' => $invoice->customer_id,
             'invoice_id' => $invoice->id,
             'type' => 'invoice',
@@ -932,7 +934,7 @@ class AppointmentService
         $this->autoApplyCustomerCredit($invoice, $request->user());
     }
 
-    private function autoApplyCustomerCredit(Invoice $invoice, $user): void
+    private function autoApplyCustomerCredit(Invoice $invoice, $user, $branchId): void
     {
         $companyId = $invoice->company_id;
 
@@ -995,6 +997,7 @@ class AppointmentService
 
         CustomerLedgerEntry::create([
             'company_id'  => $companyId,
+            'branch_id'   => $branchId,   // ✅ أضف هذا السطر
             'customer_id' => $invoice->customer_id,
             'invoice_id'  => $invoice->id,
             'payment_id'  => null,

@@ -19,6 +19,7 @@ class InvoicePaymentService
     public function store(Request $request, $invoiceId)
     {
         $companyId = Tenant::id();
+        $branchId  = Tenant::branchId() ?? $request->user()->branch_id;
 
         $data = $request->validate([
             'amount'            => ['required', 'numeric', 'min:0.01'],
@@ -96,6 +97,7 @@ class InvoicePaymentService
             if ($applied > 0) {
                 CustomerLedgerEntry::create([
                     'company_id'  => $companyId,
+                    'branch_id'   => $branchId,   // ✅ أضف هذا السطر
                     'customer_id' => $invoice->customer_id,
                     'invoice_id'  => $invoice->id,
                     'payment_id'  => $payment->id,
