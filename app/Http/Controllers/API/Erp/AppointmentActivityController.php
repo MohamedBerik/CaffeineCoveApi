@@ -12,32 +12,42 @@ class AppointmentActivityController extends Controller
 {
     public function index(Request $request, $id)
     {
-        // ✅ تأكيد أن الموعد بتاع نفس الشركة
-        $appointment = Appointment::query()->findOrFail($id);
+        // 1. جلب الموعد مع التأكيد على تبعيته لنفس الشركة
+        $appointment = Appointment::where('company_id', Tenant::id())->findOrFail($id);
 
-        // ✅ Authorization check
+        // 2. التحقق من الصلاحية (سيأخذ بالاعتبار الفرع والدور من خلال Policy)
         $this->authorize('view', $appointment);
 
-        // ✅ Eager load user relationship
-        $logs = ActivityLog::with('user:id,name')
+        // 3. بناء الاستعلام على سجلات النشاط
+        $logsQuery = ActivityLog::with('user:id,name')
             ->where('subject_type', Appointment::class)
-            ->where('subject_id', (int) $id)
-            ->orderByDesc('id')
-            ->get();
+            ->where('subject_id', $appointment->id);
+
+        // فلترة حسب company_id إن كان العمود موجوداً (احتياطي)
+        if (app(ActivityLog::class)->getConnection()->getSchemaBuilder()->hasColumn('activity_logs', 'company_id')) {
+            $logsQuery->where('company_id', Tenant::id());
+        }
+
+        // 4. ترتيب تنازلي مع pagination للحفاظ على الأداء
+        $logs = $logsQuery->orderByDesc('id')
+            ->paginate((int) $request->get('per_page', 20));
+
+        // 5. تنسيق البيانات (حافظت على نفس الحقول السابقة)
+        $data = $logs->through(fn($log) => [
+            'id' => $log->id,
+            'action' => $log->action,
+            'user_id' => $log->user_id,
+            'user_name' => $log->user?->name,
+            'subject_type' => $log->subject_type,
+            'subject_id' => $log->subject_id,
+            'properties' => $log->properties,
+            'created_at' => $log->created_at?->toISOString(),
+        ]);
 
         return response()->json([
             'msg' => 'Appointment activity',
             'status' => 200,
-            'data' => $logs->map(fn($log) => [
-                'id' => $log->id,
-                'action' => $log->action,
-                'user_id' => $log->user_id,
-                'user_name' => $log->user?->name,
-                'subject_type' => $log->subject_type,
-                'subject_id' => $log->subject_id,
-                'properties' => $log->properties,
-                'created_at' => $log->created_at?->toISOString(),
-            ]),
+            'data' => $data,
         ]);
     }
 }
