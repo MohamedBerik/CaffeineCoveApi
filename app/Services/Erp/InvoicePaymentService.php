@@ -30,7 +30,7 @@ class InvoicePaymentService
 
         $allowOverpayment = (bool)($data['allow_overpayment'] ?? false);
 
-        return DB::transaction(function () use ($request, $invoiceId, $companyId, $data, $allowOverpayment) {
+        return DB::transaction(function () use ($request, $invoiceId, $companyId, $data, $allowOverpayment, $branchId) {
 
             $invoice = Invoice::lockForUpdate()->findOrFail($invoiceId);
 
