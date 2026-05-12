@@ -122,10 +122,12 @@ class PatientProfileService
 
     protected function getFinancialSummary(Customer $customer): array
     {
+        // 1. استخدم جميع الفواتير (بدون limit)
         $invoiceIds = Invoice::query()
             ->where('customer_id', $customer->id)
-            ->pluck('id');
+            ->pluck('id'); // الآن كل الفواتير، وليس فقط 10
 
+        // 2. أرصدة العملاء (كما هي)
         $creditIssued = (float) DB::table('customer_credits')
             ->where('customer_id', $customer->id)
             ->where('type', 'credit')
@@ -138,10 +140,12 @@ class PatientProfileService
 
         $netCredit = max(0, $creditIssued - $creditUsed);
 
+        // 3. إجمالي الفواتير (كل الفواتير)
         $invoicesTotal = (float) Invoice::query()
             ->where('customer_id', $customer->id)
             ->sum('total');
 
+        // 4. المدفوعات المباشرة ومرتجعات الفواتير و credit_applied على جميع الفواتير
         $directPayments = 0.0;
         $invoiceRefunds = 0.0;
         $creditApplied = 0.0;
@@ -165,9 +169,8 @@ class PatientProfileService
         }
 
         $paid = max(0, $directPayments - $invoiceRefunds + $creditApplied);
-        $remainingFromInvoices = max(0, $invoicesTotal - $paid);
 
-        // المصدر الموثوق (Ledger)
+        // 5. المصدر الموثوق (Ledger) – الرصيد الحقيقي المستخدم في remaining
         $ledger = DB::table('customer_ledger_entries')
             ->where('customer_id', $customer->id);
 
@@ -175,7 +178,7 @@ class PatientProfileService
         $totalCredit = (float) (clone $ledger)->sum('credit');
         $closingBalance = $totalDebit - $totalCredit;
 
-        // الرقم النهائي المعتمد (المتبقي الفعلي على العميل)
+        // 6. المتبقي الفعلي هو الأكبر من الصفر للرصيد الختامي
         $customerBalance = max(0, $closingBalance);
 
         return [
@@ -186,22 +189,19 @@ class PatientProfileService
             ],
 
             'invoices' => [
-                'total'           => $invoicesTotal,
-                'direct_paid'     => $directPayments,
-                'credit_applied'  => $creditApplied,
-                'paid'            => $paid,
-                'remaining'       => $customerBalance,   // ← التعديل الجوهري هنا
+                'total'          => $invoicesTotal,          // إجمالي جميع الفواتير
+                'direct_paid'    => $directPayments,        // مدفوعات نقدية على جميع الفواتير
+                'credit_applied' => $creditApplied,         // رصيد مستخدم من عميل
+                'paid'           => $paid,                  // صافي المدفوعات (شامل الائتمان)
+                'remaining'      => $customerBalance,       // الرصيد الحقيقي من الـ Ledger
             ],
 
             'ledger' => [
-                'opening_balance' => 0, // يمكنك حسابه إذا أردت، لكنه غير ضروري للتوحيد
+                'opening_balance' => 0, // حسب الحاجة
                 'total_debit'     => $totalDebit,
                 'total_credit'    => $totalCredit,
-                'closing_balance' => $closingBalance,   // متطابق مع customerBalance
+                'closing_balance' => $closingBalance,
             ],
-
-            // (اختياري) يمكن إضافة هذا الحقل لتوضيح أن الرصيص معتمد على Ledger
-            'customer_balance' => $customerBalance,
         ];
     }
 
