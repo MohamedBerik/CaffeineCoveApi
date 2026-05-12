@@ -147,18 +147,12 @@ class PatientProfileService
         $creditApplied = 0.0;
 
         if ($invoiceIds->isNotEmpty()) {
-
             $directPayments = (float) Payment::query()
                 ->whereIn('invoice_id', $invoiceIds)
                 ->sum('applied_amount');
 
             $invoiceRefunds = (float) DB::table('payment_refunds')
-                ->join(
-                    'payments',
-                    'payments.id',
-                    '=',
-                    'payment_refunds.payment_id'
-                )
+                ->join('payments', 'payments.id', '=', 'payment_refunds.payment_id')
                 ->whereIn('payments.invoice_id', $invoiceIds)
                 ->where('payment_refunds.applies_to', 'invoice')
                 ->sum('payment_refunds.amount');
@@ -170,52 +164,44 @@ class PatientProfileService
                 ->sum('amount');
         }
 
-        $paid = max(
-            0,
-            $directPayments - $invoiceRefunds + $creditApplied
-        );
+        $paid = max(0, $directPayments - $invoiceRefunds + $creditApplied);
+        $remainingFromInvoices = max(0, $invoicesTotal - $paid);
 
-        $remaining = max(
-            0,
-            $invoicesTotal - $paid
-        );
-
-        /*
-       |--------------------------------------------------------------------------
-       | Ledger = Source Of Truth
-       |--------------------------------------------------------------------------
-       */
-
+        // المصدر الموثوق (Ledger)
         $ledger = DB::table('customer_ledger_entries')
             ->where('customer_id', $customer->id);
 
         $totalDebit = (float) (clone $ledger)->sum('debit');
-
         $totalCredit = (float) (clone $ledger)->sum('credit');
-
         $closingBalance = $totalDebit - $totalCredit;
+
+        // الرقم النهائي المعتمد (المتبقي الفعلي على العميل)
+        $customerBalance = max(0, $closingBalance);
 
         return [
             'credit_balance' => [
                 'credit_issued' => $creditIssued,
-                'credit_used' => $creditUsed,
-                'net_credit' => $netCredit,
+                'credit_used'   => $creditUsed,
+                'net_credit'    => $netCredit,
             ],
 
             'invoices' => [
-                'total' => $invoicesTotal,
-                'direct_paid' => $directPayments,
-                'credit_applied' => $creditApplied,
-                'paid' => $paid,
-                'remaining' => $remaining,
+                'total'           => $invoicesTotal,
+                'direct_paid'     => $directPayments,
+                'credit_applied'  => $creditApplied,
+                'paid'            => $paid,
+                'remaining'       => $customerBalance,   // ← التعديل الجوهري هنا
             ],
 
             'ledger' => [
-                'opening_balance' => 0,
-                'total_debit' => $totalDebit,
-                'total_credit' => $totalCredit,
-                'closing_balance' => $closingBalance,
+                'opening_balance' => 0, // يمكنك حسابه إذا أردت، لكنه غير ضروري للتوحيد
+                'total_debit'     => $totalDebit,
+                'total_credit'    => $totalCredit,
+                'closing_balance' => $closingBalance,   // متطابق مع customerBalance
             ],
+
+            // (اختياري) يمكن إضافة هذا الحقل لتوضيح أن الرصيص معتمد على Ledger
+            'customer_balance' => $customerBalance,
         ];
     }
 
