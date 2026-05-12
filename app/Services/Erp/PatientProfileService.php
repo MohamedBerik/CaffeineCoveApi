@@ -15,40 +15,37 @@ class PatientProfileService
 {
     public function build(Customer $customer): array
     {
+        // يجلب branch_id مرة واحدة لاستخدامه في كل الاستعلامات
+        $branchId = $customer->branch_id;
+
         return [
-            'patient' => $customer,
-
-            'procedures' => $this->getProcedures(),
-
-            'appointments' => $this->getAppointments($customer),
-
-            'dental_records' => $this->getDentalRecords($customer),
-
-            'treatment_plans' => $this->getTreatmentPlans($customer),
-
-            'invoices' => $this->getInvoices($customer),
-
-            'financial_summary' => $this->getFinancialSummary($customer),
+            'patient'      => $customer,
+            'procedures'   => $this->getProcedures(),
+            'appointments' => $this->getAppointments($customer, $branchId),
+            'dental_records' => $this->getDentalRecords($customer, $branchId),
+            'treatment_plans' => $this->getTreatmentPlans($customer, $branchId),
+            'invoices'     => $this->getInvoices($customer, $branchId),
+            'financial_summary' => $this->getFinancialSummary($customer, $branchId),
         ];
     }
 
-    protected function getAppointments(Customer $customer)
+    protected function getAppointments(Customer $customer, $branchId)
     {
         return Appointment::query()
             ->where('patient_id', $customer->id)
-            ->with([
-                'doctor:id,name,company_id',
-            ])
+            ->when($branchId, fn($q) => $q->where('branch_id', $branchId))
+            ->with(['doctor:id,name,company_id'])
             ->latest('appointment_date')
             ->latest('appointment_time')
             ->limit(10)
             ->get();
     }
 
-    protected function getDentalRecords(Customer $customer)
+    protected function getDentalRecords(Customer $customer, $branchId)
     {
         return DentalRecord::query()
             ->where('customer_id', $customer->id)
+            ->when($branchId, fn($q) => $q->where('branch_id', $branchId))
             ->with([
                 'appointment:id,company_id,appointment_date,appointment_time,status',
                 'procedure:id,company_id,name,default_price',
@@ -59,37 +56,26 @@ class PatientProfileService
             ->get();
     }
 
-    protected function getTreatmentPlans(Customer $customer)
+    protected function getTreatmentPlans(Customer $customer, $branchId)
     {
         $plans = TreatmentPlan::query()
             ->where('customer_id', $customer->id)
-            ->with([
-                'items',
-            ])
+            ->when($branchId, fn($q) => $q->where('branch_id', $branchId))
+            ->with(['items'])
             ->latest('id')
             ->limit(10)
             ->get();
 
         $plans->each(function ($plan) {
             $plan->items->transform(function ($item) {
-
                 $completedSessions = (int) $item->completed_sessions;
                 $plannedSessions = max(1, (int) $item->planned_sessions);
-
-                $remainingSessions = max(
-                    0,
-                    $plannedSessions - $completedSessions
-                );
-
-                $progress = min(
-                    100,
-                    round(($completedSessions / $plannedSessions) * 100)
-                );
+                $remainingSessions = max(0, $plannedSessions - $completedSessions);
+                $progress = min(100, round(($completedSessions / $plannedSessions) * 100));
 
                 $item->remaining_sessions = $remainingSessions;
                 $item->progress_percentage = $progress;
                 $item->is_completed = $remainingSessions === 0;
-
                 return $item;
             });
         });
@@ -97,10 +83,11 @@ class PatientProfileService
         return $plans;
     }
 
-    protected function getInvoices(Customer $customer)
+    protected function getInvoices(Customer $customer, $branchId)
     {
         return Invoice::query()
             ->where('customer_id', $customer->id)
+            ->when($branchId, fn($q) => $q->where('branch_id', $branchId))
             ->latest('issued_at')
             ->latest('id')
             ->limit(10)
@@ -120,14 +107,14 @@ class PatientProfileService
             ]);
     }
 
-    protected function getFinancialSummary(Customer $customer): array
+    protected function getFinancialSummary(Customer $customer, $branchId): array
     {
-        // 1. استخدم جميع الفواتير (بدون limit)
+        // ✅ يتم الآن فلترة الفواتير حسب الفرع
         $invoiceIds = Invoice::query()
             ->where('customer_id', $customer->id)
-            ->pluck('id'); // الآن كل الفواتير، وليس فقط 10
+            ->when($branchId, fn($q) => $q->where('branch_id', $branchId))
+            ->pluck('id');
 
-        // 2. أرصدة العملاء (كما هي)
         $creditIssued = (float) DB::table('customer_credits')
             ->where('customer_id', $customer->id)
             ->where('type', 'credit')
@@ -140,12 +127,11 @@ class PatientProfileService
 
         $netCredit = max(0, $creditIssued - $creditUsed);
 
-        // 3. إجمالي الفواتير (كل الفواتير)
         $invoicesTotal = (float) Invoice::query()
             ->where('customer_id', $customer->id)
+            ->when($branchId, fn($q) => $q->where('branch_id', $branchId))
             ->sum('total');
 
-        // 4. المدفوعات المباشرة ومرتجعات الفواتير و credit_applied على جميع الفواتير
         $directPayments = 0.0;
         $invoiceRefunds = 0.0;
         $creditApplied = 0.0;
@@ -170,15 +156,14 @@ class PatientProfileService
 
         $paid = max(0, $directPayments - $invoiceRefunds + $creditApplied);
 
-        // 5. المصدر الموثوق (Ledger) – الرصيد الحقيقي المستخدم في remaining
+        // ✅ دفتر الأستاذ أصبح الآن المصدر الوحيد للرصيد المتبقي
         $ledger = DB::table('customer_ledger_entries')
-            ->where('customer_id', $customer->id);
+            ->where('customer_id', $customer->id)
+            ->when($branchId, fn($q) => $q->where('branch_id', $branchId));
 
         $totalDebit = (float) (clone $ledger)->sum('debit');
         $totalCredit = (float) (clone $ledger)->sum('credit');
         $closingBalance = $totalDebit - $totalCredit;
-
-        // 6. المتبقي الفعلي هو الأكبر من الصفر للرصيد الختامي
         $customerBalance = max(0, $closingBalance);
 
         return [
@@ -187,17 +172,15 @@ class PatientProfileService
                 'credit_used'   => $creditUsed,
                 'net_credit'    => $netCredit,
             ],
-
             'invoices' => [
-                'total'          => $invoicesTotal,          // إجمالي جميع الفواتير
-                'direct_paid'    => $directPayments,        // مدفوعات نقدية على جميع الفواتير
-                'credit_applied' => $creditApplied,         // رصيد مستخدم من عميل
-                'paid'           => $paid,                  // صافي المدفوعات (شامل الائتمان)
-                'remaining'      => $customerBalance,       // الرصيد الحقيقي من الـ Ledger
+                'total'          => $invoicesTotal,
+                'direct_paid'    => $directPayments,
+                'credit_applied' => $creditApplied,
+                'paid'           => $paid,
+                'remaining'      => $customerBalance,   // من الـ Ledger
             ],
-
             'ledger' => [
-                'opening_balance' => 0, // حسب الحاجة
+                'opening_balance' => 0,
                 'total_debit'     => $totalDebit,
                 'total_credit'    => $totalCredit,
                 'closing_balance' => $closingBalance,
@@ -207,15 +190,8 @@ class PatientProfileService
 
     protected function getProcedures()
     {
-        return Procedure::withoutGlobalScope(
-            \App\Models\Concerns\BranchScope::class
-        )
+        return Procedure::withoutGlobalScope(\App\Models\Concerns\BranchScope::class)
             ->orderBy('name')
-            ->get([
-                'id',
-                'company_id',
-                'name',
-                'default_price',
-            ]);
+            ->get(['id', 'company_id', 'name', 'default_price']);
     }
 }

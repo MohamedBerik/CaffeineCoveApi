@@ -21,6 +21,7 @@ class PatientProfileController extends Controller
 
         $customer = Customer::query()
             ->where('company_id', $companyId)
+            ->when($request->user()->branch_id, fn($q, $b) => $q->where('branch_id', $b))
             ->findOrFail($customerId);
 
         $this->authorize('view', $customer);
