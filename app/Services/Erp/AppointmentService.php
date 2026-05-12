@@ -568,7 +568,7 @@ class AppointmentService
             ]);
         }
 
-        $this->autoApplyCustomerCredit($invoice, $request->user());
+        $this->autoApplyCustomerCredit($invoice, $request->user(), $branchId);
         $invoice->refresh();
 
         $currentCompleted = (int) ($linkedPlanItem->completed_sessions ?? 0);
@@ -931,7 +931,7 @@ class AppointmentService
             'description' => 'Consultation invoice #' . $invoice->number,
         ]);
 
-        $this->autoApplyCustomerCredit($invoice, $request->user());
+        $this->autoApplyCustomerCredit($invoice, $request->user(), $branchId);
     }
 
     private function autoApplyCustomerCredit(Invoice $invoice, $user, $branchId): void
