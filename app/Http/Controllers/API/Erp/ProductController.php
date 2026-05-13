@@ -4,6 +4,7 @@ namespace App\Http\Controllers\API\Erp;
 
 use App\Http\Controllers\Controller;
 use App\Http\Resources\ProductResource;
+use App\Models\Concerns\BranchScope;
 use App\Models\Product;
 use App\Services\Tenant;
 use Illuminate\Http\Request;
@@ -39,7 +40,10 @@ class ProductController extends Controller
 
     public function show(Request $request, $id)
     {
-        $product = Product::where('company_id', Tenant::id())->findOrFail($id);
+        $product = Product::withoutGlobalScope(BranchScope::class)
+            ->where('company_id', Tenant::id())
+            ->findOrFail($id);
+
         $this->authorize('view', $product);
 
         return response()->json([
@@ -100,8 +104,11 @@ class ProductController extends Controller
 
     public function update(Request $request, $id)
     {
-        $product = Product::where('company_id', Tenant::id())->findOrFail($id);
-        // $this->authorize('update', $product);
+        $product = Product::withoutGlobalScope(BranchScope::class)
+            ->where('company_id', Tenant::id())
+            ->findOrFail($id);
+
+        $this->authorize('update', $product);
 
         $validate = Validator::make($request->all(), [
             "title_en" => "sometimes|required|min:3|max:255",
@@ -156,7 +163,10 @@ class ProductController extends Controller
 
     public function destroy(Request $request, $id)
     {
-        $product = Product::where('company_id', Tenant::id())->findOrFail($id);
+        $product = Product::withoutGlobalScope(BranchScope::class)
+            ->where('company_id', Tenant::id())
+            ->findOrFail($id);
+
         $this->authorize('delete', $product);
 
         if ($product->product_image && File::exists(public_path("/img/product/" . $product->product_image))) {
