@@ -19,11 +19,11 @@ class RolesAndPermissionsSeeder extends Seeder
             'finance.create',
             'orders.view',
             'orders.manage',
-            'orders.confirm',       // 🆕
-            'orders.cancel',        // 🆕
+            'orders.confirm',
+            'orders.cancel',
             'appointments.view',
             'appointments.manage',
-            'appointments.complete', // 🆕
+            'appointments.complete',
             'patients.view',
             'patients.manage',
             'treatment_plans.view',
@@ -51,15 +51,19 @@ class RolesAndPermissionsSeeder extends Seeder
             'radiology.manage',
             'dental_records.view',
             'dental_records.create',
-            'payments.refund',      // 🆕
-            'users.manage',         // 🆕
+            'payments.refund',
+            'users.manage',
+            'invoices.pay',
+            // ✅ صلاحيات المنتجات الجديدة
+            'products.view',
+            'products.manage',
         ];
 
         foreach ($permissions as $perm) {
             Permission::firstOrCreate(['name' => $perm, 'guard_name' => 'api']);
         }
 
-        // داخل run()
+        // Admin role
         $adminRole = Role::firstOrCreate(['name' => 'admin', 'guard_name' => 'api']);
         $adminRole->syncPermissions([
             'finance.view',
@@ -101,8 +105,12 @@ class RolesAndPermissionsSeeder extends Seeder
             'payments.refund',
             'users.manage',
             'invoices.pay',
+            // ✅ صلاحيات المنتجات للأدمن
+            'products.view',
+            'products.manage',
         ]);
 
+        // Doctor role
         $doctorRole = Role::firstOrCreate(['name' => 'doctor', 'guard_name' => 'api']);
         $doctorRole->syncPermissions([
             'appointments.view',
@@ -114,6 +122,7 @@ class RolesAndPermissionsSeeder extends Seeder
             'radiology.view',
         ]);
 
+        // Receptionist role
         $receptionistRole = Role::firstOrCreate(['name' => 'receptionist', 'guard_name' => 'api']);
         $receptionistRole->syncPermissions([
             'appointments.view',
