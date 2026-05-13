@@ -58,11 +58,9 @@ class ProductController extends Controller
         $validate = Validator::make($request->all(), [
             'title_en' => 'required|min:3|max:255',
             'title_ar' => 'required|min:3|max:255',
-            'description_en' => 'nullable|string',
-            'description_ar' => 'nullable|string',
             'unit_price' => 'required|numeric|min:0',
             'category_id' => 'required|exists:categories,id',
-            'product_image' => 'nullable|image|max:2048|mimes:png,jpeg,jpg',
+            'product_image' => 'nullable|image|max:2048',
             'quantity' => 'nullable|integer|min:0',
         ]);
 
@@ -74,32 +72,47 @@ class ProductController extends Controller
             ], 422);
         }
 
-        $imageName = null;
-        if ($request->hasFile("product_image")) {
-            $image = $request->product_image;
-            $imageName = rand(1, 1000) . "_" . time() . "." . $image->extension();
-            $image->move(public_path("/img/product/"), $imageName);
+        try {
+            $imageName = null;
+            if ($request->hasFile("product_image")) {
+                $image = $request->product_image;
+                $imageName = rand(1, 1000) . "_" . time() . "." . $image->extension();
+                $image->move(public_path("/img/product/"), $imageName);
+            }
+
+            // ✅ تأكد من أن Tenant::id() لا يعود بـ null
+            $companyId = Tenant::id();
+            if (!$companyId) {
+                return response()->json(["msg" => "Company ID not found"], 403);
+            }
+
+            $product = Product::create([
+                "company_id"     => $companyId,
+                "branch_id"      => Tenant::branchId() ?? $request->user()->branch_id,
+                "title_en"       => $request->title_en,
+                "title_ar"       => $request->title_ar,
+                "description_en" => $request->description_en,
+                "description_ar" => $request->description_ar,
+                "unit_price"     => $request->unit_price,
+                "stock_quantity" => $request->quantity ?? 0, // تأكد أن هذا الحقل موجود في الـ Migration
+                "quantity"       => $request->quantity ?? 0,
+                "category_id"    => $request->category_id,
+                "product_image"  => $imageName,
+            ]);
+
+            return response()->json([
+                "msg" => "Product created successfully",
+                "status" => 201,
+                "data" => new ProductResource($product)
+            ], 201);
+        } catch (\Illuminate\Database\QueryException $e) {
+            // هنا سنعرف الخطأ الحقيقي من SQL
+            return response()->json([
+                "msg" => "Database Error",
+                "status" => 500,
+                "error" => $e->getMessage() // هذا سيخبرك بالحقل الناقص بالضبط
+            ], 500);
         }
-
-        $product = Product::create([
-            "company_id"     => Tenant::id(),
-            "branch_id"      => Tenant::branchId() ?? $request->user()->branch_id,
-            "title_en"       => $request->title_en,
-            "title_ar"       => $request->title_ar,
-            "description_en" => $request->description_en,
-            "description_ar" => $request->description_ar,
-            "unit_price"     => $request->unit_price,
-            "stock_quantity" => $request->quantity ?? 0,
-            "quantity"       => $request->quantity ?? 0,
-            "category_id"    => $request->category_id,
-            "product_image"  => $imageName,
-        ]);
-
-        return response()->json([
-            "msg" => "Product created successfully",
-            "status" => 201,
-            "data" => new ProductResource($product)
-        ], 201);
     }
 
     public function update(Request $request, $id)
