@@ -15,7 +15,7 @@ class ProductController extends Controller
 {
     public function __construct()
     {
-        $this->authorizeResource(Product::class, 'product', ['except' => ['index', 'show', 'update']]);
+        $this->authorizeResource(Product::class, 'product', ['except' => ['index', 'show', 'update', 'destroy']]);
     }
 
     public function index(Request $request)
