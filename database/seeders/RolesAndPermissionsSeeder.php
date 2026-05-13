@@ -141,6 +141,7 @@ class RolesAndPermissionsSeeder extends Seeder
             'dental_records.create',
             'dental_records.view',
             'radiology.view',
+            'inventory.view',
         ]);
     }
 }

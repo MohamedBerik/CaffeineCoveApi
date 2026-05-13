@@ -15,7 +15,7 @@ class CategoryController extends Controller
 {
     public function __construct()
     {
-        $this->authorizeResource(Category::class, 'category');
+        $this->authorizeResource(Category::class, 'category', ['except' => ['index', 'show']]);
     }
 
     public function index(Request $request)
