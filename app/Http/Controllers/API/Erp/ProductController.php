@@ -14,17 +14,24 @@ class ProductController extends Controller
 {
     public function __construct()
     {
-        $this->authorizeResource(Product::class, 'product');
+        $this->authorizeResource(Product::class, 'product', ['except' => ['index', 'show', 'update']]);
     }
 
     public function index(Request $request)
     {
-        $products = ProductResource::collection(
-            Product::query()->get()
-        );
+        $user = $request->user();
+
+        $query = Product::query()->orderByDesc('id');
+
+        // عزل الفروع لغير المشرفين
+        if (!$user->is_super_admin && $user->branch_id !== null) {
+            $query->where('branch_id', $user->branch_id);
+        }
+
+        $products = ProductResource::collection($query->paginate((int)$request->get('per_page', 20)));
 
         return response()->json([
-            "msg" => "Return All Data From Product Table",
+            "msg" => "Products list",
             "status" => 200,
             "data" => $products
         ]);
@@ -32,46 +39,14 @@ class ProductController extends Controller
 
     public function show(Request $request, $id)
     {
-        $product = Product::query()->find($id);
-
-        if ($product) {
-            return response()->json([
-                "msg" => "Return One Record of Product Table",
-                "status" => 200,
-                "data" => new ProductResource($product)
-            ]);
-        }
+        $product = Product::where('company_id', Tenant::id())->findOrFail($id);
+        $this->authorize('view', $product);
 
         return response()->json([
-            "msg" => "No Such id",
-            "status" => 404,
-            "data" => null
-        ], 404);
-    }
-
-    public function delete(Request $request)
-    {
-        $id = $request->id;
-        $product = Product::query()->find($id);
-
-        if ($product) {
-            if ($product->product_image && File::exists(public_path("/img/product/" . $product->product_image))) {
-                File::delete(public_path("/img/product/" . $product->product_image));
-            }
-            $product->delete();
-
-            return response()->json([
-                "msg" => "Deleted Successfully",
-                "status" => 200,
-                "data" => null
-            ]);
-        }
-
-        return response()->json([
-            "msg" => "No Such id",
-            "status" => 404,
-            "data" => null
-        ], 404);
+            "msg" => "Product details",
+            "status" => 200,
+            "data" => new ProductResource($product)
+        ]);
     }
 
     public function store(Request $request)
@@ -104,6 +79,7 @@ class ProductController extends Controller
 
         $product = Product::create([
             "company_id"     => Tenant::id(),
+            "branch_id"      => Tenant::branchId() ?? $request->user()->branch_id,
             "title_en"       => $request->title_en,
             "title_ar"       => $request->title_ar,
             "description_en" => $request->description_en,
@@ -116,32 +92,24 @@ class ProductController extends Controller
         ]);
 
         return response()->json([
-            "msg" => "Created Successfully",
+            "msg" => "Product created successfully",
             "status" => 201,
             "data" => new ProductResource($product)
         ], 201);
     }
 
-    public function update(Request $request)
+    public function update(Request $request, $id)
     {
-        $old_id = $request->old_id;
-        $product = Product::query()->find($old_id);
-
-        if (!$product) {
-            return response()->json([
-                "msg" => "No such id",
-                "status" => 404,
-                "data" => null
-            ], 404);
-        }
+        $product = Product::where('company_id', Tenant::id())->findOrFail($id);
+        $this->authorize('update', $product);
 
         $validate = Validator::make($request->all(), [
-            "title_en" => "required|min:3|max:255",
-            "title_ar" => "required|min:3|max:255",
+            "title_en" => "sometimes|required|min:3|max:255",
+            "title_ar" => "sometimes|required|min:3|max:255",
             "description_en" => "nullable|string",
             "description_ar" => "nullable|string",
-            "unit_price" => "required|numeric|min:0",
-            "category_id" => "required|exists:categories,id",
+            "unit_price" => "sometimes|required|numeric|min:0",
+            "category_id" => "sometimes|required|exists:categories,id",
             "product_image" => "nullable|image|max:2048|mimes:png,jpeg,jpg",
             "quantity" => "nullable|integer|min:0",
         ]);
@@ -168,21 +136,38 @@ class ProductController extends Controller
         }
 
         $product->update([
-            "title_en" => $request->title_en,
-            "title_ar" => $request->title_ar,
-            "description_en" => $request->description_en,
-            "description_ar" => $request->description_ar,
-            "unit_price" => $request->unit_price,
+            "title_en" => $request->title_en ?? $product->title_en,
+            "title_ar" => $request->title_ar ?? $product->title_ar,
+            "description_en" => $request->description_en ?? $product->description_en,
+            "description_ar" => $request->description_ar ?? $product->description_ar,
+            "unit_price" => $request->unit_price ?? $product->unit_price,
             "stock_quantity" => $request->quantity ?? $product->stock_quantity,
             "quantity" => $request->quantity ?? $product->quantity,
-            "category_id" => $request->category_id,
+            "category_id" => $request->category_id ?? $product->category_id,
             "product_image" => $imageName,
         ]);
 
         return response()->json([
-            "msg" => "Updated Successfully",
+            "msg" => "Product updated successfully",
             "status" => 200,
             "data" => new ProductResource($product)
+        ]);
+    }
+
+    public function destroy(Request $request, $id)
+    {
+        $product = Product::where('company_id', Tenant::id())->findOrFail($id);
+        $this->authorize('delete', $product);
+
+        if ($product->product_image && File::exists(public_path("/img/product/" . $product->product_image))) {
+            File::delete(public_path("/img/product/" . $product->product_image));
+        }
+        $product->delete();
+
+        return response()->json([
+            "msg" => "Product deleted successfully",
+            "status" => 200,
+            "data" => null
         ]);
     }
 }
