@@ -54,42 +54,49 @@ class SupplierController extends Controller
      */
     public function store(Request $request)
     {
-        // الصلاحية يتم فحصها عبر middleware (permission:inventory.manage)
-        // لذلك لا نستخدم authorize هنا لتجنب أي تعارض يؤدي إلى خطأ 500.
+        // تخطي الصلاحيات مؤقتًا للتشخيص
+        try {
+            $validate = Validator::make($request->all(), [
+                'name' => 'required|min:3|max:255',
+                'email' => 'required|email|unique:suppliers,email',
+                'phone' => 'required|min:3|max:255',
+                'address' => 'nullable|string|max:500',
+                'contact_person' => 'nullable|string|max:255',
+                'notes' => 'nullable|string',
+            ]);
 
-        $validate = Validator::make($request->all(), [
-            'name' => 'required|min:3|max:255',
-            'email' => 'required|email|unique:suppliers,email',
-            'phone' => 'required|min:3|max:255',
-            'address' => 'nullable|string|max:500',
-            'contact_person' => 'nullable|string|max:255',
-            'notes' => 'nullable|string',
-        ]);
+            if ($validate->fails()) {
+                return response()->json([
+                    "msg" => "Validation required",
+                    "status" => 422,
+                    "data" => $validate->errors()
+                ], 422);
+            }
 
-        if ($validate->fails()) {
+            $supplier = Supplier::create([
+                "company_id" => Tenant::id(),
+                "branch_id"  => Tenant::branchId() ?? $request->user()->branch_id,
+                "name" => $request->name,
+                "email" => $request->email,
+                "phone" => $request->phone,
+                "address" => $request->address ?? '',
+                "contact_person" => $request->contact_person ?? '',
+                "notes" => $request->notes ?? '',
+            ]);
+
             return response()->json([
-                "msg" => "Validation required",
-                "status" => 422,
-                "data" => $validate->errors()
-            ], 422);
+                "msg" => "Created Successfully",
+                "status" => 201,
+                "data" => new SupplierResource($supplier)
+            ], 201);
+        } catch (\Exception $e) {
+            \Log::error('Supplier store error: ' . $e->getMessage());
+            return response()->json([
+                "msg" => "Server error: " . $e->getMessage(),
+                "status" => 500,
+                "data" => null
+            ], 500);
         }
-
-        $supplier = Supplier::create([
-            "company_id" => Tenant::id(),
-            "branch_id"  => Tenant::branchId() ?? $request->user()->branch_id,
-            "name" => $request->name,
-            "email" => $request->email,
-            "phone" => $request->phone,
-            "address" => $request->address,
-            "contact_person" => $request->contact_person,
-            "notes" => $request->notes,
-        ]);
-
-        return response()->json([
-            "msg" => "Supplier created successfully",
-            "status" => 201,
-            "data" => new SupplierResource($supplier)
-        ], 201);
     }
 
     /**
