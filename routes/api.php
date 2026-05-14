@@ -40,7 +40,7 @@ use App\Http\Controllers\API\Erp\PatientProfileController;
 use App\Http\Controllers\API\Erp\PatientTimelineController;
 use App\Http\Controllers\API\Erp\ProcedureController;
 use App\Http\Controllers\API\Erp\RadiologyController;
-
+use App\Http\Controllers\API\Erp\SupplyController;
 // SaaS Controllers
 use App\Http\Controllers\API\SaaS\SaasDashboardController;
 use App\Http\Controllers\API\SaaS\SaasReportsController;
@@ -370,6 +370,8 @@ Route::prefix('erp')
             Route::get('/categories/{id}', [CategoryController::class, 'show']);
             Route::get('/suppliers', [SupplierController::class, 'index']);
             Route::get('/suppliers/{id}', [SupplierController::class, 'show']);
+            Route::get('/supplies', [SupplyController::class, 'index']);
+            Route::get('/supplies/{id}', [SupplyController::class, 'show']);
             Route::get('/products', [ProductController::class, 'index']);
             Route::get('/products/{id}', [ProductController::class, 'show']);
         });
@@ -381,6 +383,9 @@ Route::prefix('erp')
             Route::post('/suppliers', [SupplierController::class, 'store']);
             Route::put('/suppliers/{id}', [SupplierController::class, 'update']);
             Route::delete('/suppliers/{id}', [SupplierController::class, 'destroy']);
+            Route::post('/supplies', [SupplyController::class, 'store']);
+            Route::put('/supplies/{id}', [SupplyController::class, 'update']);
+            Route::delete('/supplies/{id}', [SupplyController::class, 'destroy']);
             Route::post('/products', [ProductController::class, 'store']);
             Route::put('/products/{id}', [ProductController::class, 'update']);
             Route::delete('/products/{id}', [ProductController::class, 'destroy']);
