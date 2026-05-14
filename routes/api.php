@@ -250,7 +250,7 @@ Route::prefix('erp')
         });
 
         Route::middleware('permission:finance.view')->group(function () {
-            Route::get('/suppliers/{supplier}/statement', [SupplierStatementController::class, 'show']);
+            Route::get('/suppliers/{supplierId}/statement', [SupplierStatementController::class, 'show']);
             Route::get('/customers/{customerId}/credit-balance', [CustomerCreditController::class, 'show']);
         });
 
