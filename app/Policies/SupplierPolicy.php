@@ -23,7 +23,9 @@ class SupplierPolicy
 
     public function create(User $user): bool
     {
-        return $this->hasAccess($user);
+        // ✅ السماح بالإنشاء إذا كان المستخدم ينتمي لنفس الشركة الحالية
+        if ($user->is_super_admin) return true;
+        return $user->company_id && $user->company_id === Tenant::id();
     }
 
     public function update(User $user, Supplier $supplier): bool
@@ -41,12 +43,14 @@ class SupplierPolicy
         // Super Admin
         if ($user->is_super_admin) {
             if (Tenant::hasTenant()) {
-                return $companyId == Tenant::id();
+                // في سياق شركة: يجب أن يطابق company_id
+                return $companyId !== null && $companyId == Tenant::id();
             }
+            // بدون سياق شركة: مسموح
             return true;
         }
 
-        // Regular user – must be in same company
-        return $companyId == $user->company_id;
+        // Regular user: يجب أن يطابق company_id
+        return $companyId !== null && $companyId == $user->company_id;
     }
 }
