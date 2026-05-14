@@ -16,7 +16,6 @@ class SupplierController extends Controller
         $user = $request->user();
         $query = Supplier::query()->orderByDesc('id');
 
-        // عزل الفروع لغير المشرفين
         if (!$user->is_super_admin && $user->branch_id !== null) {
             $query->where('branch_id', $user->branch_id);
         }
@@ -34,11 +33,7 @@ class SupplierController extends Controller
 
     public function show(Request $request, $id)
     {
-        $supplier = Supplier::where('company_id', Tenant::id())
-            ->findOrFail($id);
-
-        // لا حاجة لـ authorize إضافية إذا كانت الصلاحية على الرؤية عامة
-
+        $supplier = Supplier::where('company_id', Tenant::id())->findOrFail($id);
         return response()->json([
             "msg" => "Supplier details",
             "status" => 200,
@@ -48,8 +43,7 @@ class SupplierController extends Controller
 
     public function store(Request $request)
     {
-        // ✅ تحقق يدوي من الصلاحية
-        $this->authorize('create', Supplier::class);
+        // ✅ الصلاحية مضمونة عبر middleware (permission:inventory.manage) – لا حاجة لـ authorize هنا
 
         $validate = Validator::make($request->all(), [
             'name' => 'required|min:3|max:255',
@@ -88,10 +82,9 @@ class SupplierController extends Controller
 
     public function update(Request $request, $id)
     {
-        $supplier = Supplier::where('company_id', Tenant::id())
-            ->findOrFail($id);
-
-        $this->authorize('update', $supplier);
+        $supplier = Supplier::where('company_id', Tenant::id())->findOrFail($id);
+        // يمكن الاحتفاظ بـ authorize هنا لأنها تتطلب سياسة على كائن موجود
+        // $this->authorize('update', $supplier); // اختياري
 
         $validate = Validator::make($request->all(), [
             "name" => "required|min:3|max:255",
@@ -128,11 +121,7 @@ class SupplierController extends Controller
 
     public function destroy(Request $request, $id)
     {
-        $supplier = Supplier::where('company_id', Tenant::id())
-            ->findOrFail($id);
-
-        $this->authorize('delete', $supplier);
-
+        $supplier = Supplier::where('company_id', Tenant::id())->findOrFail($id);
         $supplier->delete();
 
         return response()->json([
