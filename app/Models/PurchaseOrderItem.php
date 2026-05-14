@@ -42,9 +42,9 @@ class PurchaseOrderItem extends Model
         return $this->belongsTo(PurchaseOrder::class);
     }
 
-    public function product()
+    public function supply()
     {
-        return $this->belongsTo(Product::class);
+        return $this->belongsTo(Supply::class);
     }
 
     // ============ Boot ============
