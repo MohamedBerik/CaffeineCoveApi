@@ -352,7 +352,7 @@ class PurchaseOrderController extends Controller
             // سجل حركة المخزون (نوع out)
             StockMovement::create([
                 'company_id'     => $companyId,
-                'product_id'     => $supplyId,   // ✅
+                'supply_id'     => $supplyId,   // ✅
                 'type'           => 'out',
                 'quantity'       => $qty,
                 'reference_type' => PurchaseOrder::class,
@@ -406,8 +406,8 @@ class PurchaseOrderController extends Controller
             $available = $totalIn - $totalOut;
 
             return [
-                'product_id'          => $item->supply_id,   // ملاحظة: ما زلنا نستخدم product_id في الـ response للتوافق مع الواجهة القديمة
-                'product_name'        => $item->supply?->name, // ✅
+                'supply_id'          => $item->supply_id,   // ملاحظة: ما زلنا نستخدم product_id في الـ response للتوافق مع الواجهة القديمة
+                'supply_name'        => $item->supply?->name, // ✅
                 'ordered_quantity'    => $item->quantity,
                 'received_quantity'   => $totalIn,
                 'returned_quantity'   => $totalOut,
