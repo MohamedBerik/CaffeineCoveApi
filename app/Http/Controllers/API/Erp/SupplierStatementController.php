@@ -20,22 +20,19 @@ class SupplierStatementController extends Controller
         $to   = $request->query('to');
 
         /*
-         |------------------------------------------------
-         | Opening balance
-         |------------------------------------------------
-         */
-
-        $openingQuery = SupplierLedgerEntry::query()
-            ->where('supplier_id', $supplierId);
+ |------------------------------------------------
+ | Opening balance
+ |------------------------------------------------
+ */
+        $openingBalance = 0;
 
         if ($from) {
-            $openingQuery->where('entry_date', '<', $from);
+            $openingBalance = SupplierLedgerEntry::query()
+                ->where('supplier_id', $supplierId)
+                ->where('entry_date', '<', $from)
+                ->selectRaw('SUM(debit - credit) as balance')
+                ->value('balance') ?? 0;
         }
-
-        $openingDebit  = (clone $openingQuery)->sum('debit');
-        $openingCredit = (clone $openingQuery)->sum('credit');
-
-        $openingBalance = $openingDebit - $openingCredit;
 
         /*
          |------------------------------------------------
