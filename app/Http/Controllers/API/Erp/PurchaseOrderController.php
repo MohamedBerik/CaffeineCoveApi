@@ -15,10 +15,10 @@ use Illuminate\Support\Facades\DB;
 
 class PurchaseOrderController extends Controller
 {
-    public function __construct()
-    {
-        $this->authorizeResource(PurchaseOrder::class, 'purchaseOrder');
-    }
+    // public function __construct()
+    // {
+    //     $this->authorizeResource(PurchaseOrder::class, 'purchaseOrder');
+    // }
 
     public function indexErp(Request $request)
     {
