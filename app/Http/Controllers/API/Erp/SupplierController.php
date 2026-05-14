@@ -13,7 +13,7 @@ class SupplierController extends Controller
 {
     public function __construct()
     {
-        $this->authorizeResource(Supplier::class, 'supplier');
+        $this->authorizeResource(Supplier::class, 'Supplier', ['except' => ['index', 'show', 'update']]);
     }
 
     public function index(Request $request)
