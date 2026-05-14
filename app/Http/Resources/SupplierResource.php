@@ -8,6 +8,25 @@ class SupplierResource extends JsonResource
 {
     public function toArray($request)
     {
+        // الحصول على القيم المالية بأمان
+        $totalPurchases = method_exists($this->resource, 'getTotalPurchasesAttribute')
+            ? (float) $this->total_purchases
+            : 0;
+
+        $totalPaid = method_exists($this->resource, 'getTotalPaidAttribute')
+            ? (float) $this->total_paid
+            : 0;
+
+        $balance = $totalPurchases - $totalPaid;
+
+        // تحديد الحالة بناءً على الرصيد
+        $status = 'settled';
+        if ($balance > 0) {
+            $status = 'owed';
+        } elseif ($balance < 0) {
+            $status = 'overpaid';
+        }
+
         return [
             // Basic Info
             'id' => $this->id,
@@ -21,34 +40,30 @@ class SupplierResource extends JsonResource
             'contact_person' => $this->contact_person,
             'notes' => $this->notes,
 
-            // Financial Summary
-            'total_purchases' => (float) ($this->total_purchases ?? 0),
-            'total_purchases_formatted' => number_format($this->total_purchases ?? 0, 2) . ' EGP',
-            'total_paid' => (float) ($this->total_paid ?? 0),
-            'total_paid_formatted' => number_format($this->total_paid ?? 0, 2) . ' EGP',
-            'balance' => (float) ($this->balance ?? 0),
-            'balance_formatted' => number_format($this->balance ?? 0, 2) . ' EGP',
+            // Financial Summary (محسوبة بأمان)
+            'total_purchases' => $totalPurchases,
+            'total_purchases_formatted' => number_format($totalPurchases, 2) . ' EGP',
+            'total_paid' => $totalPaid,
+            'total_paid_formatted' => number_format($totalPaid, 2) . ' EGP',
+            'balance' => $balance,
+            'balance_formatted' => number_format($balance, 2) . ' EGP',
 
             // Status
-            'status' => $this->status ?? 'settled',
-            'status_label' => $this->getStatusLabel(),
-            'status_color' => $this->getStatusColor(),
-            'has_balance' => ($this->balance ?? 0) > 0,
-            'has_overpayment' => ($this->balance ?? 0) < 0,
+            'status' => $status,
+            'status_label' => $this->getStatusLabelByStatus($status),
+            'status_color' => $this->getStatusColorByStatus($status),
+            'has_balance' => $balance > 0,
+            'has_overpayment' => $balance < 0,
 
-            // Counts
-            'purchases_count' => $this->whenLoaded('purchaseOrders', function () {
-                return $this->purchaseOrders->count();
-            }),
-            'payments_count' => $this->whenLoaded('payments', function () {
-                return $this->payments->count();
-            }),
+            // Counts (فقط عند تحميل العلاقات)
+            'purchases_count' => $this->whenLoaded('purchaseOrders', fn() => $this->purchaseOrders->count(), 0),
+            'payments_count' => $this->whenLoaded('payments', fn() => $this->payments->count(), 0),
 
             // Dates
             'created_at' => $this->created_at ? $this->created_at->toIso8601String() : null,
             'updated_at' => $this->updated_at ? $this->updated_at->toIso8601String() : null,
 
-            // Relationships (when loaded)
+            // Relationships (only when loaded)
             'purchase_orders' => PurchaseOrderResource::collection($this->whenLoaded('purchaseOrders')),
             'payments' => SupplierPaymentResource::collection($this->whenLoaded('payments')),
         ];
@@ -61,31 +76,21 @@ class SupplierResource extends JsonResource
         ];
     }
 
-    private function getStatusLabel(): string
+    private function getStatusLabelByStatus(string $status): string
     {
-        switch ($this->status ?? 'settled') {
-            case 'owed':
-                return 'مستحق عليه';
-            case 'overpaid':
-                return 'له رصيد';
-            case 'settled':
-                return 'متوازن';
-            default:
-                return 'غير معروف';
-        }
+        return match ($status) {
+            'owed' => 'مستحق عليه',
+            'overpaid' => 'له رصيد',
+            default => 'متوازن',
+        };
     }
 
-    private function getStatusColor(): string
+    private function getStatusColorByStatus(string $status): string
     {
-        switch ($this->status ?? 'settled') {
-            case 'owed':
-                return 'red';
-            case 'overpaid':
-                return 'orange';
-            case 'settled':
-                return 'green';
-            default:
-                return 'gray';
-        }
+        return match ($status) {
+            'owed' => 'red',
+            'overpaid' => 'orange',
+            default => 'green',
+        };
     }
 }
