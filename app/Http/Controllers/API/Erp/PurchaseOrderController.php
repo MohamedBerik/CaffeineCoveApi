@@ -5,7 +5,7 @@ namespace App\Http\Controllers\API\Erp;
 use App\Http\Controllers\Controller;
 use App\Models\PurchaseOrder;
 use App\Models\PurchaseOrderItem;
-use App\Models\Product;
+use App\Models\Supply;                     // ✅ المستلزمات
 use App\Models\StockMovement;
 use App\Models\SupplierPayment;
 use App\Models\SupplierLedgerEntry;
@@ -24,19 +24,14 @@ class PurchaseOrderController extends Controller
     {
         $orders = PurchaseOrder::with([
             'supplier',
-            'items.product',
+            'items.supply',    // ✅ العلاقة supply بدلاً من product
             'payments'
         ])
             ->orderByDesc('created_at')
             ->get()
             ->map(function ($po) {
-
                 $totalPaid = $po->payments->sum('amount');
-                $remaining = $po->total - $totalPaid;
-
-                if ($remaining < 0) {
-                    $remaining = 0;
-                }
+                $remaining = max(0, $po->total - $totalPaid);
 
                 return [
                     'id'          => $po->id,
@@ -44,17 +39,15 @@ class PurchaseOrderController extends Controller
                     'status'      => $po->status,
                     'total'       => $po->total,
                     'supplier'    => $po->supplier,
-
                     'total_paid'  => $totalPaid,
                     'remaining'   => $remaining,
                     'is_received' => ! is_null($po->received_at),
                     'created_at'  => $po->created_at,
-
-                    'payments' => $po->payments->map(function ($p) {
+                    'payments'    => $po->payments->map(function ($p) {
                         return [
                             'id'      => $p->id,
-                            'amount' => $p->amount,
-                            'method' => $p->method,
+                            'amount'  => $p->amount,
+                            'method'  => $p->method,
                             'paid_at' => $p->paid_at,
                         ];
                     }),
@@ -68,16 +61,12 @@ class PurchaseOrderController extends Controller
     {
         $po = PurchaseOrder::with([
             'supplier',
-            'items.product',
+            'items.supply',   // ✅
             'payments'
         ])->findOrFail($id);
 
         $totalPaid = $po->payments->sum('amount');
-        $remaining = $po->total - $totalPaid;
-
-        if ($remaining < 0) {
-            $remaining = 0;
-        }
+        $remaining = max(0, $po->total - $totalPaid);
 
         return response()->json([
             'id'          => $po->id,
@@ -87,22 +76,19 @@ class PurchaseOrderController extends Controller
             'supplier'    => $po->supplier,
             'created_at'  => $po->created_at,
             'received_at' => $po->received_at,
-
             'total_paid'  => $totalPaid,
             'remaining'   => $remaining,
             'is_received' => ! is_null($po->received_at),
-
-            'items' => $po->items->map(function ($item) {
+            'items'       => $po->items->map(function ($item) {
                 return [
                     'id'        => $item->id,
-                    'product'   => $item->product,
+                    'supply'    => $item->supply,    // ✅
                     'quantity'  => $item->quantity,
                     'unit_cost' => $item->unit_cost,
                     'total'     => $item->total,
                 ];
             }),
-
-            'payments' => $po->payments->map(function ($p) {
+            'payments'    => $po->payments->map(function ($p) {
                 return [
                     'id'      => $p->id,
                     'amount'  => $p->amount,
@@ -118,23 +104,19 @@ class PurchaseOrderController extends Controller
         $companyId = Tenant::id();
 
         $data = $request->validate([
-            'supplier_id' => ['required'],
-            'items' => ['required', 'array', 'min:1'],
-            'items.*.product_id' => ['required'],
-            'items.*.quantity' => ['required', 'integer', 'min:1'],
-            'items.*.unit_cost' => ['required', 'numeric', 'min:0'],
+            'supplier_id'           => ['required'],
+            'items'                 => ['required', 'array', 'min:1'],
+            'items.*.supply_id'     => ['required'],       // ✅ supply_id
+            'items.*.quantity'      => ['required', 'integer', 'min:1'],
+            'items.*.unit_cost'     => ['required', 'numeric', 'min:0'],
         ]);
 
         return DB::transaction(function () use ($data, $companyId) {
-
             $supplierExists = \App\Models\Supplier::query()
                 ->where('id', $data['supplier_id'])
                 ->exists();
-
             if (! $supplierExists) {
-                return response()->json([
-                    'msg' => 'Invalid supplier'
-                ], 422);
+                return response()->json(['msg' => 'Invalid supplier'], 422);
             }
 
             $po = PurchaseOrder::create([
@@ -142,19 +124,15 @@ class PurchaseOrderController extends Controller
                 'supplier_id' => $data['supplier_id'],
                 'number'      => 'PO-' . now()->format('YmdHis'),
                 'status'      => 'ordered',
-                'total'       => 0
+                'total'       => 0,
             ]);
 
             $total = 0;
-
             foreach ($data['items'] as $item) {
-
-                $productExists = Product::query()
-                    ->where('id', $item['product_id'])
-                    ->exists();
-
-                if (! $productExists) {
-                    throw new \Exception('Invalid product for this company');
+                // ✅ تحقق من وجود المستلزم
+                $supplyExists = Supply::query()->where('id', $item['supply_id'])->exists();
+                if (! $supplyExists) {
+                    throw new \Exception('Invalid supply for this company');
                 }
 
                 $line = $item['quantity'] * $item['unit_cost'];
@@ -162,7 +140,7 @@ class PurchaseOrderController extends Controller
                 PurchaseOrderItem::create([
                     'company_id'        => $companyId,
                     'purchase_order_id' => $po->id,
-                    'product_id'        => $item['product_id'],
+                    'supply_id'         => $item['supply_id'],   // ✅
                     'quantity'          => $item['quantity'],
                     'unit_cost'         => $item['unit_cost'],
                     'total'             => $line,
@@ -173,6 +151,7 @@ class PurchaseOrderController extends Controller
 
             $po->update(['total' => $total]);
 
+            // قيد يومية المورد (مدين)
             SupplierLedgerEntry::create([
                 'company_id'        => $companyId,
                 'supplier_id'       => $po->supplier_id,
@@ -193,23 +172,19 @@ class PurchaseOrderController extends Controller
         $companyId = Tenant::id();
 
         return DB::transaction(function () use ($request, $id, $companyId) {
-
-            $po = PurchaseOrder::with(['items.product'])
+            $po = PurchaseOrder::with(['items.supply'])   // ✅
                 ->lockForUpdate()
                 ->findOrFail($id);
 
             if ($po->received_at !== null) {
-                return response()->json([
-                    'msg' => 'Purchase order already received'
-                ], 422);
+                return response()->json(['msg' => 'Purchase order already received'], 422);
             }
 
             if ($po->items->isEmpty()) {
-                return response()->json([
-                    'msg' => 'Purchase order has no items'
-                ], 422);
+                return response()->json(['msg' => 'Purchase order has no items'], 422);
             }
 
+            // ✅ التحقق من عدم وجود حركة استلام سابقة
             $alreadyMoved = StockMovement::query()
                 ->where('reference_type', PurchaseOrder::class)
                 ->where('reference_id', $po->id)
@@ -217,26 +192,21 @@ class PurchaseOrderController extends Controller
                 ->exists();
 
             if ($alreadyMoved) {
-                return response()->json([
-                    'msg' => 'Stock already received for this purchase order'
-                ], 422);
+                return response()->json(['msg' => 'Stock already received for this purchase order'], 422);
             }
 
             foreach ($po->items as $item) {
-
-                $product = Product::query()
-                    ->lockForUpdate()
-                    ->find($item->product_id);
-
-                if (! $product) {
-                    throw new \Exception("Product not found or not in this company");
+                // ✅ تعامل مع Supply بدلاً من Product
+                $supply = Supply::query()->lockForUpdate()->find($item->supply_id);
+                if (! $supply) {
+                    throw new \Exception("Supply not found or not in this company");
                 }
 
-                $product->increment('stock_quantity', $item->quantity);
+                $supply->increment('stock_quantity', $item->quantity);
 
                 StockMovement::create([
                     'company_id'     => $companyId,
-                    'product_id'     => $product->id,
+                    'product_id'     => $supply->id,      // حقل product_id مؤقتاً يشير لـ supply
                     'type'           => 'in',
                     'quantity'       => $item->quantity,
                     'reference_type' => PurchaseOrder::class,
@@ -248,9 +218,7 @@ class PurchaseOrderController extends Controller
             $po->received_at = now();
             $po->save();
 
-            return response()->json([
-                'msg' => 'Purchase order received successfully'
-            ]);
+            return response()->json(['msg' => 'Purchase order received successfully']);
         });
     }
 
@@ -260,37 +228,29 @@ class PurchaseOrderController extends Controller
 
         $request->validate([
             'amount' => ['required', 'numeric', 'min:0.01'],
-            'method' => ['nullable', 'string']
+            'method' => ['nullable', 'string'],
         ]);
 
         return DB::transaction(function () use ($request, $id, $companyId) {
-
-            $po = PurchaseOrder::with(['payments'])
-                ->lockForUpdate()
-                ->findOrFail($id);
+            $po = PurchaseOrder::with(['payments'])->lockForUpdate()->findOrFail($id);
 
             $alreadyPaid = $po->payments->sum('amount');
             $remaining   = $po->total - $alreadyPaid;
 
             if ($remaining <= 0) {
-                return response()->json([
-                    'msg' => 'This purchase order is already fully paid'
-                ], 422);
+                return response()->json(['msg' => 'This purchase order is already fully paid'], 422);
             }
 
             if ($request->amount > $remaining) {
                 return response()->json([
-                    'msg' => 'Payment exceeds remaining amount',
-                    'remaining' => $remaining
+                    'msg'       => 'Payment exceeds remaining amount',
+                    'remaining' => $remaining,
                 ], 422);
             }
 
             $supplier = $po->supplier()->first();
-
             if (! $supplier) {
-                return response()->json([
-                    'msg' => 'Supplier does not belong to this company'
-                ], 422);
+                return response()->json(['msg' => 'Supplier does not belong to this company'], 422);
             }
 
             $payment = SupplierPayment::create([
@@ -300,7 +260,7 @@ class PurchaseOrderController extends Controller
                 'amount'            => $request->amount,
                 'method'            => $request->method,
                 'paid_at'           => now(),
-                'paid_by'           => $request->user()->id
+                'paid_by'           => $request->user()->id,
             ]);
 
             SupplierLedgerEntry::create([
@@ -316,18 +276,12 @@ class PurchaseOrderController extends Controller
             ]);
 
             $newPaid = $alreadyPaid + $request->amount;
-
-            if ($newPaid < $po->total) {
-                $po->status = 'partially_paid';
-            } else {
-                $po->status = 'paid';
-            }
-
+            $po->status = $newPaid < $po->total ? 'partially_paid' : 'paid';
             $po->save();
 
             return response()->json([
-                'msg' => 'Supplier payment recorded',
-                'payment_id' => $payment->id
+                'msg'        => 'Supplier payment recorded',
+                'payment_id' => $payment->id,
             ]);
         });
     }
@@ -335,80 +289,70 @@ class PurchaseOrderController extends Controller
     public function returnItems(Request $request, $id)
     {
         $request->validate([
-            'product_id' => ['required', 'exists:products,id'],
-            'quantity'   => ['required', 'numeric', 'min:0.01'],
+            'supply_id' => ['required', 'exists:supplies,id'],   // ✅ تغيير إلى supply_id
+            'quantity'  => ['required', 'numeric', 'min:0.01'],
         ]);
 
         $companyId = Tenant::id();
-        $user = $request->user();
+        $user      = $request->user();
 
         return DB::transaction(function () use ($request, $id, $companyId, $user) {
+            $po = PurchaseOrder::with('items')->lockForUpdate()->findOrFail($id);
 
-            $po = PurchaseOrder::with('items')
-                ->lockForUpdate()
-                ->findOrFail($id);
+            $supplyId = (int) $request->supply_id;   // ✅
+            $qty      = (float) $request->quantity;
 
-            $productId = (int) $request->product_id;
-            $qty       = (float) $request->quantity;
-
-            $item = $po->items->firstWhere('product_id', $productId);
-
+            // ✅ البحث عن العنصر المرتبط بالمستلزم
+            $item = $po->items->firstWhere('supply_id', $supplyId);
             if (! $item) {
-                return response()->json([
-                    'msg' => 'This product does not belong to this purchase order'
-                ], 422);
+                return response()->json(['msg' => 'This supply does not belong to this purchase order'], 422);
             }
 
+            // ✅ الكميات المستلمة والمرتجعة للمستلزم (نستخدم حقل product_id مؤقتاً لـ supply)
             $totalIn = StockMovement::query()
                 ->where('reference_type', PurchaseOrder::class)
                 ->where('reference_id', $po->id)
-                ->where('product_id', $productId)
+                ->where('product_id', $supplyId)        // product_id مؤقتاً = supply id
                 ->where('type', 'in')
                 ->sum('quantity');
 
             if ($totalIn <= 0) {
-                return response()->json([
-                    'msg' => 'This product has not been received yet'
-                ], 422);
+                return response()->json(['msg' => 'This supply has not been received yet'], 422);
             }
 
             $totalOut = StockMovement::query()
                 ->where('reference_type', PurchaseOrder::class)
                 ->where('reference_id', $po->id)
-                ->where('product_id', $productId)
+                ->where('product_id', $supplyId)
                 ->where('type', 'out')
                 ->sum('quantity');
 
             $availableToReturn = $totalIn - $totalOut;
 
             if ($availableToReturn <= 0) {
-                return response()->json([
-                    'msg' => 'No received quantity available to return for this product'
-                ], 422);
+                return response()->json(['msg' => 'No received quantity available to return for this supply'], 422);
             }
 
             if ($qty > $availableToReturn) {
                 return response()->json([
-                    'msg' => 'Return quantity exceeds received quantity',
-                    'available' => $availableToReturn
+                    'msg'       => 'Return quantity exceeds received quantity',
+                    'available' => $availableToReturn,
                 ], 422);
             }
 
-            $product = Product::query()
-                ->lockForUpdate()
-                ->findOrFail($productId);
+            // ✅ استخدام Supply بدلاً من Product
+            $supply = Supply::query()->lockForUpdate()->findOrFail($supplyId);
 
-            if ($product->stock_quantity < $qty) {
-                return response()->json([
-                    'msg' => 'Insufficient stock to return'
-                ], 422);
+            if ($supply->stock_quantity < $qty) {
+                return response()->json(['msg' => 'Insufficient stock to return'], 422);
             }
 
-            $product->decrement('stock_quantity', $qty);
+            $supply->decrement('stock_quantity', $qty);
 
+            // سجل حركة المخزون (نوع out)
             StockMovement::create([
                 'company_id'     => $companyId,
-                'product_id'     => $productId,
+                'product_id'     => $supplyId,   // ✅
                 'type'           => 'out',
                 'quantity'       => $qty,
                 'reference_type' => PurchaseOrder::class,
@@ -429,46 +373,41 @@ class PurchaseOrderController extends Controller
                 'description'       => 'Purchase return for PO #' . $po->number,
             ]);
 
-            if ($availableToReturn - $qty == 0) {
-                $po->status = 'returned';
-            } else {
-                $po->status = 'has_return';
-            }
-
+            // تحديث حالة الأمر
+            $po->status = ($availableToReturn - $qty == 0) ? 'returned' : 'has_return';
             $po->save();
 
             return response()->json([
-                'msg' => 'Items returned successfully',
-                'returned_quantity' => $qty
+                'msg'               => 'Items returned successfully',
+                'returned_quantity' => $qty,
             ]);
         });
     }
 
     public function getReturnableItems(Request $request, $id)
     {
-        $po = PurchaseOrder::with(['items.product'])->findOrFail($id);
+        $po = PurchaseOrder::with(['items.supply'])->findOrFail($id);  // ✅
 
         $items = $po->items->map(function ($item) use ($po) {
-
             $totalIn = StockMovement::query()
                 ->where('reference_type', PurchaseOrder::class)
                 ->where('reference_id', $po->id)
-                ->where('product_id', $item->product_id)
+                ->where('product_id', $item->supply_id)   // ✅ supply_id
                 ->where('type', 'in')
                 ->sum('quantity');
 
             $totalOut = StockMovement::query()
                 ->where('reference_type', PurchaseOrder::class)
                 ->where('reference_id', $po->id)
-                ->where('product_id', $item->product_id)
+                ->where('product_id', $item->supply_id)
                 ->where('type', 'out')
                 ->sum('quantity');
 
             $available = $totalIn - $totalOut;
 
             return [
-                'product_id'          => $item->product_id,
-                'product_name'        => $item->product?->title_en,
+                'product_id'          => $item->supply_id,   // ملاحظة: ما زلنا نستخدم product_id في الـ response للتوافق مع الواجهة القديمة
+                'product_name'        => $item->supply?->name, // ✅
                 'ordered_quantity'    => $item->quantity,
                 'received_quantity'   => $totalIn,
                 'returned_quantity'   => $totalOut,
@@ -479,7 +418,7 @@ class PurchaseOrderController extends Controller
 
         return response()->json([
             'purchase_order_id' => $po->id,
-            'items'             => $items->values()
+            'items'             => $items->values(),
         ]);
     }
 
@@ -487,7 +426,7 @@ class PurchaseOrderController extends Controller
     {
         $po = PurchaseOrder::query()->findOrFail($id);
 
-        $rows = StockMovement::with('product')
+        $rows = StockMovement::with('supply')    // ✅ علاقة supply في StockMovement
             ->where('reference_type', PurchaseOrder::class)
             ->where('reference_id', $po->id)
             ->where('type', 'out')
@@ -497,7 +436,7 @@ class PurchaseOrderController extends Controller
                 return [
                     'id'         => $m->id,
                     'product_id' => $m->product_id,
-                    'product'    => $m->product?->title_en,
+                    'product'    => $m->supply?->name,   // ✅
                     'quantity'   => $m->quantity,
                     'created_at' => $m->created_at,
                     'created_by' => $m->created_by,
@@ -506,7 +445,7 @@ class PurchaseOrderController extends Controller
 
         return response()->json([
             'purchase_order_id' => $po->id,
-            'returns'           => $rows
+            'returns'           => $rows,
         ]);
     }
 }
