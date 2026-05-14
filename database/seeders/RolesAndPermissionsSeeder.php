@@ -1,4 +1,5 @@
 <?php
+//php artisan db:seed --class=RolesAndPermissionsSeeder
 
 namespace Database\Seeders;
 

@@ -4,6 +4,7 @@ namespace App\Http\Controllers\API\Erp;
 
 use App\Http\Controllers\Controller;
 use App\Http\Resources\SupplierResource;
+use App\Models\Concerns\BranchScope;
 use App\Models\Supplier;
 use App\Services\Tenant;
 use Illuminate\Http\Request;
@@ -91,6 +92,7 @@ class SupplierController extends Controller
 
         $supplier = Supplier::create([
             "company_id" => Tenant::id(),
+            "branch_id"  => Tenant::branchId() ?? $request->user()->branch_id,
             "name" => $request->name,
             "email" => $request->email,
             "phone" => $request->phone,
@@ -106,10 +108,13 @@ class SupplierController extends Controller
         ], 201);
     }
 
-    public function update(Request $request)
+    public function update(Request $request, $id)
     {
-        $old_id = $request->old_id;
-        $supplier = Supplier::query()->find($old_id);
+        $supplier = Supplier::withoutGlobalScope(BranchScope::class)
+            ->where('company_id', Tenant::id())
+            ->findOrFail($id);
+
+        $this->authorize('update', $supplier);
 
         if (!$supplier) {
             return response()->json([
@@ -121,7 +126,7 @@ class SupplierController extends Controller
 
         $validate = Validator::make($request->all(), [
             "name" => "required|min:3|max:255",
-            "email" => "required|email|unique:suppliers,email," . $old_id,
+            "email" => "required|email|unique:suppliers,email,",
             "phone" => "required|min:3|max:255",
             "address" => "nullable|string|max:500",
             "contact_person" => "nullable|string|max:255",
