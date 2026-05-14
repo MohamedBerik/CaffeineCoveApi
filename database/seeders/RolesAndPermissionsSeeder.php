@@ -55,9 +55,9 @@ class RolesAndPermissionsSeeder extends Seeder
             'payments.refund',
             'users.manage',
             'invoices.pay',
-            // ✅ صلاحيات المنتجات الجديدة
             'products.view',
             'products.manage',
+            'supplies.view',
         ];
 
         foreach ($permissions as $perm) {
@@ -106,9 +106,10 @@ class RolesAndPermissionsSeeder extends Seeder
             'payments.refund',
             'users.manage',
             'invoices.pay',
-            // ✅ صلاحيات المنتجات للأدمن
             'products.view',
             'products.manage',
+            'supplies.view',
+
         ]);
 
         // Doctor role
