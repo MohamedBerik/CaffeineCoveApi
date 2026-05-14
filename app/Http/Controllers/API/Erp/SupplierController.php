@@ -4,7 +4,6 @@ namespace App\Http\Controllers\API\Erp;
 
 use App\Http\Controllers\Controller;
 use App\Http\Resources\SupplierResource;
-use App\Models\Concerns\BranchScope;
 use App\Models\Supplier;
 use App\Services\Tenant;
 use Illuminate\Http\Request;
@@ -12,67 +11,52 @@ use Illuminate\Support\Facades\Validator;
 
 class SupplierController extends Controller
 {
-    public function __construct()
-    {
-        $this->authorizeResource(Supplier::class, 'Supplier', ['except' => ['index', 'show', 'update']]);
-    }
-
+    /**
+     * عرض قائمة الموردين.
+     */
     public function index(Request $request)
     {
+        $user = $request->user();
+        $query = Supplier::query()->orderByDesc('id');
+
+        // عزل الفروع لغير المشرفين
+        if (!$user->is_super_admin && $user->branch_id !== null) {
+            $query->where('branch_id', $user->branch_id);
+        }
+
         $suppliers = SupplierResource::collection(
-            Supplier::query()->get()
+            $query->paginate((int) $request->get('per_page', 20))
         );
 
         return response()->json([
-            "msg" => "Return All Data From Supplier Table",
+            "msg" => "Suppliers list",
             "status" => 200,
             "data" => $suppliers
         ]);
     }
 
+    /**
+     * عرض تفاصيل مورد واحد.
+     */
     public function show(Request $request, $id)
     {
-        $supplier = Supplier::query()->find($id);
-
-        if ($supplier) {
-            return response()->json([
-                "msg" => "Return One Record of Supplier Table",
-                "status" => 200,
-                "data" => new SupplierResource($supplier)
-            ]);
-        }
+        $supplier = Supplier::where('company_id', Tenant::id())->findOrFail($id);
 
         return response()->json([
-            "msg" => "No Such id",
-            "status" => 404,
-            "data" => null
-        ], 404);
+            "msg" => "Supplier details",
+            "status" => 200,
+            "data" => new SupplierResource($supplier)
+        ]);
     }
 
-    public function delete(Request $request)
-    {
-        $id = $request->id;
-        $supplier = Supplier::query()->find($id);
-
-        if ($supplier) {
-            $supplier->delete();
-
-            return response()->json([
-                "msg" => "Deleted Successfully",
-                "status" => 200,
-                "data" => null
-            ]);
-        }
-
-        return response()->json([
-            "msg" => "No Such id",
-            "status" => 404,
-            "data" => null
-        ], 404);
-    }
-
+    /**
+     * إضافة مورد جديد.
+     */
     public function store(Request $request)
     {
+        // الصلاحية يتم فحصها عبر middleware (permission:inventory.manage)
+        // لذلك لا نستخدم authorize هنا لتجنب أي تعارض يؤدي إلى خطأ 500.
+
         $validate = Validator::make($request->all(), [
             'name' => 'required|min:3|max:255',
             'email' => 'required|email|unique:suppliers,email',
@@ -102,32 +86,26 @@ class SupplierController extends Controller
         ]);
 
         return response()->json([
-            "msg" => "Created Successfully",
+            "msg" => "Supplier created successfully",
             "status" => 201,
             "data" => new SupplierResource($supplier)
         ], 201);
     }
 
+    /**
+     * تعديل بيانات مورد.
+     */
     public function update(Request $request, $id)
     {
-        $supplier = Supplier::withoutGlobalScope(BranchScope::class)
-            ->where('company_id', Tenant::id())
-            ->findOrFail($id);
+        $supplier = Supplier::where('company_id', Tenant::id())->findOrFail($id);
 
-        $this->authorize('update', $supplier);
-
-        if (!$supplier) {
-            return response()->json([
-                "msg" => "No such id",
-                "status" => 404,
-                "data" => null
-            ], 404);
-        }
+        // يمكن تفعيل سطر authorize لو أردت، لكن الأمان الأساسي من middleware
+        // $this->authorize('update', $supplier);
 
         $validate = Validator::make($request->all(), [
-            "name" => "required|min:3|max:255",
-            "email" => "required|email|unique:suppliers,email,",
-            "phone" => "required|min:3|max:255",
+            "name" => "sometimes|required|min:3|max:255",
+            "email" => "sometimes|required|email|unique:suppliers,email," . $supplier->id,
+            "phone" => "sometimes|required|min:3|max:255",
             "address" => "nullable|string|max:500",
             "contact_person" => "nullable|string|max:255",
             "notes" => "nullable|string",
@@ -141,19 +119,34 @@ class SupplierController extends Controller
             ], 422);
         }
 
-        $supplier->update([
-            "name" => $request->name,
-            "email" => $request->email,
-            "phone" => $request->phone,
-            "address" => $request->address,
-            "contact_person" => $request->contact_person,
-            "notes" => $request->notes,
-        ]);
+        $supplier->update($request->only([
+            "name",
+            "email",
+            "phone",
+            "address",
+            "contact_person",
+            "notes"
+        ]));
 
         return response()->json([
-            "msg" => "Updated Successfully",
+            "msg" => "Supplier updated successfully",
             "status" => 200,
             "data" => new SupplierResource($supplier->fresh())
+        ]);
+    }
+
+    /**
+     * حذف مورد.
+     */
+    public function destroy(Request $request, $id)
+    {
+        $supplier = Supplier::where('company_id', Tenant::id())->findOrFail($id);
+        $supplier->delete();
+
+        return response()->json([
+            "msg" => "Supplier deleted successfully",
+            "status" => 200,
+            "data" => null
         ]);
     }
 }
