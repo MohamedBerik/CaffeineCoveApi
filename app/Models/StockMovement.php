@@ -21,7 +21,7 @@ class StockMovement extends Model
     protected $fillable = [
         'company_id',
         'branch_id',
-        'product_id',
+        'supply_id',
         'type',
         'quantity',
         'reference_type',
@@ -41,9 +41,9 @@ class StockMovement extends Model
         return $this->belongsTo(Company::class);
     }
 
-    public function product()
+    public function supply()
     {
-        return $this->belongsTo(Product::class);
+        return $this->belongsTo(Supply::class);
     }
 
     public function creator()
