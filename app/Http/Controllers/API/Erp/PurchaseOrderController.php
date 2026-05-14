@@ -206,7 +206,7 @@ class PurchaseOrderController extends Controller
 
                 StockMovement::create([
                     'company_id'     => $companyId,
-                    'product_id'     => $supply->id,      // حقل product_id مؤقتاً يشير لـ supply
+                    'supply_id'      => $supply->id,    // ✅ تم التغيير
                     'type'           => 'in',
                     'quantity'       => $item->quantity,
                     'reference_type' => PurchaseOrder::class,
@@ -312,7 +312,7 @@ class PurchaseOrderController extends Controller
             $totalIn = StockMovement::query()
                 ->where('reference_type', PurchaseOrder::class)
                 ->where('reference_id', $po->id)
-                ->where('product_id', $supplyId)        // product_id مؤقتاً = supply id
+                ->where('supply_id', $supplyId)        // ✅ تم التغيير
                 ->where('type', 'in')
                 ->sum('quantity');
 
@@ -323,7 +323,7 @@ class PurchaseOrderController extends Controller
             $totalOut = StockMovement::query()
                 ->where('reference_type', PurchaseOrder::class)
                 ->where('reference_id', $po->id)
-                ->where('product_id', $supplyId)
+                ->where('supply_id', $supplyId)        // ✅ تم التغيير
                 ->where('type', 'out')
                 ->sum('quantity');
 
@@ -392,14 +392,14 @@ class PurchaseOrderController extends Controller
             $totalIn = StockMovement::query()
                 ->where('reference_type', PurchaseOrder::class)
                 ->where('reference_id', $po->id)
-                ->where('product_id', $item->supply_id)   // ✅ supply_id
+                ->where('supply_id', $item->supply_id)   // ✅ تم التغيير
                 ->where('type', 'in')
                 ->sum('quantity');
 
             $totalOut = StockMovement::query()
                 ->where('reference_type', PurchaseOrder::class)
                 ->where('reference_id', $po->id)
-                ->where('product_id', $item->supply_id)
+                ->where('supply_id', $item->supply_id)   // ✅ تم التغيير
                 ->where('type', 'out')
                 ->sum('quantity');
 
@@ -435,8 +435,8 @@ class PurchaseOrderController extends Controller
             ->map(function ($m) {
                 return [
                     'id'         => $m->id,
-                    'product_id' => $m->product_id,
-                    'product'    => $m->supply?->name,   // ✅
+                    'supply_id'  => $m->supply_id,     // ✅ تم التغيير
+                    'supply'     => $m->supply?->name, // ✅ تم التغيير
                     'quantity'   => $m->quantity,
                     'created_at' => $m->created_at,
                     'created_by' => $m->created_by,

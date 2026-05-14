@@ -11,14 +11,11 @@ class PurchaseOrderItem extends Model
     use HasFactory;
     use BelongsToCompanyTrait;
 
-    // ✅ Performance fix
-    // public static $hasCompanyColumn = true;
-
     protected $fillable = [
         'company_id',
         'branch_id',
         'purchase_order_id',
-        'product_id',
+        'supply_id',            // ✅ تم التغيير
         'quantity',
         'unit_cost',
         'total',
@@ -44,7 +41,7 @@ class PurchaseOrderItem extends Model
 
     public function supply()
     {
-        return $this->belongsTo(Supply::class);
+        return $this->belongsTo(Supply::class);   // ✅ العلاقة مع Supply
     }
 
     // ============ Boot ============
@@ -81,7 +78,7 @@ class PurchaseOrderItem extends Model
     {
         return StockMovement::where('reference_type', PurchaseOrder::class)
             ->where('reference_id', $this->purchase_order_id)
-            ->where('product_id', $this->product_id)
+            ->where('supply_id', $this->supply_id)      // ✅ تم التغيير
             ->where('type', StockMovement::TYPE_IN)
             ->sum('quantity');
     }
@@ -90,7 +87,7 @@ class PurchaseOrderItem extends Model
     {
         return StockMovement::where('reference_type', PurchaseOrder::class)
             ->where('reference_id', $this->purchase_order_id)
-            ->where('product_id', $this->product_id)
+            ->where('supply_id', $this->supply_id)      // ✅ تم التغيير
             ->where('type', StockMovement::TYPE_OUT)
             ->sum('quantity');
     }

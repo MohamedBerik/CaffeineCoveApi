@@ -11,17 +11,13 @@ class StockMovement extends Model
     use HasFactory;
     use BelongsToCompanyTrait;
 
-    // ✅ Performance fix
-    // public static $hasCompanyColumn = true;
-
-    // ✅ الثوابت
     const TYPE_IN = 'in';
     const TYPE_OUT = 'out';
 
     protected $fillable = [
         'company_id',
         'branch_id',
-        'supply_id',
+        'supply_id',              // ✅ الحقل موجود
         'type',
         'quantity',
         'reference_type',
@@ -43,7 +39,7 @@ class StockMovement extends Model
 
     public function supply()
     {
-        return $this->belongsTo(Supply::class);
+        return $this->belongsTo(Supply::class);    // ✅ العلاقة صحيحة
     }
 
     public function creator()
@@ -68,9 +64,9 @@ class StockMovement extends Model
         return $query->where('type', self::TYPE_OUT);
     }
 
-    public function scopeForProduct($query, $productId)
+    public function scopeForSupply($query, $supplyId)  // ✅ تم تغيير الاسم والشرط
     {
-        return $query->where('product_id', $productId);
+        return $query->where('supply_id', $supplyId);
     }
 
     public function scopeByReference($query, string $type, int $id)
