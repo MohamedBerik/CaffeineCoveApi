@@ -20,9 +20,6 @@ class Supplier extends Model
         'name',
         'email',
         'phone',
-        'address',
-        'contact_person',
-        'notes',
     ];
 
     // ============ Relationships ============

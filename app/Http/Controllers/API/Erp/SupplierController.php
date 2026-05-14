@@ -54,68 +54,10 @@ class SupplierController extends Controller
      */
     public function store(Request $request)
     {
-        // تخطي الصلاحيات مؤقتًا للتشخيص
-        try {
-            $validate = Validator::make($request->all(), [
-                'name' => 'required|min:3|max:255',
-                'email' => 'required|email|unique:suppliers,email',
-                'phone' => 'required|min:3|max:255',
-                'address' => 'nullable|string|max:500',
-                'contact_person' => 'nullable|string|max:255',
-                'notes' => 'nullable|string',
-            ]);
-
-            if ($validate->fails()) {
-                return response()->json([
-                    "msg" => "Validation required",
-                    "status" => 422,
-                    "data" => $validate->errors()
-                ], 422);
-            }
-
-            $supplier = Supplier::create([
-                "company_id" => Tenant::id(),
-                "branch_id"  => Tenant::branchId() ?? $request->user()->branch_id,
-                "name" => $request->name,
-                "email" => $request->email,
-                "phone" => $request->phone,
-                "address" => $request->address ?? '',
-                "contact_person" => $request->contact_person ?? '',
-                "notes" => $request->notes ?? '',
-            ]);
-
-            return response()->json([
-                "msg" => "Created Successfully",
-                "status" => 201,
-                "data" => new SupplierResource($supplier)
-            ], 201);
-        } catch (\Exception $e) {
-            \Log::error('Supplier store error: ' . $e->getMessage());
-            return response()->json([
-                "msg" => "Server error: " . $e->getMessage(),
-                "status" => 500,
-                "data" => null
-            ], 500);
-        }
-    }
-
-    /**
-     * تعديل بيانات مورد.
-     */
-    public function update(Request $request, $id)
-    {
-        $supplier = Supplier::where('company_id', Tenant::id())->findOrFail($id);
-
-        // يمكن تفعيل سطر authorize لو أردت، لكن الأمان الأساسي من middleware
-        // $this->authorize('update', $supplier);
-
         $validate = Validator::make($request->all(), [
-            "name" => "sometimes|required|min:3|max:255",
-            "email" => "sometimes|required|email|unique:suppliers,email," . $supplier->id,
-            "phone" => "sometimes|required|min:3|max:255",
-            "address" => "nullable|string|max:500",
-            "contact_person" => "nullable|string|max:255",
-            "notes" => "nullable|string",
+            'name' => 'required|min:3|max:255',
+            'email' => 'required|email|unique:suppliers,email',
+            'phone' => 'required|min:3|max:255',
         ]);
 
         if ($validate->fails()) {
@@ -126,14 +68,46 @@ class SupplierController extends Controller
             ], 422);
         }
 
-        $supplier->update($request->only([
-            "name",
-            "email",
-            "phone",
-            "address",
-            "contact_person",
-            "notes"
-        ]));
+        $supplier = Supplier::create([
+            "company_id" => Tenant::id(),
+            "branch_id"  => Tenant::branchId() ?? $request->user()->branch_id,
+            "name" => $request->name,
+            "email" => $request->email,
+            "phone" => $request->phone,
+        ]);
+
+        return response()->json([
+            "msg" => "Supplier created successfully",
+            "status" => 201,
+            "data" => new SupplierResource($supplier)
+        ], 201);
+    }
+    /**
+     * تعديل بيانات مورد.
+     */
+    public function update(Request $request, $id)
+    {
+        $supplier = Supplier::where('company_id', Tenant::id())->findOrFail($id);
+
+        $validate = Validator::make($request->all(), [
+            "name" => "required|min:3|max:255",
+            "email" => "required|email|unique:suppliers,email," . $supplier->id,
+            "phone" => "required|min:3|max:255",
+        ]);
+
+        if ($validate->fails()) {
+            return response()->json([
+                "msg" => "Validation required",
+                "status" => 422,
+                "data" => $validate->errors()
+            ], 422);
+        }
+
+        $supplier->update([
+            "name" => $request->name,
+            "email" => $request->email,
+            "phone" => $request->phone,
+        ]);
 
         return response()->json([
             "msg" => "Supplier updated successfully",
