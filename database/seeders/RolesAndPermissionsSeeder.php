@@ -111,7 +111,6 @@ class RolesAndPermissionsSeeder extends Seeder
             'products.manage',
             'supplies.view',
             'supplies.manage',
-
         ]);
 
         // Doctor role
