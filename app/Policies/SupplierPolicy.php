@@ -46,7 +46,7 @@ class SupplierPolicy
             return true;
         }
 
-        // Regular user
+        // Regular user – must be in same company
         return $companyId == $user->company_id;
     }
 }
