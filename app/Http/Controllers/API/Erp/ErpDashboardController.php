@@ -102,6 +102,22 @@ class ErpDashboardController extends Controller
                         ];
                     });
 
+                $lowStockSupplies = Supply::query()
+                    ->where('stock_quantity', '<=', 10)
+                    ->where('stock_quantity', '>', 0)
+                    ->orderBy('stock_quantity', 'asc')
+                    ->limit(5)
+                    ->get(['id', 'name', 'stock_quantity', 'unit_cost'])
+                    ->map(function ($supply) {
+                        return [
+                            'id'             => $supply->id,
+                            'name'           => $supply->name,
+                            'stock_quantity' => $supply->stock_quantity,
+                            'unit_cost'      => $supply->unit_cost,
+                            'inventory_value' => $supply->stock_quantity * $supply->unit_cost,
+                        ];
+                    });
+
                 $recentInvoices = Invoice::query()
                     ->latest()
                     ->limit(5)
@@ -117,6 +133,7 @@ class ErpDashboardController extends Controller
                     'recent_invoices' => $recentInvoices,
                     'recent_payments' => $recentPayments,
                     'recent_purchase_orders' => $recentPurchaseOrders,
+                    'low_stock_supplies' => $lowStockSupplies,
                     'range' => $range,
                     'comparison' => [
                         'enabled' => $compare,
