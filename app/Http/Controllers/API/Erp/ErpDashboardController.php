@@ -16,6 +16,7 @@ use Illuminate\Support\Facades\Cache;
 use App\Services\Tenant; // ✅ استخدام Tenant
 use Illuminate\Support\Facades\Log;
 use App\Models\PurchaseOrder;
+use App\Models\SupplierLedgerEntry;
 use App\Models\SupplierPayment;
 use App\Models\Supply;
 
@@ -457,6 +458,17 @@ class ErpDashboardController extends Controller
                 'previous' => null,
                 'delta' => null,
             ],
+            'purchase_returns' => [
+                'current' => $this->sumPurchaseReturns($companyId, $dateRanges['current']['start'], $dateRanges['current']['end']),
+                'previous' => null,
+                'delta' => null,
+            ],
+            'purchase_net' => [
+                'current' => $this->sumPurchaseTotal($companyId, $dateRanges['current']['start'], $dateRanges['current']['end'])
+                    - $this->sumPurchaseReturns($companyId, $dateRanges['current']['start'], $dateRanges['current']['end']),
+                'previous' => null,
+                'delta' => null,
+            ],
         ];
 
         if ($compare) {
@@ -538,6 +550,17 @@ class ErpDashboardController extends Controller
                 ],
                 'inventory_value' => [
                     'current' => $this->getInventoryValue(),
+                    'previous' => null,
+                    'delta' => null,
+                ],
+                'purchase_returns' => [
+                    'current' => $this->sumPurchaseReturns($companyId, $dateRanges['current']['start'], $dateRanges['current']['end']),
+                    'previous' => null,
+                    'delta' => null,
+                ],
+                'purchase_net' => [
+                    'current' => $this->sumPurchaseTotal($companyId, $dateRanges['current']['start'], $dateRanges['current']['end'])
+                        - $this->sumPurchaseReturns($companyId, $dateRanges['current']['start'], $dateRanges['current']['end']),
                     'previous' => null,
                     'delta' => null,
                 ],
@@ -663,5 +686,13 @@ class ErpDashboardController extends Controller
         return (float) Supply::query()
             ->selectRaw('SUM(stock_quantity * unit_cost) as total_value')
             ->value('total_value') ?? 0;
+    }
+
+    private function sumPurchaseReturns($companyId, Carbon $start, Carbon $end): float
+    {
+        return (float) SupplierLedgerEntry::query()
+            ->where('type', SupplierLedgerEntry::TYPE_PURCHASE_RETURN)
+            ->whereBetween('entry_date', [$start, $end])
+            ->sum('credit');
     }
 }
