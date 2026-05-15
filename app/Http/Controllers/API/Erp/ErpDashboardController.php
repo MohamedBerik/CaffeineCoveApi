@@ -15,6 +15,8 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
 use App\Services\Tenant; // ✅ استخدام Tenant
 use Illuminate\Support\Facades\Log;
+use App\Models\PurchaseOrder;
+use App\Models\SupplierPayment;
 
 class ErpDashboardController extends Controller
 {
@@ -80,6 +82,24 @@ class ErpDashboardController extends Controller
                     ->limit(5)
                     ->get();
 
+                $recentPurchaseOrders = PurchaseOrder::with('supplier')
+                    ->latest()
+                    ->limit(5)
+                    ->get()
+                    ->map(function ($po) {
+                        $totalPaid = $po->payments()->sum('amount');
+                        return [
+                            'id'          => $po->id,
+                            'number'      => $po->number,
+                            'supplier'    => $po->supplier?->name,
+                            'total'       => $po->total,
+                            'total_paid'  => $totalPaid,
+                            'remaining'   => $po->total - $totalPaid,
+                            'status'      => $po->status,
+                            'created_at'  => $po->created_at,
+                        ];
+                    });
+
                 $recentInvoices = Invoice::query()
                     ->latest()
                     ->limit(5)
@@ -94,6 +114,7 @@ class ErpDashboardController extends Controller
                     'recent_appointments' => $recentAppointments,
                     'recent_invoices' => $recentInvoices,
                     'recent_payments' => $recentPayments,
+                    'recent_purchase_orders' => $recentPurchaseOrders,
                     'range' => $range,
                     'comparison' => [
                         'enabled' => $compare,
@@ -405,6 +426,26 @@ class ErpDashboardController extends Controller
                 'previous' => null,
                 'delta' => null,
             ],
+            'purchase_total' => [
+                'current' => $this->sumPurchaseTotal($companyId, $dateRanges['current']['start'], $dateRanges['current']['end']),
+                'previous' => null,
+                'delta' => null,
+            ],
+            'purchase_orders_count' => [
+                'current' => $this->countPurchaseOrders($companyId, $dateRanges['current']['start'], $dateRanges['current']['end']),
+                'previous' => null,
+                'delta' => null,
+            ],
+            'supplier_payments' => [
+                'current' => $this->sumSupplierPayments($companyId, $dateRanges['current']['start'], $dateRanges['current']['end']),
+                'previous' => null,
+                'delta' => null,
+            ],
+            'purchase_remaining' => [
+                'current' => $this->getTotalPurchaseRemaining(),
+                'previous' => null,
+                'delta' => null,
+            ],
         ];
 
         if ($compare) {
@@ -458,6 +499,26 @@ class ErpDashboardController extends Controller
                     'current' => $currentPaidInvoices,
                     'previous' => $previousPaidInvoices,
                     'delta' => $this->calculateDelta($currentPaidInvoices, $previousPaidInvoices),
+                ],
+                'purchase_total' => [
+                    'current' => $this->sumPurchaseTotal($companyId, $dateRanges['current']['start'], $dateRanges['current']['end']),
+                    'previous' => null,
+                    'delta' => null,
+                ],
+                'purchase_orders_count' => [
+                    'current' => $this->countPurchaseOrders($companyId, $dateRanges['current']['start'], $dateRanges['current']['end']),
+                    'previous' => null,
+                    'delta' => null,
+                ],
+                'supplier_payments' => [
+                    'current' => $this->sumSupplierPayments($companyId, $dateRanges['current']['start'], $dateRanges['current']['end']),
+                    'previous' => null,
+                    'delta' => null,
+                ],
+                'purchase_remaining' => [
+                    'current' => $this->getTotalPurchaseRemaining(),
+                    'previous' => null,
+                    'delta' => null,
                 ],
             ];
         }
@@ -530,5 +591,35 @@ class ErpDashboardController extends Controller
             return $current > 0 ? 100 : 0;
         }
         return round((($current - $previous) / $previous) * 100, 2);
+    }
+
+    private function sumPurchaseTotal($companyId, Carbon $start, Carbon $end): float
+    {
+        return (float) PurchaseOrder::query()
+            ->whereBetween('created_at', [$start, $end])
+            ->sum('total');
+    }
+
+    private function countPurchaseOrders($companyId, Carbon $start, Carbon $end): int
+    {
+        return PurchaseOrder::query()
+            ->whereBetween('created_at', [$start, $end])
+            ->count();
+    }
+
+    private function sumSupplierPayments($companyId, Carbon $start, Carbon $end): float
+    {
+        return (float) SupplierPayment::query()
+            ->whereBetween('paid_at', [$start, $end])
+            ->sum('amount');
+    }
+
+    // المتبقي = إجمالي المشتريات - إجمالي المدفوعات (في الفترة الحالية أو التراكمي؟)
+    // سنقوم بحساب المتبقي للمشتريات حتى الآن (غير مرتبط بفترة، بل إجمالي ما تبقى من جميع أوامر الشراء)
+    private function getTotalPurchaseRemaining(): float
+    {
+        $totalOrders = (float) PurchaseOrder::query()->sum('total');
+        $totalPaid = (float) SupplierPayment::query()->sum('amount');
+        return $totalOrders - $totalPaid;
     }
 }
