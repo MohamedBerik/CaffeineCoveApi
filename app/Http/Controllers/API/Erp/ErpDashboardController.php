@@ -484,6 +484,11 @@ class ErpDashboardController extends Controller
                 'previous' => null,
                 'delta' => null,
             ],
+            'purchase_balance' => [
+                'current' => $this->getPurchaseBalance($companyId, $dateRanges['current']['start'], $dateRanges['current']['end']),
+                'previous' => null,
+                'delta' => null,
+            ],
         ];
 
         if ($compare) {
@@ -591,6 +596,11 @@ class ErpDashboardController extends Controller
                 ],
                 'outstanding_receivables' => [
                     'current' => $this->getOutstandingReceivables(),
+                    'previous' => null,
+                    'delta' => null,
+                ],
+                'purchase_balance' => [
+                    'current' => $this->getPurchaseBalance($companyId, $dateRanges['current']['start'], $dateRanges['current']['end']),
                     'previous' => null,
                     'delta' => null,
                 ],
@@ -746,5 +756,15 @@ class ErpDashboardController extends Controller
         $netPurchases = $this->sumPurchaseTotal($companyId, $start, $end)
             - $this->sumPurchaseReturns($companyId, $start, $end);
         return $revenue - $netPurchases;
+    }
+    /**
+     * Purchase balance for the period: net purchases - supplier payments in period
+     */
+    private function getPurchaseBalance($companyId, Carbon $start, Carbon $end): float
+    {
+        $netPurchases = $this->sumPurchaseTotal($companyId, $start, $end)
+            - $this->sumPurchaseReturns($companyId, $start, $end);
+        $paymentsInPeriod = $this->sumSupplierPayments($companyId, $start, $end);
+        return $netPurchases - $paymentsInPeriod;
     }
 }
