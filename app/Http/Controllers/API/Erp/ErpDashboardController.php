@@ -17,6 +17,7 @@ use App\Services\Tenant; // ✅ استخدام Tenant
 use Illuminate\Support\Facades\Log;
 use App\Models\PurchaseOrder;
 use App\Models\SupplierPayment;
+use App\Models\Supply;
 
 class ErpDashboardController extends Controller
 {
@@ -446,6 +447,16 @@ class ErpDashboardController extends Controller
                 'previous' => null,
                 'delta' => null,
             ],
+            'low_stock_supplies' => [
+                'current' => $this->getLowStockSuppliesCount(),
+                'previous' => null,
+                'delta' => null,
+            ],
+            'inventory_value' => [
+                'current' => $this->getInventoryValue(),
+                'previous' => null,
+                'delta' => null,
+            ],
         ];
 
         if ($compare) {
@@ -517,6 +528,16 @@ class ErpDashboardController extends Controller
                 ],
                 'purchase_remaining' => [
                     'current' => $this->getTotalPurchaseRemaining(),
+                    'previous' => null,
+                    'delta' => null,
+                ],
+                'low_stock_supplies' => [
+                    'current' => $this->getLowStockSuppliesCount(),
+                    'previous' => null,
+                    'delta' => null,
+                ],
+                'inventory_value' => [
+                    'current' => $this->getInventoryValue(),
                     'previous' => null,
                     'delta' => null,
                 ],
@@ -621,5 +642,26 @@ class ErpDashboardController extends Controller
         $totalOrders = (float) PurchaseOrder::query()->sum('total');
         $totalPaid = (float) SupplierPayment::query()->sum('amount');
         return $totalOrders - $totalPaid;
+    }
+
+    /**
+     * Get count of low stock supplies (quantity <= 10 and > 0)
+     */
+    private function getLowStockSuppliesCount(): int
+    {
+        return Supply::query()
+            ->where('stock_quantity', '<=', 10)
+            ->where('stock_quantity', '>', 0)
+            ->count();
+    }
+
+    /**
+     * Get total inventory value (sum of stock_quantity * unit_cost)
+     */
+    private function getInventoryValue(): float
+    {
+        return (float) Supply::query()
+            ->selectRaw('SUM(stock_quantity * unit_cost) as total_value')
+            ->value('total_value') ?? 0;
     }
 }
