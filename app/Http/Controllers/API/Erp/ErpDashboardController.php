@@ -469,6 +469,21 @@ class ErpDashboardController extends Controller
                 'previous' => null,
                 'delta' => null,
             ],
+            'outstanding_payables' => [
+                'current' => $this->getTotalPurchaseRemaining(),
+                'previous' => null,
+                'delta' => null,
+            ],
+            'net_profit' => [
+                'current' => $this->getNetProfit($companyId, $dateRanges['current']['start'], $dateRanges['current']['end']),
+                'previous' => null,
+                'delta' => null,
+            ],
+            'outstanding_receivables' => [
+                'current' => $this->getOutstandingReceivables(),
+                'previous' => null,
+                'delta' => null,
+            ],
         ];
 
         if ($compare) {
@@ -561,6 +576,21 @@ class ErpDashboardController extends Controller
                 'purchase_net' => [
                     'current' => $this->sumPurchaseTotal($companyId, $dateRanges['current']['start'], $dateRanges['current']['end'])
                         - $this->sumPurchaseReturns($companyId, $dateRanges['current']['start'], $dateRanges['current']['end']),
+                    'previous' => null,
+                    'delta' => null,
+                ],
+                'outstanding_payables' => [
+                    'current' => $this->getTotalPurchaseRemaining(),
+                    'previous' => null,
+                    'delta' => null,
+                ],
+                'net_profit' => [
+                    'current' => $this->getNetProfit($companyId, $dateRanges['current']['start'], $dateRanges['current']['end']),
+                    'previous' => null,
+                    'delta' => null,
+                ],
+                'outstanding_receivables' => [
+                    'current' => $this->getOutstandingReceivables(),
                     'previous' => null,
                     'delta' => null,
                 ],
@@ -694,5 +724,27 @@ class ErpDashboardController extends Controller
             ->where('type', SupplierLedgerEntry::TYPE_PURCHASE_RETURN)
             ->whereBetween('entry_date', [$start, $end])
             ->sum('credit');
+    }
+    /**
+     * Get total outstanding receivables (unpaid + partially_paid invoices)
+     */
+    private function getOutstandingReceivables(): float
+    {
+        return (float) Invoice::query()
+            ->whereIn('status', ['unpaid', 'partially_paid'])
+            ->sum(DB::raw('total - COALESCE((SELECT SUM(amount) FROM payments WHERE payments.invoice_id = invoices.id), 0)'));
+        // بديل أبسط إذا كان لديك net_paid في قاعدة البيانات
+        // ->sum(DB::raw('total - net_paid'));
+    }
+
+    /**
+     * Get net profit (revenue - net purchases) for the period
+     */
+    private function getNetProfit($companyId, Carbon $start, Carbon $end): float
+    {
+        $revenue = $this->sumRevenue($companyId, $start, $end);
+        $netPurchases = $this->sumPurchaseTotal($companyId, $start, $end)
+            - $this->sumPurchaseReturns($companyId, $start, $end);
+        return $revenue - $netPurchases;
     }
 }
