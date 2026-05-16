@@ -259,14 +259,12 @@ class PlatformSettingsController extends Controller
      */
     public function platformInfo()
     {
-        $general = PlatformSetting::get('general');
-        $settings = $general ? json_decode($general, true) : [];
-
+        // جلب القيم مباشرة باستخدام دالة get المعرفة في الموديل
         return response()->json([
-            'name' => $settings['platform_name'] ?? config('app.name', 'My Platform'),
-            'email' => $settings['platform_email'] ?? '',
-            'phone' => $settings['platform_phone'] ?? '',
-            'address' => $settings['platform_address'] ?? '',
+            'name'    => PlatformSetting::get('platform_name', config('app.name', 'My Platform')),
+            'email'   => PlatformSetting::get('platform_email', 'admin@platform.com'),
+            'phone'   => PlatformSetting::get('platform_phone', ''),
+            'address' => PlatformSetting::get('platform_address', ''),
         ]);
     }
 }
