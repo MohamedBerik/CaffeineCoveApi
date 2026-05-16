@@ -250,4 +250,25 @@ class PlatformSettingsController extends Controller
             }
         }
     }
+
+    // app/Http/Controllers/API/SaaS/PlatformSettingsController.php
+
+    /**
+     * GET /api/erp/platform-info
+     * الحصول على معلومات المنصة العامة (للاستخدام داخل ERP)
+     */
+    public function platformInfo()
+    {
+        $general = \App\Models\PlatformSetting::where('key', 'general')
+            ->value('value');
+
+        $settings = $general ? json_decode($general, true) : [];
+
+        return response()->json([
+            'name' => $settings['platform_name'] ?? config('app.name', 'My Platform'),
+            'email' => $settings['platform_email'] ?? '',
+            'phone' => $settings['platform_phone'] ?? '',
+            'address' => $settings['platform_address'] ?? '',
+        ]);
+    }
 }

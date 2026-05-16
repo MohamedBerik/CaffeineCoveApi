@@ -94,6 +94,10 @@ Route::middleware(['auth:sanctum', 'super.admin'])->prefix('admin')->group(funct
 | Authenticated Routes (All Users)
 |--------------------------------------------------------------------------
 */
+Route::middleware('auth:sanctum')->group(function () {
+    Route::get('/erp/platform-info', [PlatformSettingsController::class, 'platformInfo']);
+});
+
 Route::middleware(['auth:sanctum', 'company.user'])->group(function () {
 
     // User Profile
