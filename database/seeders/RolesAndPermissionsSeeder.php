@@ -59,6 +59,8 @@ class RolesAndPermissionsSeeder extends Seeder
             'products.manage',
             'supplies.view',
             'supplies.manage',
+            'branches.view',
+            'branches.manage',
         ];
 
         foreach ($permissions as $perm) {
@@ -111,6 +113,8 @@ class RolesAndPermissionsSeeder extends Seeder
             'products.manage',
             'supplies.view',
             'supplies.manage',
+            'branches.view',
+            'branches.manage',
         ]);
 
         // Doctor role

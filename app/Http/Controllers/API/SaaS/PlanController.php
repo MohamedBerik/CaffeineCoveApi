@@ -40,6 +40,7 @@ class PlanController extends Controller
             'max_users' => ['nullable', 'integer', 'min:1'],
             'max_patients' => ['nullable', 'integer', 'min:0'],
             'max_appointments' => ['nullable', 'integer', 'min:0'],
+            'max_branches' => ['nullable', 'integer', 'min:0'],
             'features' => ['nullable', 'array'],
             'is_active' => ['boolean'],
         ]);
@@ -67,6 +68,7 @@ class PlanController extends Controller
             'max_users' => ['nullable', 'integer', 'min:1'],
             'max_patients' => ['nullable', 'integer', 'min:0'],
             'max_appointments' => ['nullable', 'integer', 'min:0'],
+            'max_branches' => ['nullable', 'integer', 'min:0'],
             'features' => ['nullable', 'array'],
             'is_active' => ['boolean'],
         ]);

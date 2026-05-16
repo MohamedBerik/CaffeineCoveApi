@@ -16,6 +16,7 @@ class Plan extends Model
         'max_users',
         'max_patients',
         'max_appointments',
+        'max_branches',
         'features',
         'is_active',
     ];
@@ -25,6 +26,7 @@ class Plan extends Model
         'is_active' => 'boolean',
         'price_monthly' => 'decimal:2',
         'price_yearly' => 'decimal:2',
+        'max_branches' => 'integer',
     ];
 
     public function subscriptions()

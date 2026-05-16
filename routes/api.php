@@ -33,6 +33,7 @@ use App\Http\Controllers\API\Erp\TreatmentPlanController;
 use App\Http\Controllers\API\Erp\CustomerController;
 use App\Http\Controllers\API\Erp\AppointmentController;
 use App\Http\Controllers\API\Erp\BillingController;
+use App\Http\Controllers\API\Erp\BranchController;
 use App\Http\Controllers\API\Erp\ClinicSettingController;
 use App\Http\Controllers\API\Erp\DentalRecordController;
 use App\Http\Controllers\API\Erp\ErpDashboardController;
@@ -173,6 +174,17 @@ Route::prefix('erp')
             Route::get('/activity-logs', [ActivityLogController::class, 'index']);
         });
 
+        // ==================== Branches ====================
+        Route::middleware('permission:branches.view')->group(function () {
+            Route::get('/branches', [BranchController::class, 'index']);
+            Route::get('/branches/{id}', [BranchController::class, 'show']);
+        });
+
+        Route::middleware('permission:branches.manage')->group(function () {
+            Route::post('/branches', [BranchController::class, 'store']);
+            Route::put('/branches/{id}', [BranchController::class, 'update']);
+            Route::delete('/branches/{id}', [BranchController::class, 'destroy']);
+        });
         // ==================== ALERTS ====================
         Route::middleware('permission:finance.view')->group(function () {
             Route::get('/alerts', [AlertController::class, 'index']);
