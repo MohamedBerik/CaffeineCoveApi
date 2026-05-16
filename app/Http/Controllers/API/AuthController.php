@@ -111,30 +111,37 @@ class AuthController extends Controller
         }
 
         // ✅ فحص حالة الشركة
+        // في AuthController@login، بعد التحقق من كلمة المرور وقبل إنشاء التوكن
+
         if (!$user->is_super_admin && $user->company) {
             $status = $user->company->status;
             $trialEnd = $user->company->trial_ends_at;
+            $requiresSubscription = false;
 
-            // شركة معلقة أو ملغاة
             if (in_array($status, ['suspended', 'cancelled'])) {
-                return response()->json([
-                    'message' => $status === 'suspended'
-                        ? 'Your clinic account has been suspended. Please contact support or subscribe to reactivate.'
-                        : 'Your clinic account has been cancelled.',
-                    'code' => 'COMPANY_' . strtoupper($status),
-                    'redirect_to' => '/admin/erp/billing'
-                ], 403);
+                $requiresSubscription = true;
+            } elseif ($status === 'trial' && $trialEnd && now()->gt($trialEnd)) {
+                $requiresSubscription = true;
             }
 
-            // تجربة انتهت صلاحيتها
-            if ($status === 'trial' && $trialEnd && now()->gt($trialEnd)) {
+            if ($requiresSubscription) {
+                // ✅ سماح بتسجيل الدخول، لكن مع علامة تتطلب الاشتراك
+                $token = $user->createToken('API Token')->plainTextToken;
                 return response()->json([
-                    'message' => 'Your free trial has ended. Please subscribe to continue using the system.',
-                    'code' => 'TRIAL_EXPIRED',
+                    'user' => $user->only(['id', 'name', 'email', 'role', 'is_super_admin', 'branch_id']),
+                    'company_id' => $user->company_id,
+                    'company_status' => $status,
+                    'token' => $token,
+                    'requires_subscription' => true,
+                    'message' => $status === 'suspended'
+                        ? 'Your clinic account has been suspended. Please subscribe to reactivate.'
+                        : 'Your free trial has ended. Please subscribe to continue.',
                     'redirect_to' => '/admin/erp/billing'
-                ], 403);
+                ]);
             }
         }
+
+        // وإلا، تسجيل دخول عادي...
 
 
         $token = $user->createToken('API Token')->plainTextToken;
