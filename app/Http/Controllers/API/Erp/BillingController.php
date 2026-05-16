@@ -515,4 +515,23 @@ class BillingController extends Controller
             ],
         ]);
     }
+
+    /**
+     * GET /api/erp/billing/invoices/{id}
+     * عرض تفاصيل فاتورة اشتراك واحدة
+     */
+    public function showInvoice($id)
+    {
+        $companyId = Tenant::id();
+
+        $invoice = BillingInvoice::where('company_id', $companyId)
+            ->where('id', $id)
+            ->firstOrFail();
+
+        return response()->json([
+            'msg' => 'Invoice details',
+            'status' => 200,
+            'data' => $invoice,
+        ]);
+    }
 }

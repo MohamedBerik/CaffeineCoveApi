@@ -231,6 +231,7 @@ Route::prefix('erp')
         Route::middleware('permission:finance.view')->group(function () {
             Route::get('/invoices', [InvoiceController::class, 'indexErp']);
             Route::get('/invoices/{invoiceId}/journal-entries', [InvoiceJournalController::class, 'index']);
+            Route::get('/billing/invoices/{id}', [BillingController::class, 'showInvoice']);
         });
 
         // 2. عرض الفاتورة الواحدة، تسجيل المدفوعات، تطبيق الأرصدة – متاحة لموظف الاستقبال (invoices.pay)
