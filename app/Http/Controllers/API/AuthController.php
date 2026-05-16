@@ -87,7 +87,6 @@ class AuthController extends Controller
             'password' => 'required|string',
         ]);
 
-        // ✅ تجاوز الـ Global Scope عشان نقدر ندور على المستخدم
         $user = Tenant::asSuperAdmin(function () use ($request) {
             return User::withoutGlobalScopes()
                 ->where('email', $request->email)
@@ -105,53 +104,51 @@ class AuthController extends Controller
             ], 401);
         }
 
-        // ✅ ضبط السياق
+        // ✅ ضبط Tenant Context
         if (!$user->is_super_admin) {
             Tenant::setId($user->company_id);
+            Tenant::setIsSuperAdmin(false);
+        } else {
+            Tenant::setId(null);
+            Tenant::setIsSuperAdmin(true);
         }
 
-        // ✅ فحص حالة الشركة
-        // في AuthController@login، بعد التحقق من كلمة المرور وقبل إنشاء التوكن
+        // ✅ فحص حالة الاشتراك (والسماح بتسجيل الدخول مع علامة)
+        $requiresSubscription = false;
+        $subscriptionMessage = '';
 
         if (!$user->is_super_admin && $user->company) {
             $status = $user->company->status;
             $trialEnd = $user->company->trial_ends_at;
-            $requiresSubscription = false;
 
             if (in_array($status, ['suspended', 'cancelled'])) {
                 $requiresSubscription = true;
+                $subscriptionMessage = $status === 'suspended'
+                    ? 'Your clinic account has been suspended. Please subscribe to reactivate.'
+                    : 'Your clinic account has been cancelled.';
             } elseif ($status === 'trial' && $trialEnd && now()->gt($trialEnd)) {
                 $requiresSubscription = true;
-            }
-
-            if ($requiresSubscription) {
-                // ✅ سماح بتسجيل الدخول، لكن مع علامة تتطلب الاشتراك
-                $token = $user->createToken('API Token')->plainTextToken;
-                return response()->json([
-                    'user' => $user->only(['id', 'name', 'email', 'role', 'is_super_admin', 'branch_id']),
-                    'company_id' => $user->company_id,
-                    'company_status' => $status,
-                    'token' => $token,
-                    'requires_subscription' => true,
-                    'message' => $status === 'suspended'
-                        ? 'Your clinic account has been suspended. Please subscribe to reactivate.'
-                        : 'Your free trial has ended. Please subscribe to continue.',
-                    'redirect_to' => '/admin/erp/billing'
-                ]);
+                $subscriptionMessage = 'Your free trial has ended. Please subscribe to continue using the system.';
             }
         }
 
-        // وإلا، تسجيل دخول عادي...
-
-
         $token = $user->createToken('API Token')->plainTextToken;
 
-        return response()->json([
+        $response = [
             'user' => $user->only(['id', 'name', 'email', 'role', 'is_super_admin', 'branch_id']),
             'company_id' => $user->company_id,
             'company_status' => $user->company?->status,
-            'token' => $token
-        ]);
+            'token' => $token,
+        ];
+
+        // ✅ إضافة علامة الاشتراك إذا لزم الأمر
+        if ($requiresSubscription) {
+            $response['requires_subscription'] = true;
+            $response['message'] = $subscriptionMessage;
+            $response['redirect_to'] = '/admin/erp/billing';
+        }
+
+        return response()->json($response);
     }
 
     /**
