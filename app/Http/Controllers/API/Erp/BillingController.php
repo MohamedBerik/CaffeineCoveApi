@@ -254,6 +254,23 @@ class BillingController extends Controller
             ->with('plan')
             ->latest()
             ->first();
+        $company = \App\Models\Company::find($companyId);
+
+        // ✅ تحسين: إرجاع معلومات التجربة إذا لم يوجد اشتراك
+        if (!$subscription && $company && $company->status === 'trial') {
+            return response()->json([
+                'msg' => 'Trial period',
+                'status' => 200,
+                'data' => [
+                    'type' => 'trial',
+                    'days_left' => $company->trial_ends_at
+                        ? max(0, now()->diffInDays($company->trial_ends_at, false))
+                        : null,
+                    'trial_ends_at' => $company->trial_ends_at,
+                    'plan' => null,
+                ]
+            ]);
+        }
 
         if ($subscription) {
             // ✅ تأكد إن features راجعة كـ Array

@@ -5,6 +5,7 @@ namespace App\Http\Controllers\API\Webhook;
 use App\Http\Controllers\Controller;
 use App\Models\Subscription;
 use App\Models\BillingInvoice;
+use App\Models\Company;
 use App\Models\PaymentMethod;
 use App\Models\WebhookLog;
 use App\Services\PayMobService;
@@ -58,16 +59,6 @@ class PayMobWebhookController extends Controller
                     return response()->json(['status' => 'subscription_not_found'], 404);
                 }
 
-                // ✅ Idempotency Check: هل الاشتراك نشط بالفعل؟
-                if ($subscription->status === 'active' && $subscription->payment_token) {
-                    Log::info('PayMob Webhook: Already processed (idempotent)', [
-                        'subscription_id' => $subscription->id,
-                        'order_id' => $orderId,
-                    ]);
-                    $webhookLog->update(['status' => 'duplicate_ignored', 'subscription_id' => $subscription->id]);
-                    return response()->json(['status' => 'already_active']);
-                }
-
                 // ✅ هل تم معالجة نفس الـ Webhook من قبل؟
                 $duplicateWebhook = WebhookLog::where('order_id', $orderId)
                     ->where('status', 'success')
@@ -93,6 +84,16 @@ class PayMobWebhookController extends Controller
                     'payment_token' => $transactionId,
                     'transaction_id' => $transactionId,
                 ]);
+
+                // ✅ تفعيل الشركة المرتبطة تلقائياً بعد الدفع الناجح
+                $company = Company::find($subscription->company_id);
+                if ($company && in_array($company->status, ['trial', 'suspended'])) {
+                    $company->update(['status' => 'active']);
+                    Log::info('Company activated after payment', [
+                        'company_id' => $company->id,
+                        'previous_status' => $company->status,
+                    ]);
+                }
 
                 // ✅ حفظ طريقة الدفع
                 if (isset($payload['obj']['source_data'])) {
