@@ -29,9 +29,16 @@ class CheckGracePeriods extends Command
                 'suspension_reason' => 'grace_period_expired',
             ]);
 
+            // ✅ تعليق الشركة المرتبطة أيضًا
+            $company = \App\Models\Company::find($subscription->company_id);
+            if ($company && $company->status === 'active') {
+                $company->update(['status' => 'suspended']);
+            }
+
             Log::warning('Subscription suspended: grace period expired', [
                 'subscription_id' => $subscription->id,
                 'company_id' => $subscription->company_id,
+                'company_status' => $company?->status,
                 'grace_ended_at' => $subscription->grace_period_ends_at,
             ]);
 
