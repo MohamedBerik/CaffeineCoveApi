@@ -259,9 +259,7 @@ class PlatformSettingsController extends Controller
      */
     public function platformInfo()
     {
-        $general = \App\Models\PlatformSetting::where('key', 'general')
-            ->value('value');
-
+        $general = PlatformSetting::get('general');
         $settings = $general ? json_decode($general, true) : [];
 
         return response()->json([
