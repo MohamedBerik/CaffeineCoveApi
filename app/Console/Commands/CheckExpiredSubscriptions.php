@@ -27,9 +27,16 @@ class CheckExpiredSubscriptions extends Command
                 'status' => 'expired',
             ]);
 
+            // ✅ تعليق الشركة المرتبطة
+            $company = \App\Models\Company::find($subscription->company_id);
+            if ($company && $company->status === 'active') {
+                $company->update(['status' => 'suspended']);
+            }
+
             Log::info('Subscription expired', [
                 'subscription_id' => $subscription->id,
                 'company_id' => $subscription->company_id,
+                'company_status' => $company?->status,
             ]);
 
             $count++;
