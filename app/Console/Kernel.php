@@ -96,6 +96,7 @@ class Kernel extends ConsoleKernel
         $schedule->command('billing:check-expired')->dailyAt('02:30');
         $schedule->command('db:backup')->dailyAt('03:00');
         $schedule->command('trials:expire')->daily();
+        $schedule->command('billing:expire-companies')->dailyAt('03:30');
     }
 
     /**
