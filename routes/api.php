@@ -94,9 +94,7 @@ Route::middleware(['auth:sanctum', 'super.admin'])->prefix('admin')->group(funct
 | Authenticated Routes (All Users)
 |--------------------------------------------------------------------------
 */
-Route::middleware('auth:sanctum')->group(function () {
-    Route::get('/erp/platform-info', [PlatformSettingsController::class, 'platformInfo']);
-});
+// Route::middleware('auth:sanctum')->group(function () {});
 
 Route::middleware(['auth:sanctum', 'company.user'])->group(function () {
 
@@ -237,6 +235,7 @@ Route::prefix('erp')
             Route::get('/invoices/{invoiceId}/journal-entries', [InvoiceJournalController::class, 'index']);
             Route::get('/billing/invoices/{id}', [BillingController::class, 'showInvoice']);
         });
+        Route::get('/erp/platform-info', [PlatformSettingsController::class, 'platformInfo']);
 
         // 2. عرض الفاتورة الواحدة، تسجيل المدفوعات، تطبيق الأرصدة – متاحة لموظف الاستقبال (invoices.pay)
         Route::middleware('permission:invoices.pay')->group(function () {
