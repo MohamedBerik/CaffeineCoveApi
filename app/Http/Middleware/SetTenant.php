@@ -14,34 +14,25 @@ class SetTenant
 {
     public function handle(Request $request, Closure $next)
     {
-        // ✅ 1. Login/Register Bypass
+        // 1. Login/Register تخطي
         if ($request->is('api/login') || $request->is('api/register')) {
             Tenant::setId(null);
             Tenant::setIsSuperAdmin(false);
             return $next($request);
         }
 
-        // ✅ تعيين branch_id تلقائياً من المستخدم (إذا لم يُرسل يدوياً)
         $tenantIdFromHeader = $request->header('X-Tenant-ID');
-
         $user = $request->user();
 
         if (!$user) {
             Tenant::setId(null);
             Tenant::setIsSuperAdmin(false);
-
-            $this->logDebug('Tenant Check - Public Route', [
-                'path' => $request->path(),
-                'tenant_id' => null,
-            ]);
-
             return $next($request);
         }
 
-        // ✅ تحسين #2: تبسيط الشرط
         $isGlobalMode = !$tenantIdFromHeader || $tenantIdFromHeader === 'global';
 
-        // ✅ Early return for ERP requirement
+        // Super Admin يحتاج إلى tenant في ERP
         if ($user->is_super_admin && $this->isErpRoute($request)) {
             if ($isGlobalMode) {
                 return response()->json([
@@ -50,79 +41,30 @@ class SetTenant
             }
         }
 
-        // ✅ Super Admin Logic
+        // Super Admin Logic
         if ($user->is_super_admin) {
             Tenant::setIsSuperAdmin(true);
 
             if ($isGlobalMode) {
                 Tenant::setId(null);
-
-                $this->logDebug('Tenant Check - Super Admin (Global Mode)', [
-                    'user_id' => $user->id,
-                    'tenant_id' => null,
-                ]);
-
                 return $next($request);
             }
 
             $company = $this->findCompany($tenantIdFromHeader);
 
             if (!$company) {
-                Log::warning('Tenant Check - Invalid Company ID', [
-                    'user_id' => $user->id,
-                    'requested_company_id' => $tenantIdFromHeader,
-                ]);
-
-                return response()->json([
-                    'message' => 'Invalid company ID',
-                    'requested_id' => $tenantIdFromHeader,
-                ], 400);
-            }
-
-            if (!$user->canAccessCompany($company->id)) {
-                Log::warning('Tenant Check - Unauthorized Company Access', [
-                    'user_id' => $user->id,
-                    'company_id' => $company->id,
-                ]);
-
-                return response()->json([
-                    'message' => 'Unauthorized company access',
-                ], 403);
-            }
-
-            if ($company->status === 'suspended') {
-                Log::warning('Tenant Check - Suspended Company', [
-                    'user_id' => $user->id,
-                    'company_id' => $company->id,
-                    'company_status' => $company->status,
-                ]);
+                return response()->json(['message' => 'Invalid company ID'], 400);
             }
 
             Tenant::setId($company->id);
-
-            $this->logDebug('Tenant Check - Super Admin (Company Mode)', [
-                'user_id' => $user->id,
-                'tenant_id' => $company->id,
-                'company_slug' => $company->slug,
-                'company_status' => $company->status,
-            ]);
-
             return $next($request);
         }
 
-        // ✅ Regular User Logic
+        // Regular User Logic
         if ($user->company_id) {
             $company = $this->findCompany($user->company_id);
 
             if (!$company) {
-                Log::error('Tenant Check - User Company Not Found', [
-                    'user_id' => $user->id,
-                    'company_id' => $user->company_id,
-                ]);
-
-                Tenant::setId(null);
-                Tenant::setIsSuperAdmin(false);
-
                 throw new TenantException(
                     'Your company account could not be found. Please contact support.',
                     403,
@@ -130,43 +72,32 @@ class SetTenant
                 );
             }
 
-            if ($company->status === 'suspended') {
-                Log::warning('Tenant Check - Suspended Company Access Attempt', [
-                    'user_id' => $user->id,
-                    'company_id' => $company->id,
-                ]);
+            // ✅ الفحص الموحد لحالة الشركة
+            $blocked = in_array($company->status, ['suspended', 'cancelled']) ||
+                ($company->status === 'trial' && $company->trial_ends_at && now()->gt($company->trial_ends_at));
 
-                Tenant::setId(null);
-                Tenant::setIsSuperAdmin(false);
+            if ($blocked) {
+                // السماح فقط بمسارات الفوترة
+                if ($request->is('api/erp/billing*')) {
+                    Tenant::setId($user->company_id);
+                    Tenant::setIsSuperAdmin(false);
+                    return $next($request);
+                }
 
-                throw new TenantException(
-                    'Your clinic account has been suspended. Please contact support.',
-                    403,
-                    'TENANT_SUSPENDED'
-                );
+                // رفض مع رسالة واضحة
+                $message = $company->status === 'suspended'
+                    ? 'Your clinic account has been suspended. Please subscribe to reactivate.'
+                    : 'Your free trial has ended. Please subscribe to continue using the system.';
+
+                throw new TenantException($message, 403, 'TENANT_' . strtoupper($company->status));
             }
 
             Tenant::setId($user->company_id);
             Tenant::setIsSuperAdmin(false);
-
-            $this->logDebug('Tenant Check - Regular User', [
-                'user_id' => $user->id,
-                'tenant_id' => $user->company_id,
-                'company_slug' => $company->slug,
-            ]);
-
             return $next($request);
         }
 
-        // ❌ User بدون Company
-        Log::error('Tenant Check - User Without Company', [
-            'user_id' => $user->id,
-            'user_email' => $user->email,
-        ]);
-
-        Tenant::setId(null);
-        Tenant::setIsSuperAdmin(false);
-
+        // User بدون Company
         throw new TenantException(
             'Your account is not associated with any clinic. Please contact support.',
             403,
@@ -174,37 +105,17 @@ class SetTenant
         );
     }
 
-    /**
-     * ✅ تحسين #3: التحقق إذا كان الـ Route من ERP
-     */
     private function isErpRoute(Request $request): bool
     {
         return str_contains($request->path(), 'erp/') || $request->is('api/erp/*');
     }
 
-    /**
-     * ✅ Debug logging - فقط في البيئة المحلية (تحسين #5)
-     */
-    private function logDebug(string $message, array $context = []): void
-    {
-        if (app()->environment('local', 'development')) {
-            Log::debug($message, $context);
-        }
-    }
-
-    /**
-     * ✅ العثور على الشركة مع Cache (تحسين #5 - مدة أقل)
-     */
     private function findCompany($companyId): ?Company
     {
-        if (!$companyId) {
-            return null;
-        }
-
+        if (!$companyId) return null;
         $cacheKey = "company_{$companyId}_basic";
-
         return Cache::remember($cacheKey, now()->addMinutes(10), function () use ($companyId) {
-            return Company::select('id', 'name', 'slug', 'status')->find($companyId);
+            return Company::select('id', 'name', 'slug', 'status', 'trial_ends_at')->find($companyId);
         });
     }
 }
