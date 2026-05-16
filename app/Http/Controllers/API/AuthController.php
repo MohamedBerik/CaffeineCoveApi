@@ -95,7 +95,6 @@ class AuthController extends Controller
         });
 
         if (!$user || !Hash::check($request->password, $user->password)) {
-            // ✅ Audit Logging
             event(new \App\Events\FailedLogin(
                 $request->email,
                 $request->ip(),
@@ -106,23 +105,37 @@ class AuthController extends Controller
             ], 401);
         }
 
-        // ✅ بعد ما لاقينا المستخدم، نضبط Tenant Context
+        // ✅ ضبط السياق
         if (!$user->is_super_admin) {
             Tenant::setId($user->company_id);
-            Tenant::setIsSuperAdmin(false);
-        } else {
-            Tenant::setId(null);
-            Tenant::setIsSuperAdmin(true);
         }
 
-        // ✅ التحقق من حالة الشركة
+        // ✅ فحص حالة الشركة
         if (!$user->is_super_admin && $user->company) {
-            if (in_array($user->company->status, ['suspended', 'cancelled'])) {
+            $status = $user->company->status;
+            $trialEnd = $user->company->trial_ends_at;
+
+            // شركة معلقة أو ملغاة
+            if (in_array($status, ['suspended', 'cancelled'])) {
                 return response()->json([
-                    'message' => 'Your clinic account has been ' . $user->company->status
+                    'message' => $status === 'suspended'
+                        ? 'Your clinic account has been suspended. Please contact support or subscribe to reactivate.'
+                        : 'Your clinic account has been cancelled.',
+                    'code' => 'COMPANY_' . strtoupper($status),
+                    'redirect_to' => '/admin/erp/billing'
+                ], 403);
+            }
+
+            // تجربة انتهت صلاحيتها
+            if ($status === 'trial' && $trialEnd && now()->gt($trialEnd)) {
+                return response()->json([
+                    'message' => 'Your free trial has ended. Please subscribe to continue using the system.',
+                    'code' => 'TRIAL_EXPIRED',
+                    'redirect_to' => '/admin/erp/billing'
                 ], 403);
             }
         }
+
 
         $token = $user->createToken('API Token')->plainTextToken;
 
