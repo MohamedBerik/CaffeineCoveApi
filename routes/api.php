@@ -67,6 +67,7 @@ use Illuminate\Support\Facades\DB;
 Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:login');
 Route::post('/register', [AuthController::class, 'register'])->middleware('throttle:register');
 Route::get('/public/plans', [PlanController::class, 'publicIndex']);
+Route::get('/public/platform-info', [PlatformSettingsController::class, 'platformInfo']);
 
 /*
 |--------------------------------------------------------------------------
@@ -95,10 +96,6 @@ Route::middleware(['auth:sanctum', 'super.admin'])->prefix('admin')->group(funct
 | Authenticated Routes (All Users)
 |--------------------------------------------------------------------------
 */
-Route::middleware('auth:sanctum')->group(function () {
-    Route::get('/erp/platform-info', [PlatformSettingsController::class, 'platformInfo']);
-});
-
 Route::middleware(['auth:sanctum', 'company.user'])->group(function () {
 
     // User Profile
