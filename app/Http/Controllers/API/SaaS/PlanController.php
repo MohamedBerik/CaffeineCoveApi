@@ -103,4 +103,27 @@ class PlanController extends Controller
             'status' => 200,
         ]);
     }
+
+    /**
+     * GET /api/public/plans
+     * عرض الخطط النشطة فقط (للصفحة العامة)
+     */
+    public function publicIndex()
+    {
+        $plans = Plan::where('is_active', true)
+            ->orderBy('price_monthly')
+            ->get()
+            ->map(function ($plan) {
+                if (is_string($plan->features)) {
+                    $plan->features = json_decode($plan->features, true);
+                }
+                return $plan;
+            });
+
+        return response()->json([
+            'msg' => 'Available plans',
+            'status' => 200,
+            'data' => $plans,
+        ]);
+    }
 }

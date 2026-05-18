@@ -66,6 +66,7 @@ use Illuminate\Support\Facades\DB;
 
 Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:login');
 Route::post('/register', [AuthController::class, 'register'])->middleware('throttle:register');
+Route::get('/public/plans', [PlanController::class, 'publicIndex']);
 
 /*
 |--------------------------------------------------------------------------
