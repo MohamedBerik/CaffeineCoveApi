@@ -248,6 +248,10 @@ Route::prefix('erp')
         });
 
         // ==================== PAYMENTS & REFUNDS ====================
+        Route::middleware('permission:finance.view')->group(function () {
+            Route::get('/payments', [InvoicePaymentController::class, 'index']);
+        });
+
         Route::middleware('permission:payments.refund')->post('/payments/{payment}/refund', [PaymentRefundController::class, 'refund']);
 
         // ==================== PURCHASE ORDERS ====================

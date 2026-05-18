@@ -13,6 +13,17 @@ class InvoicePaymentController extends Controller
         protected InvoicePaymentService $paymentService
     ) {}
 
+    public function index(Request $request)
+    {
+        $payments = \App\Models\Payment::with(['invoice.customer'])
+            ->latest()
+            ->paginate(100);
+
+        return response()->json([
+            'data' => $payments
+        ]);
+    }
+
     public function store(Request $request, $invoiceId)
     {
         $invoice = Invoice::findOrFail($invoiceId);
