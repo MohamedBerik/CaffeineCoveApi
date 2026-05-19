@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\API;
 
 use App\Http\Controllers\Controller;
+use App\Models\ContactMessage;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Validator;
@@ -26,13 +27,20 @@ class ContactController extends Controller
             ], 422);
         }
 
-        // جلب إيميل المنصة من الإعدادات
-        $platformEmail = \App\Models\PlatformSetting::get('general');
-        $settings = $platformEmail ? json_decode($platformEmail, true) : [];
-        $toEmail = $settings['platform_email'] ?? config('mail.from.address');
+        // 1. حفظ الرسالة في قاعدة البيانات أولاً (ضمان عدم فقدانها)
+        $contact = ContactMessage::create([
+            'name'    => $request->name,
+            'email'   => $request->email,
+            'subject' => $request->subject,
+            'message' => $request->message,
+        ]);
 
-        // إرسال البريد
+        // 2. محاولة إرسال البريد الإلكتروني (إذا فشل لا نوقف المستخدم)
         try {
+            $platformEmail = \App\Models\PlatformSetting::get('general');
+            $settings = $platformEmail ? json_decode($platformEmail, true) : [];
+            $toEmail = $settings['platform_email'] ?? config('mail.from.address');
+
             Mail::raw(
                 "From: {$request->name} ({$request->email})\n\nSubject: {$request->subject}\n\n{$request->message}",
                 function ($message) use ($request, $toEmail) {
@@ -41,17 +49,14 @@ class ContactController extends Controller
                         ->replyTo($request->email, $request->name);
                 }
             );
-
-            return response()->json([
-                'msg'    => 'Your message has been sent successfully. We will get back to you soon.',
-                'status' => 200
-            ]);
         } catch (\Exception $e) {
-            \Log::error('Contact form email failed: ' . $e->getMessage());
-            return response()->json([
-                'msg'    => 'Failed to send your message. Please try again later.',
-                'status' => 500
-            ], 500);
+            \Log::error('Contact email failed: ' . $e->getMessage());
+            // لا نمنع المستخدم، فالرسالة محفوظة
         }
+
+        return response()->json([
+            'msg'    => 'Your message has been sent successfully. We will get back to you soon.',
+            'status' => 200
+        ]);
     }
 }
