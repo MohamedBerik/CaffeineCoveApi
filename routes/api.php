@@ -5,7 +5,7 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\API\AuthController;
 use App\Http\Controllers\API\UserController;
 use App\Http\Controllers\API\AdminCrudController;
-
+use App\Http\Controllers\API\ContactController;
 // ERP Controllers
 use App\Http\Controllers\API\Erp\SaleController;
 use App\Http\Controllers\API\Erp\ReservationController;
@@ -68,6 +68,7 @@ Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:lo
 Route::post('/register', [AuthController::class, 'register'])->middleware('throttle:register');
 Route::get('/public/plans', [PlanController::class, 'publicIndex']);
 Route::get('/public/platform-info', [PlatformSettingsController::class, 'platformInfo']);
+Route::post('/public/contact', [ContactController::class, 'send'])->middleware('throttle:5,1');
 
 /*
 |--------------------------------------------------------------------------
