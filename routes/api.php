@@ -47,6 +47,7 @@ use App\Http\Controllers\API\SaaS\SaasDashboardController;
 use App\Http\Controllers\API\SaaS\SaasReportsController;
 use App\Http\Controllers\API\SaaS\PlatformSettingsController;
 use App\Http\Controllers\API\SaaS\CompanyManagementController;
+use App\Http\Controllers\API\SaaS\ContactMessageController;
 use App\Http\Controllers\API\SaaS\PlanController;
 use App\Http\Controllers\API\SaaS\SubscriptionController;
 
@@ -494,6 +495,12 @@ Route::prefix('saas')
         Route::post('/companies/{id}/force-cancel-subscription', [CompanyManagementController::class, 'forceCancelSubscription']);
         Route::post('/companies/{id}/adjust-billing', [CompanyManagementController::class, 'adjustBilling']);
         Route::post('/companies/{id}/impersonate', [CompanyManagementController::class, 'impersonate']);
+
+        // ==================== CONTACT MESSAGES ====================
+        Route::get('/contact-messages', [ContactMessageController::class, 'index']);
+        Route::get('/contact-messages/{id}', [ContactMessageController::class, 'show']);
+        Route::post('/contact-messages/{id}/read', [ContactMessageController::class, 'markAsRead']);
+        Route::delete('/contact-messages/{id}', [ContactMessageController::class, 'destroy']);
     });
 
 
