@@ -15,6 +15,7 @@ class ContactController extends Controller
         $validate = Validator::make($request->all(), [
             'name'    => 'required|string|min:3|max:255',
             'email'   => 'required|email|max:255',
+            'phone' => 'nullable|string|max:50',
             'subject' => 'required|string|min:3|max:255',
             'message' => 'required|string|min:10|max:5000',
         ]);
@@ -31,6 +32,7 @@ class ContactController extends Controller
         $contact = ContactMessage::create([
             'name'    => $request->name,
             'email'   => $request->email,
+            'phone' => $request->phone,
             'subject' => $request->subject,
             'message' => $request->message,
         ]);
@@ -42,7 +44,7 @@ class ContactController extends Controller
             $toEmail = $settings['platform_email'] ?? config('mail.from.address');
 
             Mail::raw(
-                "From: {$request->name} ({$request->email})\n\nSubject: {$request->subject}\n\n{$request->message}",
+                "From: {$request->name} ({$request->email})\n\nPhone: {$request->phone}Subject: {$request->subject}\n\n{$request->message}",
                 function ($message) use ($request, $toEmail) {
                     $message->to($toEmail)
                         ->subject("Contact Us: {$request->subject}")
