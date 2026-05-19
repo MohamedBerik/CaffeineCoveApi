@@ -44,7 +44,10 @@ class ContactController extends Controller
             $toEmail = $settings['platform_email'] ?? config('mail.from.address');
 
             Mail::raw(
-                "From: {$request->name} ({$request->email})\n\nPhone: {$request->phone}Subject: {$request->subject}\n\n{$request->message}",
+                "From: {$request->name} ({$request->email})\n"
+                    . ($request->phone ? "Phone: {$request->phone}\n" : "")
+                    . "\nSubject: {$request->subject}\n\n"
+                    . $request->message,
                 function ($message) use ($request, $toEmail) {
                     $message->to($toEmail)
                         ->subject("Contact Us: {$request->subject}")
