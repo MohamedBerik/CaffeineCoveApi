@@ -34,24 +34,36 @@ class Handler extends ExceptionHandler
 
     public function render($request, Throwable $e)
     {
-        // التعامل مع ValidationException
+        // ✅ معالجة ValidationException
         if ($e instanceof \Illuminate\Validation\ValidationException) {
             return $this->invalidJson($request, $e);
         }
 
-        // التعامل مع AuthorizationException
+        // ✅ معالجة AuthorizationException
         if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
             return response()->json([
                 'message' => $e->getMessage() ?: 'This action is unauthorized.',
             ], 403);
         }
 
-        // استجابة عامة للـ API
+        // ✅ معالجة AuthenticationException بشكل خاص (لتظهر السبب بوضوح)
+        if ($e instanceof \Illuminate\Auth\AuthenticationException) {
+            return response()->json([
+                'message' => $e->getMessage(),
+                'exception' => get_class($e),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+                'trace' => array_slice($e->getTrace(), 0, 10),
+                'status' => 401,
+            ], 401);
+        }
+
+        // ✅ استجابة عامة للـ API مع تفاصيل الخطأ الحقيقية (للمساعدة في التطوير)
         if ($request->expectsJson() || $request->is('api/*')) {
             $statusCode = 500;
             if (method_exists($e, 'getStatusCode')) {
                 $statusCode = $e->getStatusCode();
-            } elseif (method_exists($e, 'getCode') && $e->getCode() > 0) {
+            } elseif (method_exists($e, 'getCode') && $e->getCode() > 0 && $e->getCode() < 600) {
                 $statusCode = $e->getCode();
             }
 
@@ -60,8 +72,9 @@ class Handler extends ExceptionHandler
                 'exception' => get_class($e),
                 'file' => $e->getFile(),
                 'line' => $e->getLine(),
+                'trace' => array_slice($e->getTrace(), 0, 5),
                 'status' => $statusCode,
-            ], $statusCode);
+            ], $statusCode >= 100 && $statusCode < 600 ? $statusCode : 500);
         }
 
         return parent::render($request, $e);
