@@ -9,23 +9,40 @@ use Illuminate\Database\Eloquent\Scope;
 
 class BranchScope implements Scope
 {
-    public function apply(Builder $builder, Model $model): void
+    protected array $branchAwareTables = [
+        'appointments',
+        'customers',
+        'payments',
+        'invoices',
+        'treatment_plans',
+        'dental_records',
+        'activity_logs',
+        'billing_invoices',
+        'categories',
+        'clinic_settings',
+        'customer_credits',
+        'customer_ledger_entries',
+        'doctors',
+        'employees',
+        '',
+    ];
+
+    public function apply(Builder $builder, Model $model)
     {
-        $branchId = Tenant::branchId();
+        $branchId = app()->has('tenant_branch_id')
+            ? app('tenant_branch_id')
+            : Tenant::branchId();
 
         if (!$branchId) {
             return;
         }
 
-        // IMPORTANT:
-        // Apply only if model explicitly supports branching
-        if (!property_exists($model, 'hasBranchScope') || !$model->hasBranchScope) {
+        $table = $model->getTable();
+
+        if (!in_array($table, $this->branchAwareTables)) {
             return;
         }
 
-        $builder->where(
-            $model->qualifyColumn('branch_id'),
-            $branchId
-        );
+        $builder->where($table . '.branch_id', $branchId);
     }
 }
