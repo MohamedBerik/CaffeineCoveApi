@@ -84,8 +84,9 @@ class ErpDashboardController extends Controller
                     ->limit(5)
                     ->get();
 
-                $recentPurchaseOrders = PurchaseOrder::with('supplier')
-                    ->latest()
+                $recentPurchaseOrders = $this->applyBranchFilter(
+                    PurchaseOrder::with('supplier')
+                )->latest()
                     ->limit(5)
                     ->get()
                     ->map(function ($po) {
@@ -102,8 +103,9 @@ class ErpDashboardController extends Controller
                         ];
                     });
 
-                $lowStockSupplies = Supply::query()
-                    ->where('stock_quantity', '<=', 10)
+                $lowStockSupplies = $this->applyBranchFilter(
+                    Supply::query()
+                )->where('stock_quantity', '<=', 10)
                     ->where('stock_quantity', '>', 0)
                     ->orderBy('stock_quantity', 'asc')
                     ->limit(5)
@@ -696,31 +698,37 @@ class ErpDashboardController extends Controller
 
     private function sumPurchaseTotal($companyId, Carbon $start, Carbon $end): float
     {
-        return (float) PurchaseOrder::query()
-            ->whereBetween('created_at', [$start, $end])
-            ->sum('total');
+        return (float) $this->applyBranchFilter(
+            PurchaseOrder::query()
+        )->whereBetween('created_at', [$start, $end])->sum('total');
     }
 
     private function countPurchaseOrders($companyId, Carbon $start, Carbon $end): int
     {
-        return PurchaseOrder::query()
-            ->whereBetween('created_at', [$start, $end])
-            ->count();
+        return $this->applyBranchFilter(
+            PurchaseOrder::query()
+        )->whereBetween('created_at', [$start, $end])->count();
     }
 
     private function sumSupplierPayments($companyId, Carbon $start, Carbon $end): float
     {
-        return (float) SupplierPayment::query()
-            ->whereBetween('paid_at', [$start, $end])
-            ->sum('amount');
+        return (float) $this->applyBranchFilter(
+            SupplierPayment::query()
+        )->whereBetween('paid_at', [$start, $end])->sum('amount');
     }
 
     // المتبقي = إجمالي المشتريات - إجمالي المدفوعات (في الفترة الحالية أو التراكمي؟)
     // سنقوم بحساب المتبقي للمشتريات حتى الآن (غير مرتبط بفترة، بل إجمالي ما تبقى من جميع أوامر الشراء)
     private function getTotalPurchaseRemaining(): float
     {
-        $totalOrders = (float) PurchaseOrder::query()->sum('total');
-        $totalPaid = (float) SupplierPayment::query()->sum('amount');
+        $totalOrders = (float) $this->applyBranchFilter(
+            PurchaseOrder::query()
+        )->sum('total');
+
+        $totalPaid = (float) $this->applyBranchFilter(
+            SupplierPayment::query()
+        )->sum('amount');
+
         return $totalOrders - $totalPaid;
     }
 
@@ -729,8 +737,9 @@ class ErpDashboardController extends Controller
      */
     private function getLowStockSuppliesCount(): int
     {
-        return Supply::query()
-            ->where('stock_quantity', '<=', 10)
+        return $this->applyBranchFilter(
+            Supply::query()
+        )->where('stock_quantity', '<=', 10)
             ->where('stock_quantity', '>', 0)
             ->count();
     }
@@ -740,17 +749,17 @@ class ErpDashboardController extends Controller
      */
     private function getInventoryValue(): float
     {
-        return (float) Supply::query()
-            ->selectRaw('SUM(stock_quantity * unit_cost) as total_value')
+        return (float) $this->applyBranchFilter(
+            Supply::query()
+        )->selectRaw('SUM(stock_quantity * unit_cost) as total_value')
             ->value('total_value') ?? 0;
     }
 
     private function sumPurchaseReturns($companyId, Carbon $start, Carbon $end): float
     {
-        return (float) SupplierLedgerEntry::query()
-            ->where('type', SupplierLedgerEntry::TYPE_PURCHASE_RETURN)
-            ->whereBetween('entry_date', [$start, $end])
-            ->sum('credit');
+        return (float) $this->applyBranchFilter(
+            SupplierLedgerEntry::query()->where('type', SupplierLedgerEntry::TYPE_PURCHASE_RETURN)
+        )->whereBetween('entry_date', [$start, $end])->sum('credit');
     }
     /**
      * Get total outstanding receivables (unpaid + partially_paid invoices)
@@ -783,5 +792,17 @@ class ErpDashboardController extends Controller
             - $this->sumPurchaseReturns($companyId, $start, $end);
         $paymentsInPeriod = $this->sumSupplierPayments($companyId, $start, $end);
         return $netPurchases - $paymentsInPeriod;
+    }
+
+    /**
+     * Apply branch filter to a query if a branch is selected
+     */
+    private function applyBranchFilter($query)
+    {
+        $branchId = Tenant::branchId();
+        if ($branchId) {
+            $query->where('branch_id', $branchId);
+        }
+        return $query;
     }
 }
