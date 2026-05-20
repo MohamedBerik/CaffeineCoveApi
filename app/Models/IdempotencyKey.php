@@ -9,8 +9,7 @@ class IdempotencyKey extends Model
 {
     use BelongsToCompanyTrait;
 
-    // ✅ Performance fix
-    // public static $hasCompanyColumn = true;
+    public static $hasBranchScope = true;
 
     protected $table = 'idempotency_keys';
 

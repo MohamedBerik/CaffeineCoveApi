@@ -11,8 +11,7 @@ class CustomerLedgerEntry extends Model
     use HasFactory;
     use BelongsToCompanyTrait;
 
-    // ✅ Performance fix
-    // public static $hasCompanyColumn = true;
+    public static $hasBranchScope = true;
 
     // ✅ الثوابت
     const TYPE_INVOICE = 'invoice';

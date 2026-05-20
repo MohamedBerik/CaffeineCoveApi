@@ -11,13 +11,15 @@ class StockMovement extends Model
     use HasFactory;
     use BelongsToCompanyTrait;
 
+    public static $hasBranchScope = true;
+
     const TYPE_IN = 'in';
     const TYPE_OUT = 'out';
 
     protected $fillable = [
         'company_id',
         'branch_id',
-        'supply_id',              // ✅ الحقل موجود
+        'supply_id',
         'type',
         'quantity',
         'reference_type',

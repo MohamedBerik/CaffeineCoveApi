@@ -11,8 +11,7 @@ class Order extends Model
     use HasFactory;
     use BelongsToCompanyTrait;
 
-    // ✅ Performance fix
-    // public static $hasCompanyColumn = true;
+    public static $hasBranchScope = true;
 
     // ✅ الثوابت
     const STATUS_PENDING = 'pending';

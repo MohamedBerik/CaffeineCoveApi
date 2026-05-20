@@ -11,11 +11,13 @@ class PurchaseOrderItem extends Model
     use HasFactory;
     use BelongsToCompanyTrait;
 
+    public static $hasBranchScope = true;
+
     protected $fillable = [
         'company_id',
         'branch_id',
         'purchase_order_id',
-        'supply_id',            // ✅ تم التغيير
+        'supply_id',
         'quantity',
         'unit_cost',
         'total',

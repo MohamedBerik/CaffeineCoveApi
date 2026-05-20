@@ -18,6 +18,8 @@ class User extends Authenticatable
 
     // ✅ Performance fix - تفعيل
     public static $hasCompanyColumn = true;
+    public static $hasBranchScope = true;
+
     protected $guard_name = 'api';
 
     // ✅ الثوابت

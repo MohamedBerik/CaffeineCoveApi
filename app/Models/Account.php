@@ -10,11 +10,6 @@ class Account extends Model
     use BelongsToCompanyTrait;
 
     /**
-     * ✅ Performance fix
-     */
-    // public static $hasCompanyColumn = true;
-
-    /**
      * Account types
      */
     const TYPE_ASSET = 'asset';

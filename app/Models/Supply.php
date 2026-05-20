@@ -9,6 +9,8 @@ use App\Models\Concerns\BelongsToCompanyTrait;
 class Supply extends Model
 {
     use HasFactory, BelongsToCompanyTrait;
+    public static $hasBranchScope = true;
+
 
     protected $fillable = [
         'company_id',
