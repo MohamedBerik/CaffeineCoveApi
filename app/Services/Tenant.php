@@ -18,7 +18,7 @@ class Tenant
     public static function setId(?int $companyId): void
     {
         static::$currentId = $companyId;
-        static::$currentCompany = null; // Clear cached company
+        static::$currentCompany = null;
     }
 
     /**
@@ -33,7 +33,6 @@ class Tenant
         if (Auth::check()) {
             return Auth::user()->company_id;
         }
-
 
         return null;
     }
