@@ -11,7 +11,6 @@ class Supply extends Model
     use HasFactory, BelongsToCompanyTrait;
     public static $hasBranchScope = true;
 
-
     protected $fillable = [
         'company_id',
         'branch_id',

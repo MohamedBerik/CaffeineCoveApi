@@ -13,7 +13,6 @@ class Category extends Model
 
     public static $hasBranchScope = true;
 
-
     protected $fillable = [
         'company_id',
         'branch_id',
