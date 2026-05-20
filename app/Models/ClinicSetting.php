@@ -10,7 +10,8 @@ class ClinicSetting extends Model
     // ✅ الـ Trait - ضروري
     use BelongsToCompanyTrait;
 
-    public static $hasBranchScope = true;
+    // ✅ Performance fix - ضروري
+    // public static $hasCompanyColumn = true;
 
     protected $fillable = [
         'company_id',

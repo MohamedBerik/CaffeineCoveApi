@@ -48,6 +48,11 @@ trait BelongsToCompanyTrait
                 return;
             }
 
+            // ✅ لو companyId مش موجود والمستخدم مش Super Admin → خطأ
+            if (!$companyId) {
+                throw new \Exception('Tenant not resolved for model: ' . get_class($model));
+            }
+
             // ✅ تعيين company_id تلقائيًا
             $model->company_id = $companyId;
 

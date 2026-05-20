@@ -2,17 +2,10 @@
 
 namespace App\Models;
 
-use App\Models\Concerns\BelongsToCompanyTrait;
-use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 class BillingInvoice extends Model
 {
-    use HasFactory;
-    use BelongsToCompanyTrait;
-
-    public static $hasBranchScope = true;
-
     protected $fillable = [
         'company_id',
         'branch_id',

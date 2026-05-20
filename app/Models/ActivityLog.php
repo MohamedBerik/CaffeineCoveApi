@@ -11,8 +11,6 @@ class ActivityLog extends Model
     use HasFactory;
     use BelongsToCompanyTrait;
 
-    public static $hasBranchScope = true;
-
     protected $fillable = [
         'company_id',
         'branch_id',

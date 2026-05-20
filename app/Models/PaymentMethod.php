@@ -2,22 +2,15 @@
 
 namespace App\Models;
 
-use App\Models\Concerns\BelongsToCompanyTrait;
-use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 class PaymentMethod extends Model
 {
-    use HasFactory;
-    use BelongsToCompanyTrait;
-
-    public static $hasBranchScope = true;
-
     protected $fillable = [
         'company_id',
         'branch_id',
-        'gateway',
-        'token',
+        'gateway',        // ✅ أضف
+        'token',          // ✅ أضف (بدل stripe_id)
         'card_brand',
         'card_last4',
         'card_exp_month',

@@ -11,7 +11,8 @@ class TreatmentPlan extends Model
     use HasFactory;
     use BelongsToCompanyTrait;
 
-    public static $hasBranchScope = true;
+    // ✅ Performance fix
+    // public static $hasCompanyColumn = true;
 
     // ✅ الثوابت
     const STATUS_ACTIVE = 'active';

@@ -11,7 +11,8 @@ class Sale extends Model
     use HasFactory;
     use BelongsToCompanyTrait;
 
-    public static $hasBranchScope = true;
+    // ✅ Performance fix
+    // public static $hasCompanyColumn = true;
 
     protected $fillable = [
         'company_id',

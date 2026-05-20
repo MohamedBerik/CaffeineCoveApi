@@ -11,7 +11,8 @@ class SupplierPayment extends Model
     use HasFactory;
     use BelongsToCompanyTrait;
 
-    public static $hasBranchScope = true;
+    // ✅ Performance fix
+    // public static $hasCompanyColumn = true;
 
     // ✅ الثوابت
     const METHOD_CASH = 'cash';
