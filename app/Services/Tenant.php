@@ -34,6 +34,7 @@ class Tenant
             return Auth::user()->company_id;
         }
 
+
         return null;
     }
 
