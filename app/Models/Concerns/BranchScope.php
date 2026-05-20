@@ -2,36 +2,30 @@
 
 namespace App\Models\Concerns;
 
+use App\Services\Tenant;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Scope;
-use App\Services\Tenant;
-use Illuminate\Support\Facades\Schema;
 
 class BranchScope implements Scope
 {
-    protected static $hasBranchColumnCache = [];
-
-    public function apply(Builder $builder, Model $model)
+    public function apply(Builder $builder, Model $model): void
     {
-        $branchId = app()->has('tenant_branch_id')
-            ? app('tenant_branch_id')
-            : Tenant::branchId();
+        $branchId = Tenant::branchId();
 
         if (!$branchId) {
             return;
         }
 
-        $table = $model->getTable();
-
-        if (!isset(self::$hasBranchColumnCache[$table])) {
-            self::$hasBranchColumnCache[$table] = Schema::hasColumn($table, 'branch_id');
-        }
-
-        if (!self::$hasBranchColumnCache[$table]) {
+        // IMPORTANT:
+        // Apply only if model explicitly supports branching
+        if (!property_exists($model, 'hasBranchScope') || !$model->hasBranchScope) {
             return;
         }
 
-        $builder->where($model->getTable() . '.branch_id', $branchId);
+        $builder->where(
+            $model->qualifyColumn('branch_id'),
+            $branchId
+        );
     }
 }
