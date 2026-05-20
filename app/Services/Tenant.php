@@ -176,6 +176,7 @@ class Tenant
         static::$currentId = null;
         static::$isSuperAdmin = null;
         static::$currentCompany = null;
+        static::$branchId = null;
     }
 
     /**

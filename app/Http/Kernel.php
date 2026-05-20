@@ -34,6 +34,7 @@ class Kernel extends HttpKernel
             \Illuminate\Routing\Middleware\SubstituteBindings::class,
             \App\Http\Middleware\SetTenant::class,
             \App\Http\Middleware\SetBranchContext::class,
+            \App\Http\Middleware\ClearTenantContext::class,
         ],
     ];
 

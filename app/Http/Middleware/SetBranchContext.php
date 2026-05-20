@@ -3,26 +3,29 @@
 namespace App\Http\Middleware;
 
 use Closure;
-use App\Services\Tenant;
 use Illuminate\Http\Request;
+use App\Services\Tenant;
 
 class SetBranchContext
 {
     public function handle(Request $request, Closure $next)
     {
+        Tenant::setBranchId(null);
+
         $branchId = $request->header('X-Branch-ID');
 
-        if ($branchId !== null && $branchId !== '' && $branchId !== 'all') {
+        if (
+            $branchId !== null &&
+            $branchId !== '' &&
+            $branchId !== 'all'
+        ) {
             Tenant::setBranchId((int) $branchId);
-        } elseif ($user = $request->user()) {
-            Tenant::setBranchId($user->branch_id);
+        } elseif ($request->user()) {
+            Tenant::setBranchId(
+                $request->user()->branch_id
+            );
         }
 
-        try {
-            return $next($request);
-        } finally {
-            // IMPORTANT
-            Tenant::setBranchId(null);
-        }
+        return $next($request);
     }
 }

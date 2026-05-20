@@ -1,5 +1,4 @@
 <?php
-// app/Models/Concerns/CompanyScope.php
 
 namespace App\Models\Concerns;
 
@@ -12,35 +11,30 @@ class CompanyScope implements Scope
 {
     public function apply(Builder $builder, Model $model)
     {
+        // لا تطبق على super admin global context
+        if (Tenant::isSuperAdmin() && !Tenant::hasTenant()) {
+            return;
+        }
+
+        // تجاهل الموديلات التي لا تحتوي company_id
+        if (
+            !property_exists($model, 'hasCompanyColumn') ||
+            !$model::$hasCompanyColumn
+        ) {
+            return;
+        }
+
         $companyId = Tenant::id();
-        $isSuperAdmin = Tenant::isSuperAdmin();
 
-        // ✅ Super Admin بدون شركة = يشوف كل حاجة
-        if ($isSuperAdmin && !Tenant::hasTenant()) {
-            return;
-        }
-
-        // ✅ تجاهل User Model عشان Sanctum
-        if ($model instanceof \App\Models\User) {
-            return;
-        }
-
-        // ✅ التحقق من وجود hasCompanyColumn
-        if (!property_exists(get_class($model), 'hasCompanyColumn') || !$model::$hasCompanyColumn) {
-            return;
-        }
-
-        // ✅ Fail-Safe: لو مفيش company_id والمستخدم مش Super Admin، ارمي Exception
-        if (!$companyId && !$isSuperAdmin) {
-            throw new \Exception('Tenant context not resolved for model: ' . get_class($model));
-        }
-
-        // ✅ أمان: لو مفيش company_id، ارجع فاضي (مافيش تسريب بيانات)
+        // fail safe بدون exceptions
         if (!$companyId) {
             $builder->whereRaw('1 = 0');
             return;
         }
 
-        $builder->where($model->getTable() . '.company_id', $companyId);
+        $builder->where(
+            $model->getTable() . '.company_id',
+            $companyId
+        );
     }
 }

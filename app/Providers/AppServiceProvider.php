@@ -106,28 +106,6 @@ class AppServiceProvider extends ServiceProvider
         RateLimiter::for('webhooks', function (Request $request) {
             return Limit::perMinute(60)->by($request->ip());
         });
-        // ✅ Structured Logging for API Requests
-        if (app()->environment('production')) {
-            $this->app['router']->matched(function ($route) {
-                // ✅ Login/Register Bypass
-                if (request()->is('api/login') || request()->is('api/register')) {
-                    return;
-                }
-
-                // ✅ طريقة آمنة لجلب اسم الـ route في Laravel 8
-                $routeName = request()->path();
-
-                Log::channel('api')->info('API Request', [
-                    'route' => $routeName,
-                    'method' => request()->method(),
-                    'url' => request()->fullUrl(),
-                    'user_id' => auth()->id(),
-                    'tenant_id' => \App\Services\Tenant::id(),
-                    'ip' => request()->ip(),
-                    'user_agent' => request()->userAgent(),
-                ]);
-            });
-        }
     }
 
     /**
@@ -152,7 +130,6 @@ class AppServiceProvider extends ServiceProvider
             Procedure::class,
             PatientRadiology::class,
             User::class,
-
         ];
 
         foreach ($loggableModels as $model) {
