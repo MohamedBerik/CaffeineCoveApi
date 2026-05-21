@@ -94,6 +94,7 @@ class RadiologyController extends Controller
 
         $radiology = PatientRadiology::create([
             'company_id' => $companyId,
+            'branch_id'  => Tenant::branchId() ?? $request->header('X-Branch-ID'),
             'customer_id' => $request->customer_id,
             'dental_record_id' => $request->dental_record_id,
             'title' => $request->title,
