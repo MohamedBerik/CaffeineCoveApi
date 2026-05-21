@@ -68,7 +68,7 @@ class RadiologyController extends Controller
         $extension = $file->getClientOriginalExtension();
         $fileName = time() . '_' . preg_replace('/[^a-zA-Z0-9]/', '_', $originalName) . '.' . $extension;
 
-        $directory = "{$companyId}/{$request->customer_id}";
+        $directory = "radiology/{$companyId}/{$request->customer_id}";
 
         Log::info('Upload attempt', [
             'directory' => $directory,
