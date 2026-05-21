@@ -10,8 +10,8 @@
 
 /vendor
 
-.env
-.env.*
+# .env
+# .env.*
 .env.testing
 
 .phpunit.result.cache
