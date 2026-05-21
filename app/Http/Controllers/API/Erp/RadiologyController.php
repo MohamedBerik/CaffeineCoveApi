@@ -107,6 +107,7 @@ class RadiologyController extends Controller
         ]);
         $radiology->file_path = "radiology/{$directory}/{$fileName}";
         $radiology->save();
+
         return response()->json([
             'status' => 201,
             'message' => 'Radiology uploaded successfully',
