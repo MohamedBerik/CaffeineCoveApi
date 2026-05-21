@@ -12,10 +12,10 @@ use Illuminate\Support\Facades\Validator;
 
 class RadiologyController extends Controller
 {
-    public function __construct()
-    {
-        $this->authorizeResource(PatientRadiology::class, 'radiology', ['except' => ['index']]);
-    }
+    // public function __construct()
+    // {
+    //     $this->authorizeResource(PatientRadiology::class, 'radiology', ['except' => ['index']]);
+    // }
 
     public function index(Request $request)
     {
