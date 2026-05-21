@@ -128,6 +128,7 @@ class RolesAndPermissionsSeeder extends Seeder
             'dental_records.view',
             'dental_records.create',
             'radiology.view',
+            'radiology.manage',
         ]);
 
         // Receptionist role
@@ -141,6 +142,7 @@ class RolesAndPermissionsSeeder extends Seeder
             'doctors.view',
             'treatment_plans.view',
             'radiology.view',
+            'radiology.manage',
             'customers.statements.view',
             'finance.create',
             'invoices.pay',
@@ -148,7 +150,6 @@ class RolesAndPermissionsSeeder extends Seeder
             'procedures.view',
             'dental_records.create',
             'dental_records.view',
-            'radiology.view',
             'inventory.view',
         ]);
     }
