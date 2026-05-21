@@ -105,8 +105,6 @@ class RadiologyController extends Controller
             'captured_at' => $request->captured_at ?? now(),
             'notes' => $request->notes,
         ]);
-        $radiology->file_path = "radiology/{$directory}/{$fileName}";
-        $radiology->save();
 
         return response()->json([
             'status' => 201,
