@@ -87,8 +87,7 @@ class PatientRadiology extends Model
             return null;
         }
 
-        // ✅ إرجاع الرابط مباشرة باستخدام asset (لا حاجة للتحقق من الوجود)
-        return asset('storage/' . $this->file_path);
+        return Storage::disk('public')->url($this->file_path);
     }
 
     public function getFileSizeAttribute(): ?string
