@@ -81,17 +81,14 @@ class PatientRadiology extends Model
 
     // ============ Accessors ============
 
-    public function getFileUrlAttribute()
+    public function getFileUrlAttribute(): ?string
     {
         if (!$this->file_path) {
             return null;
         }
 
-        if (!Storage::disk('public')->exists($this->file_path)) {
-            return null;
-        }
-
-        return Storage::disk('public')->url($this->file_path);
+        // ✅ إرجاع الرابط مباشرة باستخدام asset (لا حاجة للتحقق من الوجود)
+        return asset('storage/' . $this->file_path);
     }
 
     public function getFileSizeAttribute(): ?string
