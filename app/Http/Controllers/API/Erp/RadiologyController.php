@@ -36,8 +36,7 @@ class RadiologyController extends Controller
         $validator = Validator::make($request->all(), [
             'customer_id' => 'required|exists:customers,id',
             'title' => 'required|string|max:255',
-            // ✅ تم التعديل هنا للسماح بالامتدادات بشكل مرن ومضمون
-            'file' => 'required|file|extensions:jpeg,png,jpg,gif,pdf|max:10240',
+            'file' => 'required|file|mimes:jpeg,png,jpg,gif,pdf|max:20480',
             'file_type' => 'nullable|string|in:xray,panorama,cbct,cephalometric,report,consent,other',
             'tooth_number' => 'nullable|string|max:10',
             'captured_at' => 'nullable|date',
