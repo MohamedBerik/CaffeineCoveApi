@@ -13,10 +13,6 @@ class PatientRadiology extends Model
     use HasFactory;
     use BelongsToCompanyTrait;
 
-    // ✅ Performance fix
-    // public static $hasCompanyColumn = true;
-
-    // ✅ الثوابت
     const TYPE_XRAY = 'xray';
     const TYPE_PANORAMA = 'panorama';
     const TYPE_CBCT = 'cbct';
@@ -43,41 +39,7 @@ class PatientRadiology extends Model
         'captured_at' => 'datetime',
     ];
 
-    protected $appends = ['file_url'];
-
-    // ============ Relationships ============
-
-    public function company()
-    {
-        return $this->belongsTo(Company::class);
-    }
-
-    public function customer()
-    {
-        return $this->belongsTo(Customer::class, 'customer_id');
-    }
-
-    public function dentalRecord()
-    {
-        return $this->belongsTo(DentalRecord::class, 'dental_record_id');
-    }
-
-    // ============ Scopes ============
-
-    public function scopeForCustomer($query, $customerId)
-    {
-        return $query->where('customer_id', $customerId);
-    }
-
-    public function scopeOfType($query, string $type)
-    {
-        return $query->where('file_type', $type);
-    }
-
-    public function scopeForTooth($query, string $toothNumber)
-    {
-        return $query->where('tooth_number', $toothNumber);
-    }
+    protected $appends = ['file_url', 'file_extension']; // إضافة الامتداد لسهولة فحص الفرونت إند
 
     // ============ Accessors ============
 
@@ -91,11 +53,18 @@ class PatientRadiology extends Model
 
     public function getFileSizeAttribute(): ?string
     {
-        if (!$this->file_path || !Storage::disk('public')->exists($this->file_path)) {
+        if (!$this->file_path) {
             return null;
         }
 
-        $size = Storage::disk('public')->size($this->file_path);
+        // إزالة البادئة لأن الديسك المخصص يقف على المجلد مباشرة
+        $cleanPath = str_replace('radiology/', '', $this->file_path);
+
+        if (!Storage::disk('radiology_public')->exists($cleanPath)) {
+            return null;
+        }
+
+        $size = Storage::disk('radiology_public')->size($cleanPath);
 
         if ($size < 1024) {
             return $size . ' B';
@@ -111,21 +80,20 @@ class PatientRadiology extends Model
         if (!$this->file_name) {
             return null;
         }
-        return pathinfo($this->file_name, PATHINFO_EXTENSION);
+        return strtolower(pathinfo($this->file_name, PATHINFO_EXTENSION));
     }
 
     // ============ Helpers ============
 
-    public function isImage(): bool
+    public function isPdf(): bool
     {
-        $imageTypes = [self::TYPE_XRAY, self::TYPE_PANORAMA, self::TYPE_CBCT, self::TYPE_CEPHALOMETRIC];
-        return in_array($this->file_type, $imageTypes);
+        return $this->file_extension === 'pdf';
     }
 
-    public function isDocument(): bool
+    public function isImage(): bool
     {
-        $docTypes = [self::TYPE_REPORT, self::TYPE_CONSENT, self::TYPE_OTHER];
-        return in_array($this->file_type, $docTypes);
+        $imageExtensions = ['jpeg', 'jpg', 'png', 'gif'];
+        return in_array($this->file_extension, $imageExtensions);
     }
 
     // ============ Boot ============
@@ -135,12 +103,16 @@ class PatientRadiology extends Model
         parent::boot();
 
         static::deleting(function ($radiology) {
-            if ($radiology->file_path && Storage::disk('public')->exists($radiology->file_path)) {
-                Storage::disk('public')->delete($radiology->file_path);
-                Log::info('Radiology file deleted', [
-                    'id' => $radiology->id,
-                    'file_path' => $radiology->file_path,
-                ]);
+            if ($radiology->file_path) {
+                $cleanPath = str_replace('radiology/', '', $radiology->file_path);
+
+                if (Storage::disk('radiology_public')->exists($cleanPath)) {
+                    Storage::disk('radiology_public')->delete($cleanPath);
+                    Log::info('Radiology file deleted from custom disk', [
+                        'id' => $radiology->id,
+                        'clean_path' => $cleanPath,
+                    ]);
+                }
             }
         });
     }

@@ -58,31 +58,26 @@ class RadiologyController extends Controller
         }
 
         $file = $request->file('file');
-
+        $extension = strtolower($file->getClientOriginalExtension());
         $originalName = pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME);
-        $extension = $file->getClientOriginalExtension();
         $fileName = time() . '_' . preg_replace('/[^a-zA-Z0-9]/', '_', $originalName) . '.' . $extension;
 
-        // ✅ تم إزالة بادئة radiology/ لأن الديسك يتوجه إليها برمجياً تلقائياً
         $directory = "{$companyId}/{$request->customer_id}";
 
-        Log::info('Upload attempt', [
-            'directory' => $directory,
-            'file_name' => $fileName,
-        ]);
-
-        // ✅ لورافيل سينشئ المجلدات الفرعية تلقائياً هنا داخل public/radiology/
         $filePath = $file->storeAs($directory, $fileName, 'radiology_public');
 
         if (!$filePath) {
-            Log::error('Failed to save file', ['directory' => $directory, 'file_name' => $fileName]);
             return response()->json([
                 'status' => 500,
                 'message' => 'Failed to save file',
             ], 500);
         }
 
-        Log::info('File saved successfully', ['path' => $filePath]);
+        // تحديد نوع الملف بشكل ذكي إذا لم يرسله الفرونت إند
+        $finalFileType = $request->file_type;
+        if (!$finalFileType) {
+            $finalFileType = ($extension === 'pdf') ? PatientRadiology::TYPE_REPORT : PatientRadiology::TYPE_XRAY;
+        }
 
         $radiology = PatientRadiology::create([
             'company_id' => $companyId,
@@ -90,10 +85,9 @@ class RadiologyController extends Controller
             'customer_id' => $request->customer_id,
             'dental_record_id' => $request->dental_record_id,
             'title' => $request->title,
-            // سنخزن المسار مضافاً إليه radiology/ لكي يسهل على الـ Accessor قراءته وبنائه
             'file_path' => 'radiology/' . $filePath,
             'file_name' => $fileName,
-            'file_type' => $request->file_type ?? 'xray',
+            'file_type' => $finalFileType,
             'tooth_number' => $request->tooth_number,
             'captured_at' => $request->captured_at ?? now(),
             'notes' => $request->notes,
@@ -101,28 +95,9 @@ class RadiologyController extends Controller
 
         return response()->json([
             'status' => 201,
-            'message' => 'Radiology uploaded successfully',
+            'message' => 'Radiology file uploaded successfully',
             'data' => $radiology,
         ], 201);
-    }
-
-    public function show(Request $request, $id)
-    {
-        $radiology = PatientRadiology::query()
-            ->where('id', $id)
-            ->first();
-
-        if (!$radiology) {
-            return response()->json([
-                'status' => 404,
-                'message' => 'Radiology image not found',
-            ], 404);
-        }
-
-        return response()->json([
-            'status' => 200,
-            'data' => $radiology,
-        ]);
     }
 
     public function destroy(Request $request, $id)
@@ -130,19 +105,12 @@ class RadiologyController extends Controller
         $radiology = PatientRadiology::query()->find($id);
 
         if (!$radiology) {
-            return response()->json(['status' => 404, 'message' => 'Radiology image not found'], 404);
+            return response()->json(['status' => 404, 'message' => 'Radiology record not found'], 404);
         }
 
-        // ✅ تم تعديل ديسك الحذف ليعمل على الديسك الصحيح المباشر
-        // نقوم بإزالة كلمة 'radiology/' من السلسلة النصية لأن جذر الديسك يبدأ منها أساساً
-        $cleanPath = str_replace('radiology/', '', $radiology->file_path);
-
-        if ($radiology->file_path && Storage::disk('radiology_public')->exists($cleanPath)) {
-            Storage::disk('radiology_public')->delete($cleanPath);
-        }
-
+        // الحذف الآن أصبح معتمداً بالكامل على الـ Boot الخاص بالـ Model لمنع تكرار الكود
         $radiology->delete();
 
-        return response()->json(['status' => 200, 'message' => 'Radiology image deleted successfully']);
+        return response()->json(['status' => 200, 'message' => 'Radiology record and file deleted successfully']);
     }
 }
