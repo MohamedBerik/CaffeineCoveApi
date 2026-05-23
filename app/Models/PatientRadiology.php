@@ -86,7 +86,7 @@ class PatientRadiology extends Model
         if (!$this->file_path) {
             return null;
         }
-        return asset($this->file_path);
+        return Storage::disk('public')->url($this->file_path);
     }
 
     public function getFileSizeAttribute(): ?string
