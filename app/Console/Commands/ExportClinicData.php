@@ -1,24 +1,22 @@
 <?php
-//railway run php artisan clinic:export 1
+
 namespace App\Console\Commands;
 
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
-use Illuminate\Support\Facades\Storage;
+use PhpOffice\PhpSpreadsheet\Spreadsheet;
+use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 use ZipArchive;
 
 class ExportClinicData extends Command
 {
     protected $signature = 'clinic:export
                             {company_id : The ID of the company/clinic to export}
-                            {--format=json : Export format: json or sql}';
+                            {--excel : Also generate an Excel file (.xlsx) with one sheet per table}';
 
     protected $description = 'Export all data for a specific clinic/company into a compressed file';
 
-    /**
-     * قائمة الجداول التي سيتم تجاهلها (مثل الجداول العامة للمنصة)
-     */
     private array $excludeTables = [
         'migrations',
         'password_resets',
@@ -30,9 +28,8 @@ class ExportClinicData extends Command
     public function handle()
     {
         $companyId = (int) $this->argument('company_id');
-        $format = $this->option('format');
+        $withExcel = $this->option('excel');
 
-        // التحقق من وجود الشركة
         $company = \App\Models\Company::find($companyId);
         if (!$company) {
             $this->error("❌ Company with ID {$companyId} not found.");
@@ -41,45 +38,46 @@ class ExportClinicData extends Command
 
         $this->info("🔍 Exporting data for company: {$company->name} (ID: {$companyId})");
 
-        // 1. جلب أسماء جميع الجداول التي تحتوي على عمود company_id (باستثناء المستثناة)
+        // 1. جلب الجداول
         $tables = $this->getCompanyTables();
-
         if (empty($tables)) {
             $this->warn("⚠️ No tables found with company_id column.");
             return 1;
         }
 
-        // 2. إنشاء مجلد مؤقت لتجميع الملفات
+        // 2. مجلد مؤقت
         $tempDir = storage_path("app/export_{$companyId}_" . now()->timestamp);
         if (!mkdir($tempDir, 0755, true) && !is_dir($tempDir)) {
             $this->error("❌ Could not create temporary directory.");
             return 1;
         }
 
-        // 3. تصدير البيانات من كل جدول
+        // 3. تصدير JSON + تجميع البيانات
         $exportData = [];
         $totalRows  = 0;
-        foreach ($tables as $table) {
-            $rows = DB::table($table)
-                ->where('company_id', $companyId)
-                ->get();
 
-            if ($rows->isEmpty()) {
-                continue;
-            }
+        foreach ($tables as $table) {
+            $rows = DB::table($table)->where('company_id', $companyId)->get();
+            if ($rows->isEmpty()) continue;
 
             $rowsArray = $rows->toArray();
             $exportData[$table] = $rowsArray;
             $totalRows += count($rowsArray);
 
-
-            // حفظ كل جدول كملف JSON منفصل داخل المجلد المؤقت
             $json = json_encode($rowsArray, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
             file_put_contents("{$tempDir}/{$table}.json", $json);
 
             $this->info("✔️ {$table}: " . count($rowsArray) . " rows");
         }
 
+        // 4. إنشاء Excel إذا طُلب
+        if ($withExcel) {
+            $excelPath = "{$tempDir}/clinic_{$companyId}_data.xlsx";
+            $this->generateExcel($exportData, $excelPath);
+            $this->info("✔️ Excel file created.");
+        }
+
+        // 5. README
         $this->generateReadme($company->name, $companyId, $exportData, $totalRows, $tempDir);
 
         if ($totalRows === 0) {
@@ -88,10 +86,10 @@ class ExportClinicData extends Command
             return 1;
         }
 
-        // 4. نسخ مجلد الراديولوجي (إن وجد)
+        // 6. نسخ ملفات الأشعة
         $this->copyRadiologyFiles($companyId, $tempDir);
 
-        // 5. إنشاء ملف مضغوط
+        // 7. ضغط الملفات
         $zipFileName = "clinic_{$companyId}_export_" . now()->format('Y-m-d_His') . ".zip";
         $zipPath = storage_path("app/{$zipFileName}");
 
@@ -119,13 +117,52 @@ class ExportClinicData extends Command
             return 1;
         }
 
-        // 6. حذف المجلد المؤقت
         $this->deleteDirectory($tempDir);
 
         $this->info("✅ Export completed: " . storage_path("app/{$zipFileName}"));
         $this->info("📦 Total tables: " . count($exportData) . " | Total rows: {$totalRows}");
 
         return 0;
+    }
+
+    /**
+     * إنشاء ملف Excel بورقة لكل جدول
+     */
+    private function generateExcel(array $exportData, string $filePath): void
+    {
+        $spreadsheet = new Spreadsheet();
+        $spreadsheet->removeSheetByIndex(0); // نزيل الورقة الافتراضية
+
+        $sheetIndex = 0;
+        foreach ($exportData as $table => $rows) {
+            if (empty($rows)) continue;
+
+            $sheet = $spreadsheet->createSheet($sheetIndex++);
+            $sheet->setTitle(substr($table, 0, 31)); // طول الورقة الأقصى 31 حرفًا
+
+            // رأس الأعمدة
+            $columns = array_keys((array) $rows[0]);
+            $col = 'A';
+            foreach ($columns as $column) {
+                $sheet->setCellValue($col . '1', $column);
+                $col++;
+            }
+
+            // البيانات
+            $rowNum = 2;
+            foreach ($rows as $row) {
+                $row = (array) $row;
+                $col = 'A';
+                foreach ($columns as $column) {
+                    $sheet->setCellValue($col . $rowNum, $row[$column] ?? '');
+                    $col++;
+                }
+                $rowNum++;
+            }
+        }
+
+        $writer = new Xlsx($spreadsheet);
+        $writer->save($filePath);
     }
 
     /**
