@@ -37,7 +37,7 @@ class RadiologyController extends Controller
             'customer_id' => 'required|exists:customers,id',
             'title' => 'required|string|max:255',
             'file' => 'required|file|mimes:jpeg,png,jpg,gif,pdf|max:20480',
-            'file_type' => 'nullable|string|in:xray,panorama,cbct,cephalometric,report,consent,other',
+            'file_type' => 'nullable|string|in:xray,panorama,cbct,cephalometric,pdf report,consent,other',
             'tooth_number' => 'nullable|string|max:10',
             'captured_at' => 'nullable|date',
             'notes' => 'nullable|string',
