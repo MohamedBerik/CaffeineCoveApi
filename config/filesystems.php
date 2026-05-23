@@ -42,6 +42,13 @@ return [
             'visibility' => 'public',
         ],
 
+        'radiology_public' => [
+            'driver' => 'local',
+            'root' => public_path('radiology'),
+            'url' => env('APP_URL') . '/radiology',
+            'visibility' => 'public',
+        ],
+
         's3' => [
             'driver' => 's3',
             'key' => env('AWS_ACCESS_KEY_ID'),
@@ -51,13 +58,6 @@ return [
             'url' => env('AWS_URL'),
             'endpoint' => env('AWS_ENDPOINT'),
             'use_path_style_endpoint' => env('AWS_USE_PATH_STYLE_ENDPOINT', false),
-        ],
-
-        'radiology_public' => [
-            'driver' => 'local',
-            'root' => public_path('radiology'),
-            'url' => env('APP_URL') . '/radiology',
-            'visibility' => 'public',
         ],
 
     ],
