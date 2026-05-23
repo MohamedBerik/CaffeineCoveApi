@@ -416,10 +416,6 @@ class CompanyManagementController extends Controller
         ]);
     }
 
-
-
-
-
     public function exportClinic($id)
     {
         Artisan::call('clinic:export', ['company_id' => $id]);
