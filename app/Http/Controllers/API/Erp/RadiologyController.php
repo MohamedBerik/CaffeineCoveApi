@@ -72,7 +72,7 @@ class RadiologyController extends Controller
         ]);
 
         // ✅ لورافيل سينشئ المجلدات الفرعية تلقائياً هنا داخل public/radiology/
-        $filePath = $file->storeAs($directory, $fileName, 'public');
+        $filePath = $file->storeAs($directory, $fileName, 'radiology_public');
 
         if (!$filePath) {
             Log::error('Failed to save file', ['directory' => $directory, 'file_name' => $fileName]);
@@ -137,8 +137,8 @@ class RadiologyController extends Controller
         // نقوم بإزالة كلمة 'radiology/' من السلسلة النصية لأن جذر الديسك يبدأ منها أساساً
         $cleanPath = str_replace('radiology/', '', $radiology->file_path);
 
-        if ($radiology->file_path && Storage::disk('public')->exists($cleanPath)) {
-            Storage::disk('public')->delete($cleanPath);
+        if ($radiology->file_path && Storage::disk('radiology_public')->exists($cleanPath)) {
+            Storage::disk('radiology_public')->delete($cleanPath);
         }
 
         $radiology->delete();
