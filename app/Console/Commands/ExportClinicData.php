@@ -131,10 +131,14 @@ class ExportClinicData extends Command
     /**
      * إنشاء ملف Excel بورقة لكل جدول
      */
+
+
+
+
     private function generateExcel(array $exportData, string $filePath): void
     {
         $spreadsheet = new Spreadsheet();
-        $spreadsheet->removeSheetByIndex(0); // نزيل الورقة الافتراضية
+        $spreadsheet->removeSheetByIndex(0); // حذف الورقة الافتراضية
 
         $sheetIndex = 0;
         foreach ($exportData as $table => $rows) {
