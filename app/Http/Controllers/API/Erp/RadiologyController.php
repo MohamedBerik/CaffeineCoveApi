@@ -100,11 +100,10 @@ class RadiologyController extends Controller
         ]);
 
         return response()->json([
-            'received_all_data' => $request->all(),
-            'has_file' => $request->hasFile('file'),
-            'file_valid' => $request->file('file') ? $request->file('file')->isValid() : false,
-            'file_mime' => $request->file('file') ? $request->file('file')->getMimeType() : null
-        ], 200);
+            'status' => 201,
+            'message' => 'Radiology uploaded successfully',
+            'data' => $radiology,
+        ], 201);
     }
 
     public function show(Request $request, $id)
