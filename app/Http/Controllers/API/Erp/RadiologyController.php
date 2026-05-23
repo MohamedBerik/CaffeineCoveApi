@@ -12,11 +12,6 @@ use Illuminate\Support\Facades\Validator;
 
 class RadiologyController extends Controller
 {
-    // public function __construct()
-    // {
-    //     $this->authorizeResource(PatientRadiology::class, 'radiology', ['except' => ['index']]);
-    // }
-
     public function index(Request $request)
     {
         $customerId = $request->customer_id;
@@ -68,18 +63,15 @@ class RadiologyController extends Controller
         $extension = $file->getClientOriginalExtension();
         $fileName = time() . '_' . preg_replace('/[^a-zA-Z0-9]/', '_', $originalName) . '.' . $extension;
 
-        $directory = "radiology/{$companyId}/{$request->customer_id}";
+        // ✅ تم إزالة بادئة radiology/ لأن الديسك يتوجه إليها برمجياً تلقائياً
+        $directory = "{$companyId}/{$request->customer_id}";
 
         Log::info('Upload attempt', [
             'directory' => $directory,
             'file_name' => $fileName,
         ]);
 
-        if (!Storage::disk('public')->exists($directory)) {
-            Storage::disk('public')->makeDirectory($directory);
-            Log::info('Created directory: ' . $directory);
-        }
-
+        // ✅ لورافيل سينشئ المجلدات الفرعية تلقائياً هنا داخل public/radiology/
         $filePath = $file->storeAs($directory, $fileName, 'radiology_public');
 
         if (!$filePath) {
@@ -98,7 +90,8 @@ class RadiologyController extends Controller
             'customer_id' => $request->customer_id,
             'dental_record_id' => $request->dental_record_id,
             'title' => $request->title,
-            'file_path' => $filePath,
+            // سنخزن المسار مضافاً إليه radiology/ لكي يسهل على الـ Accessor قراءته وبنائه
+            'file_path' => 'radiology/' . $filePath,
             'file_name' => $fileName,
             'file_type' => $request->file_type ?? 'xray',
             'tooth_number' => $request->tooth_number,
@@ -140,9 +133,12 @@ class RadiologyController extends Controller
             return response()->json(['status' => 404, 'message' => 'Radiology image not found'], 404);
         }
 
-        // ✅ احذف الملف من التخزين
-        if ($radiology->file_path && Storage::disk('public')->exists($radiology->file_path)) {
-            Storage::disk('public')->delete($radiology->file_path);
+        // ✅ تم تعديل ديسك الحذف ليعمل على الديسك الصحيح المباشر
+        // نقوم بإزالة كلمة 'radiology/' من السلسلة النصية لأن جذر الديسك يبدأ منها أساساً
+        $cleanPath = str_replace('radiology/', '', $radiology->file_path);
+
+        if ($radiology->file_path && Storage::disk('radiology_public')->exists($cleanPath)) {
+            Storage::disk('radiology_public')->delete($cleanPath);
         }
 
         $radiology->delete();
