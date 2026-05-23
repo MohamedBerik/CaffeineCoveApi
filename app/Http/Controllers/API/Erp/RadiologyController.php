@@ -35,12 +35,12 @@ class RadiologyController extends Controller
 
         $validator = Validator::make($request->all(), [
             'customer_id' => 'required|exists:customers,id',
-            'title' => 'required|string|max:255',
-            'file' => 'required|file|mimes:jpeg,png,jpg,gif,pdf|max:20480',
-            'file_type' => 'nullable|string|in:xray,panorama,cbct,cephalometric,report,consent,other',
+            'title'       => 'required|string|max:255',
+            'file'        => ['required', 'file', 'mimetypes:image/jpeg,image/png,image/gif,application/pdf', 'max:20480'],
+            'file_type'   => 'nullable|string|in:xray,panorama,cbct,cephalometric,report,consent,other',
             'tooth_number' => 'nullable|string|max:10',
             'captured_at' => 'nullable|date',
-            'notes' => 'nullable|string',
+            'notes'       => 'nullable|string',
         ]);
 
         if ($validator->fails()) {
@@ -52,57 +52,46 @@ class RadiologyController extends Controller
 
         if (!$request->hasFile('file')) {
             return response()->json([
-                'status' => 400,
+                'status'  => 400,
                 'message' => 'No file uploaded',
             ], 400);
         }
 
-        $file = $request->file('file');
-
-        $originalName = pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME);
+        $file      = $request->file('file');
         $extension = $file->getClientOriginalExtension();
-        $fileName = time() . '_' . preg_replace('/[^a-zA-Z0-9]/', '_', $originalName) . '.' . $extension;
+        $fileName  = time() . '_' . Str::random(10) . '.' . $extension;
 
-        // ✅ تم إزالة بادئة radiology/ لأن الديسك يتوجه إليها برمجياً تلقائياً
-        $directory = "{$companyId}/{$request->customer_id}";
+        // المسار داخل storage/app/public/radiology/
+        $directory = "radiology/{$companyId}/{$request->customer_id}";
 
-        Log::info('Upload attempt', [
-            'directory' => $directory,
-            'file_name' => $fileName,
-        ]);
-
-        // ✅ لورافيل سينشئ المجلدات الفرعية تلقائياً هنا داخل public/radiology/
-        $filePath = $file->storeAs($directory, $fileName, 'radiology_public');
+        // حفظ الملف باستخدام القرص public (الافتراضي)
+        $filePath = $file->storeAs($directory, $fileName, 'public');
 
         if (!$filePath) {
-            Log::error('Failed to save file', ['directory' => $directory, 'file_name' => $fileName]);
             return response()->json([
-                'status' => 500,
+                'status'  => 500,
                 'message' => 'Failed to save file',
             ], 500);
         }
 
-        Log::info('File saved successfully', ['path' => $filePath]);
-
         $radiology = PatientRadiology::create([
-            'company_id' => $companyId,
-            'branch_id'  => Tenant::branchId() ?? $request->header('X-Branch-ID'),
-            'customer_id' => $request->customer_id,
+            'company_id'       => $companyId,
+            'branch_id'        => Tenant::branchId() ?? $request->header('X-Branch-ID'),
+            'customer_id'      => $request->customer_id,
             'dental_record_id' => $request->dental_record_id,
-            'title' => $request->title,
-            // سنخزن المسار مضافاً إليه radiology/ لكي يسهل على الـ Accessor قراءته وبنائه
-            'file_path' => 'radiology/' . $filePath,
-            'file_name' => $fileName,
-            'file_type' => $request->file_type ?? 'xray',
-            'tooth_number' => $request->tooth_number,
-            'captured_at' => $request->captured_at ?? now(),
-            'notes' => $request->notes,
+            'title'            => $request->title,
+            'file_path'        => $filePath,           // المسار النسبي: "radiology/1/123/...pdf"
+            'file_name'        => $fileName,
+            'file_type'        => $request->file_type ?? 'xray',
+            'tooth_number'     => $request->tooth_number,
+            'captured_at'      => $request->captured_at ?? now(),
+            'notes'            => $request->notes,
         ]);
 
         return response()->json([
-            'status' => 201,
+            'status'  => 201,
             'message' => 'Radiology uploaded successfully',
-            'data' => $radiology,
+            'data'    => $radiology,
         ], 201);
     }
 

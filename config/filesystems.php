@@ -53,13 +53,6 @@ return [
             'use_path_style_endpoint' => env('AWS_USE_PATH_STYLE_ENDPOINT', false),
         ],
 
-        'radiology_public' => [
-            'driver' => 'local',
-            'root' => public_path('radiology'),
-            'url' => env('APP_URL') . '/radiology',
-            'visibility' => 'public',
-        ],
-
     ],
 
     /*
