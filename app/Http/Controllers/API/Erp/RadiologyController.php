@@ -72,7 +72,7 @@ class RadiologyController extends Controller
         ]);
 
         // ✅ لورافيل سينشئ المجلدات الفرعية تلقائياً هنا داخل public/radiology/
-        $filePath = $file->storeAs($directory, $fileName, 'radiology_public');
+        $filePath = $file->storeAs($directory, $fileName, 'public');
 
         if (!$filePath) {
             Log::error('Failed to save file', ['directory' => $directory, 'file_name' => $fileName]);
