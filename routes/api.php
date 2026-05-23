@@ -501,6 +501,9 @@ Route::prefix('saas')
         Route::get('/contact-messages/{id}', [ContactMessageController::class, 'show']);
         Route::post('/contact-messages/{id}/read', [ContactMessageController::class, 'markAsRead']);
         Route::delete('/contact-messages/{id}', [ContactMessageController::class, 'destroy']);
+
+        Route::post('/companies/{id}/export', [CompanyManagementController::class, 'exportClinic']);
+        Route::get('/companies/{id}/export-download', [CompanyManagementController::class, 'downloadExport']);
     });
 
 

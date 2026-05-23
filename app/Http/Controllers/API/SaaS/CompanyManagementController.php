@@ -12,6 +12,8 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
+use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\File;
 
 class CompanyManagementController extends Controller
 {
@@ -412,5 +414,40 @@ class CompanyManagementController extends Controller
             'user' => $user->only(['id', 'name', 'email', 'role']),
             'company_id' => $id,
         ]);
+    }
+
+
+
+    public function exportClinic($id)
+    {
+        // تشغيل أمر التصدير
+        Artisan::call('clinic:export', ['company_id' => $id]);
+
+        // البحث عن أحدث ملف تصدير لهذه الشركة
+        $files = File::glob(storage_path("app/clinic_{$id}_export_*.zip"));
+        if (empty($files)) {
+            return response()->json(['msg' => 'Export failed or no file found'], 500);
+        }
+
+        // ترتيب الملفات تنازلياً حسب التاريخ (أحدث ملف)
+        rsort($files);
+        $latestFile = basename($files[0]);
+
+        return response()->json([
+            'msg' => 'Export ready',
+            'download_url' => "/api/saas/companies/{$id}/export-download?file={$latestFile}"
+        ]);
+    }
+
+    public function downloadExport($id, Request $request)
+    {
+        $fileName = $request->query('file');
+        $filePath = storage_path("app/{$fileName}");
+
+        if (!File::exists($filePath)) {
+            return response()->json(['msg' => 'File not found'], 404);
+        }
+
+        return response()->download($filePath, $fileName);
     }
 }
