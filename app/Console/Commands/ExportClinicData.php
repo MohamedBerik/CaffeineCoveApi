@@ -1,5 +1,8 @@
 <?php
 
+//railway run php artisan clinic:export 1
+//railway run php artisan clinic:export 1 --excel
+
 namespace App\Console\Commands;
 
 use Illuminate\Console\Command;
