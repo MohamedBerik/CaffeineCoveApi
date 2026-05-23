@@ -137,8 +137,8 @@ class RadiologyController extends Controller
         // نقوم بإزالة كلمة 'radiology/' من السلسلة النصية لأن جذر الديسك يبدأ منها أساساً
         $cleanPath = str_replace('radiology/', '', $radiology->file_path);
 
-        if ($radiology->file_path && Storage::disk('radiology_public')->exists($cleanPath)) {
-            Storage::disk('radiology_public')->delete($cleanPath);
+        if ($radiology->file_path && Storage::disk('public')->exists($cleanPath)) {
+            Storage::disk('public')->delete($cleanPath);
         }
 
         $radiology->delete();
