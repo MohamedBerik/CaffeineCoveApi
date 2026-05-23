@@ -418,24 +418,23 @@ class CompanyManagementController extends Controller
 
 
 
+
+
     public function exportClinic($id)
     {
-        // تشغيل أمر التصدير
         Artisan::call('clinic:export', ['company_id' => $id]);
 
-        // البحث عن أحدث ملف تصدير لهذه الشركة
         $files = File::glob(storage_path("app/clinic_{$id}_export_*.zip"));
         if (empty($files)) {
             return response()->json(['msg' => 'Export failed or no file found'], 500);
         }
 
-        // ترتيب الملفات تنازلياً حسب التاريخ (أحدث ملف)
         rsort($files);
         $latestFile = basename($files[0]);
 
         return response()->json([
             'msg' => 'Export ready',
-            'download_url' => "/api/saas/companies/{$id}/export-download?file={$latestFile}"
+            'download_url' => "/saas/companies/{$id}/export-download?file={$latestFile}"
         ]);
     }
 
