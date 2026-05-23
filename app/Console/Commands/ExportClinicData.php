@@ -72,12 +72,15 @@ class ExportClinicData extends Command
             $exportData[$table] = $rowsArray;
             $totalRows += count($rowsArray);
 
+
             // حفظ كل جدول كملف JSON منفصل داخل المجلد المؤقت
             $json = json_encode($rowsArray, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
             file_put_contents("{$tempDir}/{$table}.json", $json);
 
             $this->info("✔️ {$table}: " . count($rowsArray) . " rows");
         }
+
+        $this->generateReadme($company->name, $companyId, $exportData, $totalRows, $tempDir);
 
         if ($totalRows === 0) {
             $this->warn("⚠️ No data found for company ID {$companyId}.");
@@ -205,5 +208,33 @@ class ExportClinicData extends Command
             }
         }
         rmdir($dir);
+    }
+
+    private function generateReadme(string $companyName, int $companyId, array $exportData, int $totalRows, string $tempDir): void
+    {
+        $lines = [];
+        $lines[] = "============================================";
+        $lines[] = " Clinic Data Export";
+        $lines[] = "============================================";
+        $lines[] = "";
+        $lines[] = "Company Name : {$companyName}";
+        $lines[] = "Company ID   : {$companyId}";
+        $lines[] = "Export Date  : " . now()->toDateTimeString();
+        $lines[] = "Total Tables : " . count($exportData);
+        $lines[] = "Total Rows   : {$totalRows}";
+        $lines[] = "";
+        $lines[] = "Files Included:";
+        $lines[] = "---------------";
+
+        foreach ($exportData as $table => $rows) {
+            $lines[] = sprintf("  %-35s  (%d rows)", $table . '.json', count($rows));
+        }
+
+        $lines[] = "";
+        $lines[] = "The 'radiology_files' folder (if present) contains the uploaded radiology images for this clinic.";
+        $lines[] = "";
+        $lines[] = "These JSON files can be imported into another system using a custom script or database tool.";
+
+        file_put_contents("{$tempDir}/README.txt", implode("\n", $lines));
     }
 }
