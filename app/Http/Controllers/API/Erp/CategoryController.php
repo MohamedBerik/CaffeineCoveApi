@@ -21,7 +21,7 @@ class CategoryController extends Controller
     public function index(Request $request)
     {
         $categories = CategoryResource::collection(
-            Category::query()->get()
+            Category::withoutGlobalScopes()->get()  // ✅ تجاوز الـ Global Scope
         );
 
         return response()->json([
