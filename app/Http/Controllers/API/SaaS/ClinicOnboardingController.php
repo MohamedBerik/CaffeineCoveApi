@@ -4,6 +4,7 @@ namespace App\Http\Controllers\API\SaaS;
 
 use App\Http\Controllers\Controller;
 use App\Models\Company;
+use App\Models\Product;
 use App\Models\User;
 use App\Services\CompanyAccountingInitializer;
 use App\Services\Tenant;
@@ -51,6 +52,31 @@ class ClinicOnboardingController extends Controller
                         'logo'          => null,
                         'primary_color' => '#0ea5e9',
                     ],
+                ]);
+
+                Product::create([
+                    'company_id' => $company->id,
+                    'branch_id'  => null,
+                    'title_en'   => 'Consultation',
+                    'title_ar'   => 'استشارة',
+                    'description_en' => 'Consultation Service',
+                    'description_ar' => 'خدمة استشارة',
+                    'unit_price' => 0,
+                    'stock_quantity' => 0,
+                    'quantity'   => 0,
+                    'category_id' => 1,
+                ]);
+                Product::create([
+                    'company_id' => $company->id,
+                    'branch_id'  => null,
+                    'title_en'   => 'Treatment',
+                    'title_ar'   => 'علاج',
+                    'description_en' => 'Treatment Service',
+                    'description_ar' => 'خدمة علاج',
+                    'unit_price' => 0,
+                    'stock_quantity' => 0,
+                    'quantity'   => 0,
+                    'category_id' => 1,
                 ]);
 
                 // 3) Initialize accounting

@@ -4,6 +4,7 @@ namespace App\Http\Controllers\API\Erp;
 
 use App\Http\Controllers\Controller;
 use App\Models\Branch;
+use App\Models\Product;
 use App\Models\Subscription;
 use App\Services\Tenant;
 use Illuminate\Http\Request;
@@ -83,6 +84,33 @@ class BranchController extends Controller
             'address'    => $request->address,
             'phone'      => $request->phone,
             'is_active'  => $request->is_active ?? true,
+        ]);
+
+        // ✅ إنشاء المنتجين الأساسيين للفرع الجديد تلقائياً
+        Product::create([
+            'company_id'     => $companyId,
+            'branch_id'      => $branch->id,
+            'title_en'       => 'Consultation',
+            'title_ar'       => 'استشارة',
+            'description_en' => 'Consultation Service',
+            'description_ar' => 'خدمة استشارة',
+            'unit_price'     => 0,
+            'stock_quantity' => 0,
+            'quantity'       => 0,
+            'category_id'    => 1,
+        ]);
+
+        Product::create([
+            'company_id'     => $companyId,
+            'branch_id'      => $branch->id,
+            'title_en'       => 'Treatment',
+            'title_ar'       => 'علاج',
+            'description_en' => 'Treatment Service',
+            'description_ar' => 'خدمة علاج',
+            'unit_price'     => 0,
+            'stock_quantity' => 0,
+            'quantity'       => 0,
+            'category_id'    => 1,
         ]);
 
         return response()->json([
