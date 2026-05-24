@@ -11,6 +11,7 @@ return [
     | by the framework. The "local" disk, as well as a variety of cloud
     | based disks are available to your application. Just store away!
     |
+    |
     */
 
     'default' => env('FILESYSTEM_DRIVER', 'local'),
@@ -42,9 +43,10 @@ return [
             'visibility' => 'public',
         ],
 
+        // تعديل المسار ليكون داخل الـ storage الآمن والمستقر برمجياً
         'radiology_public' => [
             'driver' => 'local',
-            'root' => public_path('radiology'),
+            'root' => storage_path('app/public/radiology'),
             'url' => env('APP_URL') . '/radiology',
             'visibility' => 'public',
         ],
@@ -75,6 +77,8 @@ return [
 
     'links' => [
         public_path('storage') => storage_path('app/public'),
+        // إضافة هذا السطر لربط مجلد العرض الخارجي بالملفات المخزنة داخلياً بشكل آمن
+        public_path('radiology') => storage_path('app/public/radiology'),
     ],
 
 ];
