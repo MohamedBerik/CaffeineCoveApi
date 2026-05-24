@@ -501,8 +501,9 @@ class AppointmentService
             throw ValidationException::withMessages(['appointment' => ['The linked treatment item must have a valid price.']]);
         }
 
-        $treatmentServiceProduct = \App\Models\Product::withoutGlobalScope(\App\Models\Concerns\BranchScope::class)
+        $treatmentServiceProduct = \App\Models\Product::where('company_id', $companyId)
             ->where('title_en', 'Appointment Service')
+            ->when($branchId, fn($q) => $q->where('branch_id', $branchId))
             ->first();
 
         if (!$treatmentServiceProduct) {
@@ -870,8 +871,9 @@ class AppointmentService
 
         if ($exists) return;
 
-        $product = Product::withoutGlobalScope(\App\Models\Concerns\BranchScope::class)
+        $product = Product::where('company_id', $companyId)
             ->where('title_en', 'Consultation')
+            ->when($branchId, fn($q) => $q->where('branch_id', $branchId))
             ->first();
 
         if (!$product) return;
