@@ -480,7 +480,7 @@ class AppointmentService
 
         $existingTreatmentInvoice = Invoice::query()
             ->where('appointment_id', $appointment->id)
-            ->whereHas('order', fn($q) => $q->where('title_en', 'Appointment Service'))
+            ->whereHas('order', fn($q) => $q->where('title_en', 'Treatment'))
             ->lockForUpdate()
             ->first();
 
@@ -502,7 +502,7 @@ class AppointmentService
         }
 
         $treatmentServiceProduct = \App\Models\Product::where('company_id', $companyId)
-            ->where('title_en', 'Appointment Service')
+            ->where('title_en', 'Treatment')
             ->when($branchId, fn($q) => $q->where('branch_id', $branchId))
             ->first();
 
