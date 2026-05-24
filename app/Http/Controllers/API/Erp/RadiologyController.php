@@ -57,47 +57,59 @@ class RadiologyController extends Controller
             ], 400);
         }
 
-        $file = $request->file('file');
-        $extension = strtolower($file->getClientOriginalExtension());
-        $originalName = pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME);
-        $fileName = time() . '_' . preg_replace('/[^a-zA-Z0-9]/', '_', $originalName) . '.' . $extension;
+        try {
+            $file = $request->file('file');
+            $extension = strtolower($file->getClientOriginalExtension());
+            $originalName = pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME);
+            $fileName = time() . '_' . preg_replace('/[^a-zA-Z0-9]/', '_', $originalName) . '.' . $extension;
 
-        $directory = "{$companyId}/{$request->customer_id}";
+            $directory = "{$companyId}/{$request->customer_id}";
 
-        $filePath = $file->storeAs($directory, $fileName, 'radiology_public');
+            // الرفع على الديسك المخصص
+            $filePath = $file->storeAs($directory, $fileName, 'radiology_public');
 
-        if (!$filePath) {
+            if (!$filePath) {
+                return response()->json([
+                    'status' => 500,
+                    'message' => 'Failed to save file on storage disk',
+                ], 500);
+            }
+
+            // تحديد نوع الملف بشكل ذكي إذا لم يرسله الفرونت إند
+            $finalFileType = $request->file_type;
+            if (!$finalFileType) {
+                $finalFileType = ($extension === 'pdf') ? PatientRadiology::TYPE_REPORT : PatientRadiology::TYPE_XRAY;
+            }
+
+            $radiology = PatientRadiology::create([
+                'company_id' => $companyId,
+                'branch_id'  => Tenant::branchId() ?? $request->header('X-Branch-ID'),
+                'customer_id' => $request->customer_id,
+                'dental_record_id' => $request->dental_record_id,
+                'title' => $request->title,
+
+                // التعديل هنا: نخزن الـ $filePath كما هو (1/39/file.jpg) لأن المجلد الأساسي مدمج بالديسك
+                'file_path' => $filePath,
+
+                'file_name' => $fileName,
+                'file_type' => $finalFileType,
+                'tooth_number' => $request->tooth_number,
+                'captured_at' => $request->captured_at ?? now(),
+                'notes' => $request->notes,
+            ]);
+
+            return response()->json([
+                'status' => 201,
+                'message' => 'Radiology file uploaded successfully',
+                'data' => $radiology,
+            ], 201);
+        } catch (\Exception $e) {
+            // في حال وجود مشكلة صلاحيات في مجلد التخزين المحلي، سيظهر لك السبب فوراً
             return response()->json([
                 'status' => 500,
-                'message' => 'Failed to save file',
+                'message' => 'Upload Exception: ' . $e->getMessage(),
             ], 500);
         }
-
-        // تحديد نوع الملف بشكل ذكي إذا لم يرسله الفرونت إند
-        $finalFileType = $request->file_type;
-        if (!$finalFileType) {
-            $finalFileType = ($extension === 'pdf') ? PatientRadiology::TYPE_REPORT : PatientRadiology::TYPE_XRAY;
-        }
-
-        $radiology = PatientRadiology::create([
-            'company_id' => $companyId,
-            'branch_id'  => Tenant::branchId() ?? $request->header('X-Branch-ID'),
-            'customer_id' => $request->customer_id,
-            'dental_record_id' => $request->dental_record_id,
-            'title' => $request->title,
-            'file_path' => 'radiology/' . $filePath,
-            'file_name' => $fileName,
-            'file_type' => $finalFileType,
-            'tooth_number' => $request->tooth_number,
-            'captured_at' => $request->captured_at ?? now(),
-            'notes' => $request->notes,
-        ]);
-
-        return response()->json([
-            'status' => 201,
-            'message' => 'Radiology file uploaded successfully',
-            'data' => $radiology,
-        ], 201);
     }
 
     public function destroy(Request $request, $id)
