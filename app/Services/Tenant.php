@@ -70,15 +70,12 @@ class Tenant
      */
     public static function isSuperAdmin(): bool
     {
-        // ✅ Manual override
         if (static::$isSuperAdmin !== null) {
             return static::$isSuperAdmin;
         }
 
-        // ✅ From Auth (مع فحص وجود المستخدم أولاً)
         if (Auth::check()) {
             $user = Auth::user();
-            // ✅ استخدم property بدل method
             return $user?->isSuperAdmin() ?? false;
         }
 
@@ -99,12 +96,7 @@ class Tenant
     public static function isActive(): bool
     {
         $company = static::company();
-
-        if (!$company) {
-            return false;
-        }
-
-        return $company->status === \App\Models\Company::STATUS_ACTIVE;
+        return $company && $company->status === \App\Models\Company::STATUS_ACTIVE;
     }
 
     /**
@@ -113,12 +105,7 @@ class Tenant
     public static function isTrial(): bool
     {
         $company = static::company();
-
-        if (!$company) {
-            return false;
-        }
-
-        return $company->status === \App\Models\Company::STATUS_TRIAL;
+        return $company && $company->status === \App\Models\Company::STATUS_TRIAL;
     }
 
     /**
@@ -127,12 +114,7 @@ class Tenant
     public static function isSuspended(): bool
     {
         $company = static::company();
-
-        if (!$company) {
-            return false;
-        }
-
-        return $company->status === \App\Models\Company::STATUS_SUSPENDED;
+        return $company && $company->status === \App\Models\Company::STATUS_SUSPENDED;
     }
 
     /**
@@ -163,19 +145,19 @@ class Tenant
     public static function trialHasExpired(): bool
     {
         $daysLeft = static::trialDaysLeft();
-
         return $daysLeft !== null && $daysLeft < 0;
     }
 
     /**
      * Reset all manual overrides
-     * ✅ MUST be called after every job/queue execution
+     * ✅ Fixed: Now clears branch context to prevent octane/serverless leakages
      */
     public static function reset(): void
     {
         static::$currentId = null;
         static::$isSuperAdmin = null;
         static::$currentCompany = null;
+        static::$branchId = null; // 👈 تم الإصلاح هنا
     }
 
     /**

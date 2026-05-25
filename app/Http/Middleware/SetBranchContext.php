@@ -10,15 +10,26 @@ class SetBranchContext
 {
     public function handle(Request $request, Closure $next)
     {
-        // تعيين branchId من الهيدر X-Branch-ID إن وُجد
         $branchId = $request->header('X-Branch-ID');
+        $resolvedBranchId = null;
+
         if ($branchId !== null && $branchId !== '' && $branchId !== 'all') {
-            Tenant::setBranchId((int) $branchId);
+            $resolvedBranchId = (int) $branchId;
         } elseif ($user = $request->user()) {
-            // وإلا استخدم branch_id الخاص بالمستخدم المسجل
-            Tenant::setBranchId($user->branch_id);
+            // استخدام فرع المستخدم الافتراضي إذا لم يرسل الهيدر
+            $resolvedBranchId = $user->branch_id ? (int) $user->branch_id : null;
+        }
+
+        // حقن القيمة في الـ Singleton والـ Service Container في نفس الوقت لمنع الـ Inconsistency
+        Tenant::setBranchId($resolvedBranchId);
+
+        if ($resolvedBranchId !== null) {
+            app()->instance('tenant_branch_id', $resolvedBranchId);
         } else {
-            Tenant::setBranchId(null);
+            if (app()->has('tenant_branch_id')) {
+                // تصفير الحاوية إذا كانت القيمة السابقة موجودة
+                app()->offsetUnset('tenant_branch_id');
+            }
         }
 
         return $next($request);
