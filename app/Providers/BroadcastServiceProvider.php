@@ -10,8 +10,11 @@ class BroadcastServiceProvider extends ServiceProvider
 {
     public function boot(): void
     {
-        // ✅ إضافة middleware 'api' لتطبيق CORS
-        Broadcast::routes(['middleware' => ['api', 'auth:sanctum']]);
+        // ✅ إضافة middleware 'branch.context' (أو 'company.user' إذا لم ينشأ بعد)
+        Broadcast::routes([
+            'middleware' => ['api', 'auth:sanctum', 'company.user']
+            // يمكن إضافة 'branch.context' إذا كان ميدلوير الفرع جاهزًا
+        ]);
 
         require base_path('routes/channels.php');
 
@@ -20,10 +23,9 @@ class BroadcastServiceProvider extends ServiceProvider
 
     protected function registerTenantChannelRules(): void
     {
+        // ---- قنوات عامة على مستوى الشركة ----
         Broadcast::channel('company.{companyId}', function ($user, $companyId) {
-            if ($user->isSuperAdmin()) {
-                return true;
-            }
+            if ($user->isSuperAdmin()) return true;
             return (int) $user->company_id === (int) $companyId;
         });
 
@@ -32,9 +34,7 @@ class BroadcastServiceProvider extends ServiceProvider
         });
 
         Broadcast::channel('doctor.{doctorId}', function ($user, $doctorId) {
-            if ($user->isSuperAdmin()) {
-                return true;
-            }
+            if ($user->isSuperAdmin()) return true;
             if ($user->role === 'admin') {
                 $doctor = \App\Models\Doctor::find($doctorId);
                 return $doctor && $doctor->company_id === $user->company_id;
@@ -54,26 +54,36 @@ class BroadcastServiceProvider extends ServiceProvider
             return $user->isSuperAdmin() || $user->role === 'admin';
         });
 
+        // ---- قنوات الإشعارات والأحداث العامة (لجميع الفروع) ----
         Broadcast::channel('company.{companyId}.notifications', function ($user, $companyId) {
-            if ($user->isSuperAdmin()) {
-                return true;
-            }
+            if ($user->isSuperAdmin()) return true;
             return (int) $user->company_id === (int) $companyId;
         });
 
-        Broadcast::channel('company.{companyId}.dashboard', function ($user, $companyId) {
-            if ($user->isSuperAdmin()) {
-                return true;
-            }
-            return (int) $user->company_id === (int) $companyId && $user->role === 'admin';
+        // ---- قنوات Branch-Scoped (تحل محل القنوات العامة القديمة) ----
+        Broadcast::channel('company.{companyId}.branch.{branchId}.dashboard', function ($user, $companyId, $branchId) {
+            if ($user->isSuperAdmin()) return true;
+            if ((int) $user->company_id !== (int) $companyId) return false;
+            // الأدمن (role = admin) يمكنه رؤية جميع الفروع
+            if ($user->role === 'admin') return true;
+            // المستخدم العادي (طبيب/موظف) يجب أن يكون مرتبطًا بنفس الفرع
+            return $user->branch_id && (int) $user->branch_id === (int) $branchId;
         });
 
-        Broadcast::channel('company.{companyId}.alerts', function ($user, $companyId) {
-            if ($user->isSuperAdmin()) {
-                return true;
-            }
-            return (int) $user->company_id === (int) $companyId &&
-                in_array($user->role, ['admin', 'doctor']);
+        Broadcast::channel('company.{companyId}.branch.{branchId}.alerts', function ($user, $companyId, $branchId) {
+            if ($user->isSuperAdmin()) return true;
+            if ((int) $user->company_id !== (int) $companyId) return false;
+            if ($user->role === 'admin') return true;
+            return $user->branch_id && (int) $user->branch_id === (int) $branchId;
         });
+
+        Broadcast::channel('company.{companyId}.branch.{branchId}.insights', function ($user, $companyId, $branchId) {
+            if ($user->isSuperAdmin()) return true;
+            if ((int) $user->company_id !== (int) $companyId) return false;
+            if ($user->role === 'admin') return true;
+            return $user->branch_id && (int) $user->branch_id === (int) $branchId;
+        });
+
+        // يمكن إضافة قنوات إضافية بنفس النمط
     }
 }
