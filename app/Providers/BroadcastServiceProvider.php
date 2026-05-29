@@ -12,7 +12,7 @@ class BroadcastServiceProvider extends ServiceProvider
     {
         // ✅ إضافة middleware 'branch.context' (أو 'company.user' إذا لم ينشأ بعد)
         Broadcast::routes([
-            'middleware' => ['api', 'auth:sanctum', 'company.user']
+            'middleware' => ['api', 'auth:sanctum', 'company.user', 'throttle:broadcasting']
             // يمكن إضافة 'branch.context' إذا كان ميدلوير الفرع جاهزًا
         ]);
 

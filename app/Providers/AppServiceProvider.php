@@ -89,10 +89,12 @@ class AppServiceProvider extends ServiceProvider
 
         RateLimiter::for('billing', function (Request $request) {
             $user = $request->user();
-            if ($user) {
-                return Limit::perMinute(10)->by($user->id);
-            }
-            return Limit::perMinute(3)->by($request->ip());
+            return Limit::perMinute($user ? 20 : 5)->by($user?->id ?: $request->ip());
+        });
+
+        RateLimiter::for('broadcasting', function (Request $request) {
+            $user = $request->user();
+            return Limit::perMinute(200)->by($user?->id ?: $request->ip());
         });
 
         RateLimiter::for('payment', function (Request $request) {
@@ -106,6 +108,7 @@ class AppServiceProvider extends ServiceProvider
         RateLimiter::for('webhooks', function (Request $request) {
             return Limit::perMinute(60)->by($request->ip());
         });
+
         // ✅ Structured Logging for API Requests
         if (app()->environment('production')) {
             $this->app['router']->matched(function ($route) {
