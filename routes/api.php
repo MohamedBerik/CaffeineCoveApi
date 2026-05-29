@@ -138,7 +138,7 @@ Route::middleware(['auth:sanctum', 'company.user'])->group(function () {
 |--------------------------------------------------------------------------
 */
 Route::prefix('erp')
-    ->middleware(['auth:sanctum', 'branch.context', 'company.user', 'subscription.active'])
+    ->middleware(['auth:sanctum', 'branch.context', 'company.user', 'subscription.active', 'throttle:api'])
     ->group(function () {
 
         Route::middleware('permission:finance.view')->group(function () {
@@ -459,3 +459,23 @@ Route::prefix('saas')
         Route::post('/companies/{id}/export', [CompanyManagementController::class, 'exportClinic']);
         Route::get('/companies/{id}/export-download', [CompanyManagementController::class, 'downloadExport']);
     });
+
+
+
+/*
+|--------------------------------------------------------------------------
+| Branches
+|--------------------------------------------------------------------------
+*/
+Route::middleware(['auth:sanctum'])->group(function () {
+    Route::get('/branches', function () {
+        $companyId = \App\Services\Tenant::id();
+        if (!$companyId) {
+            return response()->json(['message' => 'No company selected'], 400);
+        }
+
+        return \App\Models\Branch::where('company_id', $companyId)
+            ->select('id', 'name', 'slug')
+            ->get();
+    });
+});
