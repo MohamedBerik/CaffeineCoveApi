@@ -57,11 +57,9 @@ use App\Http\Controllers\API\Webhook\PayMobWebhookController;
 use App\Services\Tenant;
 use Illuminate\Support\Facades\DB;
 
-
-
 /*
 |--------------------------------------------------------------------------
-| Public Routes (No Authentication Required)
+| Public Routes
 |--------------------------------------------------------------------------
 */
 
@@ -71,20 +69,10 @@ Route::get('/public/plans', [PlanController::class, 'publicIndex']);
 Route::get('/public/platform-info', [PlatformSettingsController::class, 'platformInfo']);
 Route::post('/public/contact', [ContactController::class, 'send'])->middleware('throttle:5,1');
 
-/*
-|--------------------------------------------------------------------------
-| Webhooks (No Auth)
-|--------------------------------------------------------------------------
-*/
 Route::middleware('throttle:webhooks')->group(function () {
     Route::post('/webhooks/paymob', [PayMobWebhookController::class, 'handle']);
 });
 
-/*
-|--------------------------------------------------------------------------
-| Super Admin Dynamic CRUD
-|--------------------------------------------------------------------------
-*/
 Route::middleware(['auth:sanctum', 'super.admin'])->prefix('admin')->group(function () {
     Route::get('/crud/{table}', [AdminCrudController::class, 'index']);
     Route::get('/crud/{table}/{id}', [AdminCrudController::class, 'show']);
@@ -93,23 +81,13 @@ Route::middleware(['auth:sanctum', 'super.admin'])->prefix('admin')->group(funct
     Route::delete('/crud/{table}/{id}', [AdminCrudController::class, 'destroy']);
 });
 
-/*
-|--------------------------------------------------------------------------
-| Authenticated Routes (All Users)
-|--------------------------------------------------------------------------
-*/
 Route::middleware(['auth:sanctum', 'company.user'])->group(function () {
-
-    // User Profile
     Route::get('/me', function (Request $request) {
         $user = $request->user();
         $permissions = $user->getAllPermissions()->pluck('name')->toArray();
-
         if ($user->is_super_admin) {
             $permissions = ['*'];
         }
-
-        // تحويل المصفوفة إلى كائن للتحقق السريع في الواجهة
         $permissionsMap = array_fill_keys($permissions, true);
 
         return response()->json([
@@ -122,8 +100,8 @@ Route::middleware(['auth:sanctum', 'company.user'])->group(function () {
             'branch_id'  => $user->branch_id,
             'is_super_admin' => (bool) $user->is_super_admin,
             'can_switch_branch' => !$user->is_super_admin && $user->hasRole('admin'),
-            'permissions' => $permissions,          // مصفوفة للتوافق القديم
-            'permissions_map' => $permissionsMap,    // كائن للتحقق السريع
+            'permissions' => $permissions,
+            'permissions_map' => $permissionsMap,
         ]);
     });
 
@@ -132,26 +110,21 @@ Route::middleware(['auth:sanctum', 'company.user'])->group(function () {
         return response()->json(['message' => 'Logged out successfully']);
     });
 
-    // Tenant Context
     Route::get('/companies', function () {
         return \App\Models\Company::select('id', 'name', 'slug', 'status')->get();
     });
 
     Route::post('/switch-company', function (Request $request) {
         $companyId = $request->company_id;
-
         if ($companyId === null || $companyId === 'null') {
             session(['tenant_id' => null]);
             return response()->json(['message' => 'Switched to global mode']);
         }
-
         $company = \App\Models\Company::find($companyId);
         if (!$company) {
             return response()->json(['message' => 'Invalid company'], 404);
         }
-
         session(['tenant_id' => $companyId]);
-
         return response()->json([
             'message' => 'Company switched successfully',
             'company' => $company->only('id', 'name', 'slug')
@@ -161,14 +134,13 @@ Route::middleware(['auth:sanctum', 'company.user'])->group(function () {
 
 /*
 |--------------------------------------------------------------------------
-| ERP Routes (Multi-tenant Clinic Management)
+| ERP Routes
 |--------------------------------------------------------------------------
 */
 Route::prefix('erp')
-    ->middleware(['auth:sanctum', 'branch.context', 'company.user', 'subscription.active', 'throttle:api'])
+    ->middleware(['auth:sanctum', 'branch.context', 'company.user', 'subscription.active'])
     ->group(function () {
 
-        // ==================== DASHBOARD & REPORTS ====================
         Route::middleware('permission:finance.view')->group(function () {
             Route::get('/dashboard', [ErpDashboardController::class, 'index']);
             Route::get('/dashboard/finance', [FinanceDashboardController::class, 'index']);
@@ -178,7 +150,6 @@ Route::prefix('erp')
             Route::get('/activity-logs', [ActivityLogController::class, 'index']);
         });
 
-        // ==================== Branches ====================
         Route::middleware('permission:branches.view')->group(function () {
             Route::get('/branches', [BranchController::class, 'index']);
             Route::get('/branches/{id}', [BranchController::class, 'show']);
@@ -189,7 +160,7 @@ Route::prefix('erp')
             Route::put('/branches/{id}', [BranchController::class, 'update']);
             Route::delete('/branches/{id}', [BranchController::class, 'destroy']);
         });
-        // ==================== ALERTS ====================
+
         Route::middleware('permission:finance.view')->group(function () {
             Route::get('/alerts', [AlertController::class, 'index']);
             Route::get('/alerts/unread-count', [AlertController::class, 'unreadCount']);
@@ -197,7 +168,6 @@ Route::prefix('erp')
             Route::post('/alerts/mark-all-read', [AlertController::class, 'markAllRead']);
         });
 
-        // ==================== BILLING ====================
         Route::middleware('throttle:billing')->group(function () {
             Route::get('/billing/subscription', [BillingController::class, 'currentSubscription']);
             Route::get('/billing/invoices', [BillingController::class, 'invoices']);
@@ -215,12 +185,10 @@ Route::prefix('erp')
             Route::post('/billing/change', [BillingController::class, 'change']);
         });
 
-        // ==================== ADMIN PANEL ====================
         Route::middleware(['admin', 'permission:users.manage'])->group(function () {
             Route::apiResource('admin/users', UserController::class);
         });
 
-        // ==================== ORDERS ====================
         Route::middleware('permission:orders.manage')->post('/orders', [OrderController::class, 'storeErp']);
         Route::middleware('permission:orders.view')->group(function () {
             Route::get('/orders', [OrderController::class, 'indexErp']);
@@ -229,31 +197,25 @@ Route::prefix('erp')
         Route::middleware('permission:orders.confirm')->post('/orders/{id}/confirm', [OrderController::class, 'confirm']);
         Route::middleware('permission:orders.cancel')->post('/orders/{id}/cancel', [OrderController::class, 'cancel']);
 
-        // ==================== INVOICES ====================
-
-        // 1. قائمة الفواتير، التفاصيل الكاملة، وإدخالات اليومية – محمية للمستخدمين الماليين فقط
         Route::middleware('permission:finance.view')->group(function () {
             Route::get('/invoices', [InvoiceController::class, 'indexErp']);
             Route::get('/invoices/{invoiceId}/journal-entries', [InvoiceJournalController::class, 'index']);
             Route::get('/billing/invoices/{id}', [BillingController::class, 'showInvoice']);
         });
 
-        // 2. عرض الفاتورة الواحدة، تسجيل المدفوعات، تطبيق الأرصدة – متاحة لموظف الاستقبال (invoices.pay)
         Route::middleware('permission:invoices.pay')->group(function () {
-            Route::get('/invoices/{invoice}', [InvoiceController::class, 'show']);   // استخدم {invoice} لو تستخدم Route Model Binding
+            Route::get('/invoices/{invoice}', [InvoiceController::class, 'show']);
             Route::get('/invoices/{id}/full', [InvoiceController::class, 'showFullInvoice']);
             Route::post('/invoices/{invoice}/payments', [InvoicePaymentController::class, 'store']);
             Route::post('/invoices/{invoice}/apply-credit', [InvoicePaymentController::class, 'applyCustomerCredit']);
         });
 
-        // ==================== PAYMENTS & REFUNDS ====================
         Route::middleware('permission:finance.view')->group(function () {
             Route::get('/payments', [InvoicePaymentController::class, 'index']);
         });
 
         Route::middleware('permission:payments.refund')->post('/payments/{payment}/refund', [PaymentRefundController::class, 'refund']);
 
-        // ==================== PURCHASE ORDERS ====================
         Route::middleware('permission:purchases.manage')->post('/purchase-orders', [PurchaseOrderController::class, 'store']);
         Route::middleware('permission:finance.view')->group(function () {
             Route::get('/purchase-orders', [PurchaseOrderController::class, 'indexErp']);
@@ -265,7 +227,6 @@ Route::prefix('erp')
         Route::middleware('permission:purchases.receive')->post('/purchase-orders/{id}/receive', [PurchaseOrderController::class, 'receive']);
         Route::middleware('permission:purchases.return')->post('/purchase-orders/{id}/return', [PurchaseOrderController::class, 'returnItems']);
 
-        // ==================== STATEMENTS ====================
         Route::middleware('permission:customers.statements.view')->group(function () {
             Route::get('/customers/{customerId}/statement', [CustomerStatementController::class, 'show']);
         });
@@ -275,7 +236,6 @@ Route::prefix('erp')
             Route::get('/customers/{customerId}/credit-balance', [CustomerCreditController::class, 'show']);
         });
 
-        // ==================== APPOINTMENTS ====================
         Route::middleware('permission:appointments.view')->group(function () {
             Route::get('/appointments', [AppointmentController::class, 'index']);
             Route::get('/appointments/available-slots', [AppointmentAvailabilityController::class, 'index']);
@@ -292,29 +252,22 @@ Route::prefix('erp')
         });
         Route::middleware('permission:appointments.complete')->post('/appointments/{id}/complete', [AppointmentController::class, 'complete']);
 
-        // ==================== TREATMENT PLANS ====================
+        // ==================== TREATMENT PLANS (ترتيب مصحح) ====================
         Route::middleware('permission:treatment_plans.view')->group(function () {
             Route::get('/treatment-plans', [TreatmentPlanController::class, 'index']);
+            Route::get('/treatment-plans/{itemId}/items', [TreatmentPlanController::class, 'items']); // أولاً
             Route::get('/treatment-plans/{id}', [TreatmentPlanController::class, 'show']);
-            Route::get('/treatment-plans/{id}/summary', [TreatmentPlanController::class, 'summary']);
-            Route::get('/treatment-plans/{id}/cash-summary', [TreatmentPlanController::class, 'cashSummary']);
-            Route::get('/treatment-plans/{itemId}/items', [TreatmentPlanController::class, 'items']);
         });
-        // إنشاء خطة علاج جديدة ← تسمح بها create
         Route::middleware('permission:treatment_plans.create')->group(function () {
             Route::post('/treatment-plans', [TreatmentPlanController::class, 'store']);
             Route::post('/treatment-plans/{itemId}/items', [TreatmentPlanController::class, 'addItem']);
         });
-
-        // تعديل وحذف الخطط والعناصر ← إدارية بحتة
         Route::middleware('permission:treatment_plans.manage')->group(function () {
             Route::put('/treatment-plans/{id}', [TreatmentPlanController::class, 'update']);
             Route::delete('/treatment-plans/{id}', [TreatmentPlanController::class, 'destroy']);
             Route::put('/treatment-plan-items/{itemId}', [TreatmentPlanController::class, 'updateItem']);
             Route::delete('/treatment-plan-items/{itemId}', [TreatmentPlanController::class, 'deleteItem']);
         });
-
-        // بدء جلسة علاج وربط المواعيد ← من صلاحيات إدارة المواعيد
         Route::middleware('permission:appointments.manage')->group(function () {
             Route::post('/treatment-plan-items/{itemId}/start', [TreatmentPlanController::class, 'startItem']);
             Route::post('/treatment-plan-items/{itemId}/attach-appointment', [TreatmentPlanController::class, 'attachAppointment']);
@@ -344,7 +297,7 @@ Route::prefix('erp')
             Route::delete('/doctors/{id}', [DoctorController::class, 'destroy']);
         });
 
-        // ==================== CUSTOMERS (PATIENTS) ====================
+        // ==================== CUSTOMERS ====================
         Route::middleware('permission:patients.view')->group(function () {
             Route::get('/customers', [CustomerController::class, 'index']);
             Route::get('/customers/{customer}', [CustomerController::class, 'show']);
@@ -367,17 +320,18 @@ Route::prefix('erp')
             Route::delete('/patient-radiologies/{id}', [RadiologyController::class, 'destroy']);
         });
 
-        // ==================== DENTAL RECORDS ====================
+        // ==================== DENTAL RECORDS (صلاحيات مصححة) ====================
         Route::middleware('permission:dental_records.view')->group(function () {
             Route::get('/dental-records', [DentalRecordController::class, 'index']);
             Route::get('/dental-records/{id}', [DentalRecordController::class, 'show']);
-            Route::put('/dental-records/{id}', [DentalRecordController::class, 'update']);
-            Route::delete('/dental-records/{id}', [DentalRecordController::class, 'destroy']);
         });
         Route::middleware('permission:dental_records.create')->group(function () {
             Route::post('/dental-records', [DentalRecordController::class, 'store']);
         });
-
+        Route::middleware('permission:dental_records.manage')->group(function () {
+            Route::put('/dental-records/{id}', [DentalRecordController::class, 'update']);
+            Route::delete('/dental-records/{id}', [DentalRecordController::class, 'destroy']);
+        });
         Route::middleware('permission:appointments.manage')
             ->post('/dental-records/{id}/to-treatment-plan-item', [DentalRecordController::class, 'toTreatmentPlanItem']);
 
@@ -385,7 +339,7 @@ Route::prefix('erp')
         Route::middleware('permission:settings.view')->get('/clinic-settings', [ClinicSettingController::class, 'show']);
         Route::middleware('permission:settings.manage')->put('/clinic-settings', [ClinicSettingController::class, 'update']);
 
-        // ==================== INVENTORY ====================
+        // ==================== INVENTORY (بدون تكرار) ====================
         Route::middleware('permission:inventory.view')->group(function () {
             Route::get('/categories', [CategoryController::class, 'index']);
             Route::get('/categories/{id}', [CategoryController::class, 'show']);
@@ -397,7 +351,7 @@ Route::prefix('erp')
             Route::get('/products/{id}', [ProductController::class, 'show']);
         });
         Route::middleware('permission:inventory.manage')->group(function () {
-            Route::get('/categories', [CategoryController::class, 'index']);
+            // تم حذف Route::get('/categories', ...) المكرر
             Route::post('/categories', [CategoryController::class, 'store']);
             Route::put('/categories/{id}', [CategoryController::class, 'update']);
             Route::delete('/categories/{id}', [CategoryController::class, 'destroy']);
@@ -505,23 +459,3 @@ Route::prefix('saas')
         Route::post('/companies/{id}/export', [CompanyManagementController::class, 'exportClinic']);
         Route::get('/companies/{id}/export-download', [CompanyManagementController::class, 'downloadExport']);
     });
-
-
-
-/*
-|--------------------------------------------------------------------------
-| Branches
-|--------------------------------------------------------------------------
-*/
-Route::middleware(['auth:sanctum'])->group(function () {
-    Route::get('/branches', function () {
-        $companyId = \App\Services\Tenant::id();
-        if (!$companyId) {
-            return response()->json(['message' => 'No company selected'], 400);
-        }
-
-        return \App\Models\Branch::where('company_id', $companyId)
-            ->select('id', 'name', 'slug')
-            ->get();
-    });
-});
