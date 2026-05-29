@@ -27,11 +27,13 @@ class AlertCreated implements ShouldBroadcast
      * Get the channels the event should broadcast on.
      * ✅ قناة خاصة بالشركة: company.{companyId}
      */
-    public function broadcastOn(): array
+    public function broadcastOn()
     {
-        return [
-            new PrivateChannel('company.' . $this->alert->company_id)
-        ];
+        $channel = 'company.' . $this->alert->company_id . '.alerts';
+        if ($this->alert->branch_id) {
+            $channel = 'company.' . $this->alert->company_id . '.branch.' . $this->alert->branch_id . '.alerts';
+        }
+        return new PrivateChannel($channel);
     }
 
     /**
