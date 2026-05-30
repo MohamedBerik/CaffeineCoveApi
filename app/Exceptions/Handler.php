@@ -2,6 +2,7 @@
 
 namespace App\Exceptions;
 
+use Illuminate\Auth\AuthenticationException;
 use Illuminate\Foundation\Exceptions\Handler as ExceptionHandler;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Log;
@@ -65,5 +66,13 @@ class Handler extends ExceptionHandler
         }
 
         return parent::render($request, $e);
+    }
+
+    protected function unauthenticated($request, AuthenticationException $exception)
+    {
+        // 🎯 إجبار السيرفر على إرجاع ترميز 401 للمتصفح لمنع الـ 500
+        return $request->expectsJson() || $request->is('api/*')
+            ? response()->json(['message' => 'Unauthenticated.'], 401)
+            : redirect()->guest($exception->redirectTo($request) ?? route('login'));
     }
 }
