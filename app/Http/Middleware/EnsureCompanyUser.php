@@ -12,20 +12,21 @@ class EnsureCompanyUser
     // app/Http/Middleware/EnsureCompanyUser.php
 
 
+    // app/Http/Middleware/EnsureCompanyUser.php
+
     public function handle(Request $request, Closure $next)
     {
-        $user = $request->user();
-
-        if (!$user) {
+        // التأكد من أن المستخدم مسجل بالفعل عبر سانكتوم قبل فحص أي خصائص أخرى
+        if (!$request->user()) {
             return response()->json(['message' => 'Unauthenticated'], 401);
         }
 
-        // ✅ [إصلاح] السماح لـ Super Admin بالمرور فقط إذا لم يكن في سياق شركة
+        $user = $request->user();
+
         if (Tenant::isSuperAdmin() && !Tenant::hasTenant()) {
             return $next($request);
         }
 
-        // ✅ مستخدم عادي - يجب أن يكون لديه company_id
         if (!Tenant::hasTenant()) {
             return response()->json([
                 'message' => 'User is not assigned to any company'
