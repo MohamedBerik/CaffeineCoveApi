@@ -467,15 +467,15 @@ Route::prefix('saas')
 | Branches
 |--------------------------------------------------------------------------
 */
-// Route::middleware(['auth:sanctum'])->group(function () {
-//     Route::get('/branches', function () {
-//         $companyId = \App\Services\Tenant::id();
-//         if (!$companyId) {
-//             return response()->json(['message' => 'No company selected'], 400);
-//         }
+Route::middleware(['auth:sanctum'])->group(function () {
+    Route::get('/branches', function () {
+        $companyId = \App\Services\Tenant::id();
+        if (!$companyId) {
+            return response()->json(['message' => 'No company selected'], 400);
+        }
 
-//         return \App\Models\Branch::where('company_id', $companyId)
-//             ->select('id', 'name', 'slug')
-//             ->get();
-//     });
-// });
+        return \App\Models\Branch::where('company_id', $companyId)
+            ->select('id', 'name', 'slug')
+            ->get();
+    });
+});
