@@ -82,28 +82,7 @@ Route::middleware(['auth:sanctum', 'super.admin'])->prefix('admin')->group(funct
 });
 
 Route::middleware(['auth:sanctum', 'company.user'])->group(function () {
-    Route::get('/me', function (Request $request) {
-        $user = $request->user();
-        $permissions = $user->getAllPermissions()->pluck('name')->toArray();
-        if ($user->is_super_admin) {
-            $permissions = ['*'];
-        }
-        $permissionsMap = array_fill_keys($permissions, true);
-
-        return response()->json([
-            'id' => $user->id,
-            'name' => $user->name,
-            'email' => $user->email,
-            'role' => $user->role,
-            'roles' => $user->getRoleNames(),
-            'company_id' => Tenant::id(),
-            'branch_id'  => $user->branch_id,
-            'is_super_admin' => (bool) $user->is_super_admin,
-            'can_switch_branch' => !$user->is_super_admin && $user->hasRole('admin'),
-            'permissions' => $permissions,
-            'permissions_map' => $permissionsMap,
-        ]);
-    });
+    Route::get('/me', [AuthController::class, 'me']);
 
     Route::post('/logout', function (Request $request) {
         $request->user()->currentAccessToken()->delete();
