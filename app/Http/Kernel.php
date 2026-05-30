@@ -32,8 +32,8 @@ class Kernel extends HttpKernel
             \App\Http\Middleware\ValidateFileUpload::class,
             // 'throttle:api',
             \Illuminate\Routing\Middleware\SubstituteBindings::class,
-            \App\Http\Middleware\SetTenant::class,
-            \App\Http\Middleware\SetBranchContext::class,
+            // \App\Http\Middleware\SetTenant::class,
+            // \App\Http\Middleware\SetBranchContext::class,
         ],
     ];
 
@@ -48,8 +48,9 @@ class Kernel extends HttpKernel
         'signed' => \Illuminate\Routing\Middleware\ValidateSignature::class,
         'throttle' => \Illuminate\Routing\Middleware\ThrottleRequests::class,
         'verified' => \Illuminate\Auth\Middleware\EnsureEmailIsVerified::class,
-        'subscription.active' => \App\Http\Middleware\CheckSubscription::class,
+        'set.tenant'       => \App\Http\Middleware\SetTenant::class, // ✅ تسجيله كـ Route Middleware منفصل
         'branch.context' => \App\Http\Middleware\SetBranchContext::class,
+        'subscription.active' => \App\Http\Middleware\CheckSubscription::class,
 
         // ✅ New Clean Middleware (API)
         'admin' => \App\Http\Middleware\EnsureAdmin::class,

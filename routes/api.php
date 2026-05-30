@@ -81,7 +81,7 @@ Route::middleware(['auth:sanctum', 'super.admin'])->prefix('admin')->group(funct
     Route::delete('/crud/{table}/{id}', [AdminCrudController::class, 'destroy']);
 });
 
-Route::middleware(['auth:sanctum', 'company.user'])->group(function () {
+Route::middleware(['auth:sanctum', 'set.tenant', 'company.user'])->group(function () {
     Route::get('/me', [AuthController::class, 'me']);
 
     Route::post('/logout', function (Request $request) {
@@ -117,7 +117,7 @@ Route::middleware(['auth:sanctum', 'company.user'])->group(function () {
 |--------------------------------------------------------------------------
 */
 Route::prefix('erp')
-    ->middleware(['auth:sanctum', 'branch.context', 'company.user', 'subscription.active', 'throttle:api'])
+    ->middleware(['auth:sanctum', 'set.tenant', 'company.user', 'branch.context', 'subscription.active', 'throttle:api'])
     ->group(function () {
 
         Route::middleware('permission:finance.view')->group(function () {
