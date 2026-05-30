@@ -49,46 +49,47 @@ class RouteServiceProvider extends ServiceProvider
      */
     protected function configureRateLimiting(): void
     {
-        // ✅ Global API rate limit
+        // ✅ Global API rate limit (تم رفعه لـ 1000 لمنع الـ 429 أثناء الـ Debugging والعمل المكثف)
         RateLimiter::for('api', function (Request $request) {
-            return Limit::perMinute(60)
+            return Limit::perMinute(1000)
                 ->by(optional($request->user())->id ?: $request->ip());
         });
 
-        // ✅ Stricter limit for authentication routes
+        // ✅ Stricter limit for authentication routes (نحافظ عليه لحماية اللوجن من التخمين)
         RateLimiter::for('auth', function (Request $request) {
-            return Limit::perMinute(5)
+            return Limit::perMinute(20) // تم رفعه قليلاً لـ 20 ليعطيك أريحية تجارب تسجيل الدخول المتتالية
                 ->by($request->ip());
         });
 
-        // ✅ Tenant-specific rate limit
+        // ✅ Tenant-specific rate limit (تم رفعه لـ 1500 ليتحمل فروع العيادات وضغط الموظفين)
         RateLimiter::for('tenant', function (Request $request) {
             $companyId = Tenant::id() ?? $request->ip();
-            return Limit::perMinute(120)
+            return Limit::perMinute(1500)
                 ->by('tenant_' . $companyId);
         });
 
         // ✅ High-frequency endpoints (dashboard polling)
+        // إذا كنت تستخدم Polling بالفرونت إند، 30 طلب قد تنتهي سريعاً، يفضل رفعها لـ 300
         RateLimiter::for('dashboard', function (Request $request) {
-            return Limit::perMinute(30)
+            return Limit::perMinute(300)
                 ->by(optional($request->user())->id ?: $request->ip());
         });
 
         // ✅ Public endpoints (more restrictive)
         RateLimiter::for('public', function (Request $request) {
-            return Limit::perMinute(20)
+            return Limit::perMinute(100)
                 ->by($request->ip());
         });
 
         // ✅ Report generation (resource intensive)
         RateLimiter::for('reports', function (Request $request) {
-            return Limit::perMinute(10)
+            return Limit::perMinute(50)
                 ->by(optional($request->user())->id ?: $request->ip());
         });
 
         // ✅ File uploads
         RateLimiter::for('uploads', function (Request $request) {
-            return Limit::perMinute(30)
+            return Limit::perMinute(60)
                 ->by(optional($request->user())->id ?: $request->ip());
         });
     }
