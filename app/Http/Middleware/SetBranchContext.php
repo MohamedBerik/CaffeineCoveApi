@@ -13,11 +13,10 @@ class SetBranchContext
         $branchId = $request->header('X-Branch-ID');
         $resolvedBranchId = null;
 
+        // 🎯 [تعديل حاسم وآمن] نعتمد بالكامل على الهيدر الصريح القادم من الفرونت إند
+        // لمنع استدعاء $request->user() المبكر الذي يسبب الـ 401
         if ($branchId !== null && $branchId !== '' && $branchId !== 'all') {
             $resolvedBranchId = (int) $branchId;
-        } elseif ($user = $request->user()) {
-            // استخدام فرع المستخدم الافتراضي إذا لم يرسل الهيدر
-            $resolvedBranchId = $user->branch_id ? (int) $user->branch_id : null;
         }
 
         // حقن القيمة في الـ Singleton والـ Service Container في نفس الوقت لمنع الـ Inconsistency
@@ -26,8 +25,8 @@ class SetBranchContext
         if ($resolvedBranchId !== null) {
             app()->instance('tenant_branch_id', $resolvedBranchId);
         } else {
+            // ✅ إذا كانت القيمة null أو "all"، نضمن تصفير الحاوية تماماً ليفهم الـ Global Scope أن المستخدم يرى كل الفروع
             if (app()->has('tenant_branch_id')) {
-                // تصفير الحاوية إذا كانت القيمة السابقة موجودة
                 app()->offsetUnset('tenant_branch_id');
             }
         }
