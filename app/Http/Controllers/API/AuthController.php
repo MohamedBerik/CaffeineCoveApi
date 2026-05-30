@@ -171,11 +171,50 @@ class AuthController extends Controller
      */
     public function me(Request $request)
     {
-        dd([
-            'user' => $request->user(),
-            'auth_check' => auth()->check(),
-            'auth_id' => auth()->id(),
-        ]);
+        try {
+            $user = $request->user();
+
+            // جلب الصلاحيات بشكل آمن ومتوافق مع حزم Spatie أو الصلاحيات المخصصة لديك
+            $permissions = [];
+            if (method_exists($user, 'getAllPermissions')) {
+                $permissions = $user->getAllPermissions()->pluck('name')->toArray();
+            } elseif (isset($user->permissions)) {
+                $permissions = $user->permissions;
+            }
+
+            if ($user->is_super_admin) {
+                $permissions = ['*'];
+            }
+
+            $permissionsMap = array_fill_keys($permissions, true);
+
+            // تأمين جلب الشركة لعدم حدوث خطأ 500 إذا كانت العلاقة فارغة
+            $companyData = null;
+            if (!$user->is_super_admin && method_exists($user, 'company') && $user->company) {
+                $companyData = $user->company->only(['id', 'name', 'slug', 'status']);
+            }
+
+            // إرجاع الرد بالهيكل الشامل الموحد الذي يحتاجه الـ Front-end (بما فيها السوكيت والداشبورد)
+            return response()->json([
+                'id' => $user->id,
+                'name' => $user->name,
+                'email' => $user->email,
+                'role' => $user->role,
+                'is_super_admin' => (bool) $user->is_super_admin,
+                'branch_id'  => $user->branch_id,
+                'company_id' => Tenant::id() ?? $user->company_id ?? null,
+                'company' => $companyData,
+                'can_switch_branch' => !$user->is_super_admin && $user->role === 'admin',
+                'permissions' => $permissions,
+                'permissions_map' => $permissionsMap,
+            ]);
+        } catch (\Exception $e) {
+            // منع السيرفر من الانهيار وإرجاع رسالة خطأ واضحة بدلاً من 500 صامتة
+            return response()->json([
+                'error' => 'Internal Server Error',
+                'message' => $e->getMessage()
+            ], 500);
+        }
     }
 
     /**
