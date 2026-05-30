@@ -35,6 +35,11 @@ class Handler extends ExceptionHandler
 
     public function render($request, Throwable $e)
     {
+        // 1️⃣ [إصلاح حاسم] امسك خطأ عدم المصادقة فوراً وأجبره على 401 قبل الـ 500 العامة
+        if ($e instanceof \Illuminate\Auth\AuthenticationException) {
+            return $this->unauthenticated($request, $e);
+        }
+
         // التعامل مع ValidationException
         if ($e instanceof \Illuminate\Validation\ValidationException) {
             return $this->invalidJson($request, $e);
@@ -47,7 +52,7 @@ class Handler extends ExceptionHandler
             ], 403);
         }
 
-        // استجابة عامة للـ API
+        // استجابة عامة للـ API (للأخطاء غير المتوقعة الأخرى)
         if ($request->expectsJson() || $request->is('api/*')) {
             $statusCode = 500;
             if (method_exists($e, 'getStatusCode')) {
@@ -70,9 +75,14 @@ class Handler extends ExceptionHandler
 
     protected function unauthenticated($request, AuthenticationException $exception)
     {
-        // 🎯 إجبار السيرفر على إرجاع ترميز 401 للمتصفح لمنع الـ 500
-        return $request->expectsJson() || $request->is('api/*')
-            ? response()->json(['message' => 'Unauthenticated.'], 401)
-            : redirect()->guest($exception->redirectTo($request) ?? route('login'));
+        // 🎯 إرجاع رد 401 نظيف وصريح يفهمه الفرونت إند فوراً بدون انهيار السيرفر
+        if ($request->expectsJson() || $request->is('api/*') || str_contains($request->url(), '/api/')) {
+            return response()->json([
+                'message' => 'Unauthenticated.',
+                'status' => 401
+            ], 401);
+        }
+
+        return redirect()->guest($exception->redirectTo($request) ?? route('login'));
     }
 }
