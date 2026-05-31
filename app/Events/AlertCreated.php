@@ -29,6 +29,11 @@ class AlertCreated implements ShouldBroadcast
      */
     public function broadcastOn()
     {
+        \Log::info('ALERT BROADCASTING', [
+            'company_id' => $this->alert->company_id,
+            'branch_id' => $this->alert->branch_id,
+        ]);
+
         $channels = [
             new PrivateChannel(
                 'company.' . $this->alert->company_id . '.alerts'
