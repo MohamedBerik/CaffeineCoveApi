@@ -29,13 +29,24 @@ class AlertCreated implements ShouldBroadcast
      */
     public function broadcastOn()
     {
-        $channel = 'company.' . $this->alert->company_id . '.alerts';
-        if ($this->alert->branch_id) {
-            $channel = 'company.' . $this->alert->company_id . '.branch.' . $this->alert->branch_id . '.alerts';
-        }
-        return new PrivateChannel($channel);
-    }
+        $channels = [
+            new PrivateChannel(
+                'company.' . $this->alert->company_id . '.alerts'
+            )
+        ];
 
+        if ($this->alert->branch_id) {
+            $channels[] = new PrivateChannel(
+                'company.' .
+                    $this->alert->company_id .
+                    '.branch.' .
+                    $this->alert->branch_id .
+                    '.alerts'
+            );
+        }
+
+        return $channels;
+    }
     /**
      * The event's broadcast name.
      * ✅ اسم موحد يسهل التعامل معه في الـ Frontend
