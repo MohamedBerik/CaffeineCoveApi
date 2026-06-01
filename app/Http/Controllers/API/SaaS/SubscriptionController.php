@@ -102,15 +102,38 @@ class SubscriptionController extends Controller
     {
         $subscription = Subscription::findOrFail($id);
 
+        // إغلاق أي اشتراكات نشطة قديمة لنفس الشركة
+        Subscription::where('company_id', $subscription->company_id)
+            ->where('status', 'active')
+            ->update([
+                'status' => 'expired',
+            ]);
+
         $newSubscription = $subscription->replicate();
+
         $newSubscription->starts_at = now();
-        $newSubscription->ends_at = now()->addMonth();
+
+        if ($subscription->billing_cycle === 'yearly') {
+            $newSubscription->ends_at = now()->addYear();
+        } else {
+            $newSubscription->ends_at = now()->addMonth();
+        }
+
         $newSubscription->status = 'active';
+
         $newSubscription->save();
+
+        // تحديث حالة الشركة
+        Company::where('id', $subscription->company_id)
+            ->update([
+                'status' => Company::STATUS_ACTIVE,
+                'trial_ends_at' => null,
+            ]);
 
         return response()->json([
             'msg' => 'Subscription renewed successfully',
             'status' => 200,
+            'data' => $newSubscription,
         ]);
     }
 }
