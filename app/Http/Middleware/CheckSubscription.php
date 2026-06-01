@@ -30,6 +30,7 @@ class CheckSubscription
         // ✅ Company Admin - فحص الاشتراك
         $subscription = Subscription::where('company_id', $companyId)
             ->where('status', 'active')
+            ->latest('id')
             ->first();
 
         // ✅ لو مفيش اشتراك نشط
