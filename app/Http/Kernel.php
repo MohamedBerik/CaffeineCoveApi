@@ -30,10 +30,10 @@ class Kernel extends HttpKernel
             \App\Http\Middleware\SanitizeInput::class,
             \App\Http\Middleware\SecurityHeaders::class,
             \App\Http\Middleware\ValidateFileUpload::class,
-            'throttle:api',
+            // 'throttle:api',
             \Illuminate\Routing\Middleware\SubstituteBindings::class,
-            \App\Http\Middleware\SetTenant::class,
-            \App\Http\Middleware\SetBranchContext::class,
+            // \App\Http\Middleware\SetTenant::class,
+            // \App\Http\Middleware\SetBranchContext::class,
         ],
     ];
 
