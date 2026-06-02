@@ -20,6 +20,10 @@ class AlertCreated implements ShouldBroadcast
      */
     public function __construct(SystemAlert $alert)
     {
+        \Log::info('ALERT EVENT CONSTRUCTED', [
+            'id' => $alert->id
+        ]);
+
         $this->alert = $alert;
     }
 
@@ -33,6 +37,7 @@ class AlertCreated implements ShouldBroadcast
             'company_id' => $this->alert->company_id,
             'branch_id' => $this->alert->branch_id,
         ]);
+        \Log::info('ALERT EVENT BROADCAST ON');
 
         $channels = [
             new PrivateChannel(
