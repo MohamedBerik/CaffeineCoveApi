@@ -150,15 +150,14 @@ class ReminderAlertService
 
         $alert = SystemAlert::create([
             'company_id' => $companyId,
-            'code' => $type,
-            'type' => $config['type'],
-            'priority' => $config['priority'],
-            'message' => $message,
-            'meta' => $meta,
+            'branch_id'  => Tenant::branchId(),
+            'code'       => $type,
+            'type'       => $config['type'],
+            'priority'   => $config['priority'],
+            'message'    => $message,
+            'meta'       => $meta,
             'triggered_at' => now(),
         ]);
-
-        event(new AlertCreated($alert->toArray()));
 
         Log::warning('[REMINDER ALERT]', [
             'company_id' => $companyId,

@@ -458,11 +458,3 @@ Route::middleware(['auth:sanctum'])->group(function () {
             ->get();
     });
 });
-
-Route::middleware('auth:sanctum')->get('/debug-auth', function (Request $request) {
-    return response()->json([
-        'user' => $request->user(),
-        'auth_check' => auth()->check(),
-        'auth_id' => auth()->id(),
-    ]);
-});
