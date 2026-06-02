@@ -2,7 +2,7 @@
 
 namespace App\Services;
 
-use App\Models\Product;
+use App\Models\Supply;
 use App\Models\StockMovement;
 use App\Services\Tenant;
 use Illuminate\Support\Facades\DB;
@@ -13,38 +13,38 @@ class InventoryService
      * Issue stock (decrease inventory)
      */
     public static function issue(
-        int $productId,
+        int $supplyId,
         int $qty,
         string $referenceType,
         int $referenceId,
         ?int $userId = null,
-        ?string $notes = null
+        ?string $notes = null  // سيتم تجاهله لعدم وجود عمود notes
     ): StockMovement {
         if ($qty <= 0) {
             throw new \InvalidArgumentException("Quantity must be > 0");
         }
 
-        return DB::transaction(function () use ($productId, $qty, $referenceType, $referenceId, $userId, $notes) {
+        return DB::transaction(function () use ($supplyId, $qty, $referenceType, $referenceId, $userId) {
             // ✅ الـ Scope هيضيف company_id تلقائيًا
-            $product = Product::lockForUpdate()->findOrFail($productId);
+            $supply = Supply::lockForUpdate()->findOrFail($supplyId);
 
-            $onHand = (int) $product->stock_quantity;
+            $onHand = (int) $supply->stock_quantity;
 
             if ($onHand < $qty) {
-                throw new \Exception("Insufficient stock for product {$product->title_en}. Available: {$onHand}, Requested: {$qty}");
+                throw new \Exception("Insufficient stock for supply {$supply->name}. Available: {$onHand}, Requested: {$qty}");
             }
 
-            $product->decrement('stock_quantity', $qty);
+            $supply->decrement('stock_quantity', $qty);
 
             return StockMovement::create([
-                'company_id'     => $product->company_id,
-                'product_id'     => $product->id,
+                'company_id'     => $supply->company_id,
+                'branch_id'      => Tenant::branchId(),
+                'supply_id'      => $supply->id,
                 'type'           => StockMovement::TYPE_OUT,
                 'quantity'       => $qty,
                 'reference_type' => $referenceType,
                 'reference_id'   => $referenceId,
                 'created_by'     => $userId,
-                'notes'          => $notes,
             ]);
         });
     }
@@ -53,104 +53,105 @@ class InventoryService
      * Receive stock (increase inventory)
      */
     public static function receive(
-        int $productId,
+        int $supplyId,
         int $qty,
         string $referenceType,
         int $referenceId,
         ?int $userId = null,
-        ?string $notes = null
+        ?string $notes = null  // سيتم تجاهله
     ): StockMovement {
         if ($qty <= 0) {
             throw new \InvalidArgumentException("Quantity must be > 0");
         }
 
-        return DB::transaction(function () use ($productId, $qty, $referenceType, $referenceId, $userId, $notes) {
-            // ✅ الـ Scope هيضيف company_id تلقائيًا
-            $product = Product::lockForUpdate()->findOrFail($productId);
+        return DB::transaction(function () use ($supplyId, $qty, $referenceType, $referenceId, $userId) {
+            $supply = Supply::lockForUpdate()->findOrFail($supplyId);
 
-            $product->increment('stock_quantity', $qty);
+            $supply->increment('stock_quantity', $qty);
 
             return StockMovement::create([
-                'company_id'     => $product->company_id,
-                'product_id'     => $product->id,
+                'company_id'     => $supply->company_id,
+                'branch_id'      => Tenant::branchId(),
+                'supply_id'      => $supply->id,
                 'type'           => StockMovement::TYPE_IN,
                 'quantity'       => $qty,
                 'reference_type' => $referenceType,
                 'reference_id'   => $referenceId,
                 'created_by'     => $userId,
-                'notes'          => $notes,
             ]);
         });
     }
 
     /**
-     * Transfer stock between products
+     * Transfer stock between supplies
      */
     public static function transfer(
-        int $fromProductId,
-        int $toProductId,
+        int $fromSupplyId,
+        int $toSupplyId,
         int $qty,
         ?int $userId = null,
-        ?string $notes = null
+        ?string $notes = null  // سيتم تجاهله
     ): array {
         if ($qty <= 0) {
             throw new \InvalidArgumentException("Quantity must be > 0");
         }
 
-        if ($fromProductId === $toProductId) {
-            throw new \InvalidArgumentException("Source and destination products cannot be the same");
+        if ($fromSupplyId === $toSupplyId) {
+            throw new \InvalidArgumentException("Source and destination supplies cannot be the same");
         }
 
-        return DB::transaction(function () use ($fromProductId, $toProductId, $qty, $userId, $notes) {
-            $fromProduct = Product::lockForUpdate()->findOrFail($fromProductId);
-            $toProduct = Product::lockForUpdate()->findOrFail($toProductId);
+        return DB::transaction(function () use ($fromSupplyId, $toSupplyId, $qty, $userId) {
+            $fromSupply = Supply::lockForUpdate()->findOrFail($fromSupplyId);
+            $toSupply = Supply::lockForUpdate()->findOrFail($toSupplyId);
 
             // ✅ التحقق من نفس الشركة
-            if ($fromProduct->company_id !== $toProduct->company_id) {
+            if ($fromSupply->company_id !== $toSupply->company_id) {
                 throw new \Exception("Cannot transfer stock between different companies");
             }
 
-            $onHand = (int) $fromProduct->stock_quantity;
+            $onHand = (int) $fromSupply->stock_quantity;
 
             if ($onHand < $qty) {
-                throw new \Exception("Insufficient stock for product {$fromProduct->title_en}");
+                throw new \Exception("Insufficient stock for supply {$fromSupply->name}");
             }
 
-            $fromProduct->decrement('stock_quantity', $qty);
-            $toProduct->increment('stock_quantity', $qty);
+            $fromSupply->decrement('stock_quantity', $qty);
+            $toSupply->increment('stock_quantity', $qty);
+
+            $branchId = Tenant::branchId();
 
             $outMovement = StockMovement::create([
-                'company_id'     => $fromProduct->company_id,
-                'product_id'     => $fromProduct->id,
+                'company_id'     => $fromSupply->company_id,
+                'branch_id'      => $branchId,
+                'supply_id'      => $fromSupply->id,
                 'type'           => StockMovement::TYPE_OUT,
                 'quantity'       => $qty,
                 'reference_type' => 'transfer',
-                'reference_id'   => $toProduct->id,
+                'reference_id'   => $toSupply->id,
                 'created_by'     => $userId,
-                'notes'          => $notes ?: "Transferred to {$toProduct->title_en}",
             ]);
 
             $inMovement = StockMovement::create([
-                'company_id'     => $toProduct->company_id,
-                'product_id'     => $toProduct->id,
+                'company_id'     => $toSupply->company_id,
+                'branch_id'      => $branchId,
+                'supply_id'      => $toSupply->id,
                 'type'           => StockMovement::TYPE_IN,
                 'quantity'       => $qty,
                 'reference_type' => 'transfer',
-                'reference_id'   => $fromProduct->id,
+                'reference_id'   => $fromSupply->id,
                 'created_by'     => $userId,
-                'notes'          => $notes ?: "Transferred from {$fromProduct->title_en}",
             ]);
 
             // ✅ تسجيل النشاط
             ActivityLogger::log(
-                $fromProduct->company_id,
+                $fromSupply->company_id,
                 $userId ? \App\Models\User::find($userId) : null,
                 'inventory.transfer',
-                Product::class,
-                $fromProduct->id,
+                Supply::class,
+                $fromSupply->id,
                 [
-                    'from_product' => $fromProduct->title_en,
-                    'to_product' => $toProduct->title_en,
+                    'from_supply' => $fromSupply->name,
+                    'to_supply' => $toSupply->name,
                     'quantity' => $qty,
                 ]
             );
@@ -166,7 +167,7 @@ class InventoryService
      * Adjust stock (positive or negative)
      */
     public static function adjust(
-        int $productId,
+        int $supplyId,
         int $adjustment,
         string $reason,
         ?int $userId = null
@@ -175,38 +176,38 @@ class InventoryService
             throw new \InvalidArgumentException("Adjustment cannot be zero");
         }
 
-        return DB::transaction(function () use ($productId, $adjustment, $reason, $userId) {
-            $product = Product::lockForUpdate()->findOrFail($productId);
+        return DB::transaction(function () use ($supplyId, $adjustment, $reason, $userId) {
+            $supply = Supply::lockForUpdate()->findOrFail($supplyId);
 
-            $newStock = $product->stock_quantity + $adjustment;
+            $newStock = $supply->stock_quantity + $adjustment;
 
             if ($newStock < 0) {
                 throw new \Exception("Adjustment would result in negative stock");
             }
 
-            $product->stock_quantity = $newStock;
-            $product->save();
+            $supply->stock_quantity = $newStock;
+            $supply->save();
 
             $type = $adjustment > 0 ? StockMovement::TYPE_IN : StockMovement::TYPE_OUT;
             $quantity = abs($adjustment);
 
             $movement = StockMovement::create([
-                'company_id'     => $product->company_id,
-                'product_id'     => $product->id,
+                'company_id'     => $supply->company_id,
+                'branch_id'      => Tenant::branchId(),
+                'supply_id'      => $supply->id,
                 'type'           => $type,
                 'quantity'       => $quantity,
                 'reference_type' => 'adjustment',
-                'reference_id'   => $product->id,
+                'reference_id'   => $supply->id,
                 'created_by'     => $userId,
-                'notes'          => "Adjustment: {$reason}",
             ]);
 
             ActivityLogger::log(
-                $product->company_id,
+                $supply->company_id,
                 $userId ? \App\Models\User::find($userId) : null,
                 'inventory.adjust',
-                Product::class,
-                $product->id,
+                Supply::class,
+                $supply->id,
                 [
                     'adjustment' => $adjustment,
                     'reason' => $reason,
@@ -219,27 +220,27 @@ class InventoryService
     }
 
     /**
-     * Get current stock for a product
+     * Get current stock for a supply
      */
-    public static function getStock(int $productId): int
+    public static function getStock(int $supplyId): int
     {
-        $product = Product::query()->findOrFail($productId);
-        return (int) $product->stock_quantity;
+        $supply = Supply::query()->findOrFail($supplyId);
+        return (int) $supply->stock_quantity;
     }
 
     /**
-     * Get stock movements for a product
+     * Get stock movements for a supply
      */
-    public static function getMovements(int $productId, ?int $limit = 50): array
+    public static function getMovements(int $supplyId, ?int $limit = 50): array
     {
         $movements = StockMovement::query()
-            ->where('product_id', $productId)
+            ->where('supply_id', $supplyId)
             ->orderByDesc('created_at')
             ->limit($limit)
             ->get();
 
         return [
-            'product_id' => $productId,
+            'supply_id' => $supplyId,
             'movements' => $movements,
             'total_in' => $movements->where('type', StockMovement::TYPE_IN)->sum('quantity'),
             'total_out' => $movements->where('type', StockMovement::TYPE_OUT)->sum('quantity'),
@@ -247,9 +248,9 @@ class InventoryService
     }
 
     /**
-     * Get low stock products
+     * Get low stock supplies
      */
-    public static function getLowStockProducts(?int $threshold = 10): array
+    public static function getLowStockSupplies(?int $threshold = 10): array
     {
         $companyId = Tenant::id();
 
@@ -257,24 +258,24 @@ class InventoryService
             return [];
         }
 
-        return Product::query()
+        return Supply::query()
             ->where('stock_quantity', '<=', $threshold)
             ->where('stock_quantity', '>', 0)
             ->orderBy('stock_quantity', 'asc')
             ->get()
-            ->map(fn($p) => [
-                'id' => $p->id,
-                'name' => $p->title_en,
-                'current_stock' => $p->stock_quantity,
+            ->map(fn($s) => [
+                'id' => $s->id,
+                'name' => $s->name,
+                'current_stock' => $s->stock_quantity,
                 'threshold' => $threshold,
             ])
             ->toArray();
     }
 
     /**
-     * Get out of stock products
+     * Get out of stock supplies
      */
-    public static function getOutOfStockProducts(): array
+    public static function getOutOfStockSupplies(): array
     {
         $companyId = Tenant::id();
 
@@ -282,13 +283,13 @@ class InventoryService
             return [];
         }
 
-        return Product::query()
+        return Supply::query()
             ->where('stock_quantity', '<=', 0)
-            ->orderBy('title_en', 'asc')
+            ->orderBy('name', 'asc')
             ->get()
-            ->map(fn($p) => [
-                'id' => $p->id,
-                'name' => $p->title_en,
+            ->map(fn($s) => [
+                'id' => $s->id,
+                'name' => $s->name,
                 'current_stock' => 0,
             ])
             ->toArray();
