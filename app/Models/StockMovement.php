@@ -17,13 +17,13 @@ class StockMovement extends Model
     protected $fillable = [
         'company_id',
         'branch_id',
-        'supply_id',              // ✅ الحقل موجود
+        'supply_id',
         'type',
         'quantity',
         'reference_type',
         'reference_id',
         'created_by',
-        'notes',
+        // 'notes',
     ];
 
     protected $casts = [
