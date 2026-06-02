@@ -33,29 +33,13 @@ class AlertCreated implements ShouldBroadcastNow
      */
     public function broadcastOn()
     {
-        \Log::info('ALERT BROADCASTING', [
-            'company_id' => $this->alert->company_id,
-            'branch_id' => $this->alert->branch_id,
-        ]);
-        \Log::info('ALERT EVENT BROADCAST ON');
+        dd('broadcastOn reached');
 
-        $channels = [
+        return [
             new PrivateChannel(
                 'company.' . $this->alert->company_id . '.alerts'
             )
         ];
-
-        if ($this->alert->branch_id) {
-            $channels[] = new PrivateChannel(
-                'company.' .
-                    $this->alert->company_id .
-                    '.branch.' .
-                    $this->alert->branch_id .
-                    '.alerts'
-            );
-        }
-
-        return $channels;
     }
     /**
      * The event's broadcast name.
