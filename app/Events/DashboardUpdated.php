@@ -53,6 +53,7 @@ class DashboardUpdated implements ShouldBroadcast
         return [
             'type' => $this->type,
             'data' => $this->data,
+            'branch_id' => $this->data['branch_id'] ?? null,
             'timestamp' => now()->toISOString(),
         ];
     }
