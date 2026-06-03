@@ -119,6 +119,7 @@ class DashboardObserver
     protected function logActivity($model, string $action): void
     {
         $companyId = $model->company_id ?? Tenant::id();
+        $branchId = $model->branch_id ?? null; // ✅ اجلب branch_id من النموذج
 
         if (!$companyId) {
             return;
@@ -139,6 +140,7 @@ class DashboardObserver
         try {
             \App\Models\ActivityLog::create([
                 'company_id' => $companyId,
+                'branch_id'  => $branchId, // ✅ أضفناه
                 'user_id' => auth()->id(),
                 'action' => "dashboard.{$action}",
                 'subject_type' => get_class($model),
@@ -146,6 +148,7 @@ class DashboardObserver
                 'properties' => [
                     'model' => class_basename($model),
                     'changes' => $action === 'updated' ? $model->getChanges() : null,
+                    'branch_id' => $branchId, // ✅ أضفناه للخصائص
                 ],
             ]);
         } catch (\Exception $e) {
