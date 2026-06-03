@@ -33,7 +33,7 @@ class AlertCreated implements ShouldBroadcastNow
      */
     public function broadcastOn()
     {
-        dd('broadcastOn reached');
+        \Log::info('AlertCreated::broadcastOn');
 
         return [
             new PrivateChannel(
@@ -56,15 +56,12 @@ class AlertCreated implements ShouldBroadcastNow
      */
     public function broadcastWith(): array
     {
+        \Log::info('AlertCreated::broadcastWith');
+
         return [
             'id'       => $this->alert->id,
-            'code'     => $this->alert->code,
-            'type'     => $this->alert->type,
-            'priority' => $this->alert->priority,
             'message'  => $this->alert->message,
-            'meta'     => $this->alert->meta, // ✅ إضافة meta لو فيه بيانات إضافية
-            'time'     => $this->alert->triggered_at->toISOString(),
-            'read'     => !is_null($this->alert->acknowledged_at),
+            'priority' => $this->alert->priority,
         ];
     }
 
