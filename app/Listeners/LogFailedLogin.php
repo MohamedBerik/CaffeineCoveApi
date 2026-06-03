@@ -13,14 +13,15 @@ class LogFailedLogin
         try {
             ActivityLog::create([
                 'company_id' => null,
-                'user_id' => null,
-                'action' => 'auth.failed_login',
+                'branch_id'  => null, // ✅ متوافق مع هيكل قاعدة البيانات الجديد، يمكن ملؤه إذا توفر في الحدث لاحقاً
+                'user_id'    => null,
+                'action'     => 'auth.failed_login',
                 'subject_type' => 'User',
-                'subject_id' => null,
+                'subject_id'   => null,
                 'properties' => [
-                    'email' => $event->email,
-                    'ip' => $event->ip,
-                    'reason' => $event->reason,
+                    'email'       => $event->email,
+                    'ip'          => $event->ip,
+                    'reason'      => $event->reason,
                     'attempted_at' => now(),
                 ],
             ]);
@@ -30,7 +31,7 @@ class LogFailedLogin
 
         Log::warning('Failed login attempt', [
             'email' => $event->email,
-            'ip' => $event->ip,
+            'ip'    => $event->ip,
             'reason' => $event->reason,
         ]);
     }

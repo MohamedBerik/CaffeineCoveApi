@@ -8,13 +8,13 @@ use App\Events\AdminOverride;
 use App\Models\ActivityLog;
 use Illuminate\Support\Facades\Log;
 
-
 class LogSuspiciousActivity
 {
     public function handle(SuspiciousActivity $event)
     {
         ActivityLog::create([
             'company_id' => null,
+            'branch_id'  => null, // ✅ متوافق مع الجدول الجديد
             'user_id' => $event->userId,
             'action' => 'suspicious.' . $event->action,
             'subject_type' => 'System',
@@ -38,6 +38,7 @@ class LogAdminOverride
     {
         ActivityLog::create([
             'company_id' => null,
+            'branch_id'  => null, // ✅ متوافق مع الجدول الجديد
             'user_id' => $event->adminId,
             'action' => 'admin.override.' . $event->action,
             'subject_type' => 'System',
