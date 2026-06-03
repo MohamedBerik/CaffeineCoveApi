@@ -26,8 +26,9 @@ class ActivityLogObserver
 
         ActivityLog::create([
             'company_id' => $model->company_id ?? Tenant::id(),
+            'branch_id' => $this->getBranchId($model), // ✅ إضافة branch_id
             'user_id' => auth()->id(),
-            'action' => strtolower(class_basename($model)) . '.created', // ✅ product.created
+            'action' => strtolower(class_basename($model)) . '.created',
             'subject_type' => get_class($model),
             'subject_id' => $model->id,
             'properties' => [
@@ -43,19 +44,18 @@ class ActivityLogObserver
             return;
         }
 
-        // ✅ احصل على التغييرات بدون updated_at
         $changes = $model->getChanges();
         unset($changes['updated_at']);
 
-        // ✅ لو مفيش تغييرات حقيقية، متسجلش
         if (empty($changes)) {
             return;
         }
 
         ActivityLog::create([
             'company_id' => $model->company_id ?? Tenant::id(),
+            'branch_id' => $this->getBranchId($model), // ✅ إضافة branch_id
             'user_id' => auth()->id(),
-            'action' => strtolower(class_basename($model)) . '.updated', // ✅ product.updated
+            'action' => strtolower(class_basename($model)) . '.updated',
             'subject_type' => get_class($model),
             'subject_id' => $model->id,
             'properties' => [
@@ -75,8 +75,9 @@ class ActivityLogObserver
 
         ActivityLog::create([
             'company_id' => $model->company_id ?? Tenant::id(),
+            'branch_id' => $this->getBranchId($model), // ✅ إضافة branch_id
             'user_id' => auth()->id(),
-            'action' => strtolower(class_basename($model)) . '.deleted', // ✅ product.deleted
+            'action' => strtolower(class_basename($model)) . '.deleted',
             'subject_type' => get_class($model),
             'subject_id' => $model->id,
             'properties' => [
@@ -84,6 +85,21 @@ class ActivityLogObserver
                 'meta' => $this->getRequestMeta(),
             ],
         ]);
+    }
+
+    /**
+     * ✅ Get branch_id from model if available
+     */
+    private function getBranchId(Model $model): ?int
+    {
+        try {
+            if (Schema::hasColumn($model->getTable(), 'branch_id')) {
+                return $model->branch_id;
+            }
+        } catch (\Throwable $e) {
+            // Fail silently
+        }
+        return null;
     }
 
     /**
@@ -98,22 +114,18 @@ class ActivityLogObserver
             'url' => $request->fullUrl(),
             'method' => $request->method(),
             'user_agent' => $request->userAgent(),
+            'branch_id' => $request->header('X-Branch-Id') ?? null, // ✅ تسجيل branch_id من الطلب
         ];
     }
-    /**
-     * ✅ فلترة الموديلات
-     */
+
     private function shouldIgnore(Model $model): bool
     {
         return
-            $model instanceof \App\Models\ActivityLog // منع loop
+            $model instanceof \App\Models\ActivityLog
             || $this->isSystemTable($model)
             || !$this->hasCompanyColumn($model);
     }
 
-    /**
-     * ❌ تجاهل جداول السيستم
-     */
     private function isSystemTable(Model $model): bool
     {
         return in_array($model->getTable(), [
@@ -124,9 +136,6 @@ class ActivityLogObserver
         ]);
     }
 
-    /**
-     * ✅ التأكد إن فيه company_id
-     */
     private function hasCompanyColumn(Model $model): bool
     {
         try {
