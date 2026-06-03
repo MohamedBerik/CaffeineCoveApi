@@ -50,33 +50,16 @@ trait HandlesAppointmentFollowUps
      */
     protected function validateFollowUpCanBeSent(Appointment $appointment): bool
     {
-        // ✅ Must be completed
-        if ($appointment->status !== 'completed') {
-            return false;
-        }
+        if ($appointment->status !== 'completed') return false;
+        if (!$appointment->patient || !$appointment->patient->phone) return false;
+        if (in_array($appointment->follow_up_state, ['sent', 'stopped', 'skipped'])) return false;
+        if (!$this->canSendFollowUp()) return false;
 
-        // ✅ Must have patient with phone
-        if (!$appointment->patient || !$appointment->patient->phone) {
-            return false;
-        }
-
-        // ✅ Cannot send if already sent or stopped
-        if (in_array($appointment->follow_up_state, ['sent', 'stopped', 'skipped'])) {
-            return false;
-        }
-
-        // ✅ Check if company can send WhatsApp
-        if (!$this->canSendFollowUp()) {
-            return false;
-        }
-
-        // ✅ Pending → check follow_up_at
         if ($appointment->follow_up_state === 'pending') {
             return !empty($appointment->follow_up_at)
                 && Carbon::parse($appointment->follow_up_at)->lte(now());
         }
 
-        // ✅ Retrying → check next_retry_at
         if ($appointment->follow_up_state === 'retrying') {
             return !empty($appointment->follow_up_next_retry_at)
                 && Carbon::parse($appointment->follow_up_next_retry_at)->lte(now());
@@ -91,18 +74,11 @@ trait HandlesAppointmentFollowUps
     protected function canSendFollowUp(): bool
     {
         $companyId = Tenant::id();
-
-        if (!$companyId) {
-            return false;
-        }
+        if (!$companyId) return false;
 
         $company = Tenant::company();
+        if (!$company) return false;
 
-        if (!$company) {
-            return false;
-        }
-
-        // ✅ Only active companies can send follow-ups
         return $company->status === 'active';
     }
 
@@ -125,9 +101,9 @@ trait HandlesAppointmentFollowUps
     protected function markFollowUpRetrying(int $retryCount): array
     {
         $delayMinutes = match ($retryCount) {
-            1 => 5,   // First retry: 5 minutes
-            2 => 15,  // Second retry: 15 minutes
-            default => 30, // Third+ retry: 30 minutes
+            1 => 5,
+            2 => 15,
+            default => 30,
         };
 
         return [
@@ -191,26 +167,27 @@ trait HandlesAppointmentFollowUps
     }
 
     /**
-     * Log follow-up activity
+     * Log follow-up activity (مع إضافة branch_id)
      */
     protected function logFollowUpActivity(Appointment $appointment, string $action, array $meta = []): void
     {
         $companyId = $appointment->company_id ?? Tenant::id();
+        $branchId = $appointment->branch_id ?? null; // ✅ جلب branch_id من الموعد
 
-        if (!$companyId) {
-            return;
-        }
+        if (!$companyId) return;
 
         try {
             \App\Models\ActivityLog::create([
                 'company_id' => $companyId,
-                'user_id' => auth()->id(),
-                'action' => "follow_up.{$action}",
+                'branch_id'  => $branchId, // ✅ تسجيل الفرع
+                'user_id'    => auth()->id(),
+                'action'     => "follow_up.{$action}",
                 'subject_type' => Appointment::class,
-                'subject_id' => $appointment->id,
-                'properties' => array_merge([
-                    'patient_id' => $appointment->patient_id,
-                    'follow_up_state' => $appointment->follow_up_state,
+                'subject_id'   => $appointment->id,
+                'properties'   => array_merge([
+                    'patient_id'        => $appointment->patient_id,
+                    'follow_up_state'   => $appointment->follow_up_state,
+                    'branch_id'         => $branchId, // ✅ إضافته للخصائص
                 ], $meta),
             ]);
         } catch (\Exception $e) {

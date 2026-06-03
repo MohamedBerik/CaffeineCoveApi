@@ -283,6 +283,7 @@ trait HandlesAppointmentReminders
     protected function logReminderActivity(Appointment $appointment, string $action, array $meta = []): void
     {
         $companyId = $appointment->company_id ?? Tenant::id();
+        $branchId = $appointment->branch_id ?? null; // ✅ إضافة branch_id
 
         if (!$companyId) {
             return;
@@ -291,6 +292,7 @@ trait HandlesAppointmentReminders
         try {
             \App\Models\ActivityLog::create([
                 'company_id' => $companyId,
+                'branch_id'  => $branchId, // ✅ إضافة branch_id للسجل
                 'user_id' => auth()->id(),
                 'action' => "reminder.{$action}",
                 'subject_type' => Appointment::class,
@@ -300,6 +302,7 @@ trait HandlesAppointmentReminders
                     'doctor_id' => $appointment->doctor_id,
                     'reminder_stage' => $appointment->reminder_stage,
                     'reminder_status' => $appointment->reminder_status,
+                    'branch_id'        => $branchId, // ✅ إضافته للخصائص
                 ], $meta),
             ]);
         } catch (\Exception $e) {

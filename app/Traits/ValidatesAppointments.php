@@ -12,7 +12,7 @@ trait ValidatesAppointments
     /**
      * Validate appointment date and time against doctor's schedule
      */
-    protected function validateAppointmentDateTime($doctor, string $date, string $time): void
+    protected function validateAppointmentDateTime($doctor, string $date, string $time, ?int $branchId = null): void
     {
         // ✅ Ensure doctor is active
         if (!$doctor->is_active) {
@@ -21,8 +21,8 @@ trait ValidatesAppointments
             ]);
         }
 
-        // ✅ Ensure doctor belongs to current company
-        $this->validateDoctorCompany($doctor);
+        // ✅ Ensure doctor belongs to current company AND branch (if branch context)
+        $this->validateDoctorCompanyAndBranch($doctor, $branchId);
 
         $requested = Carbon::parse("$date $time")->startOfMinute();
         $now = now()->startOfMinute();
@@ -82,9 +82,9 @@ trait ValidatesAppointments
     }
 
     /**
-     * Validate that doctor belongs to current company
+     * Validate that doctor belongs to current company AND branch
      */
-    protected function validateDoctorCompany(Doctor $doctor): void
+    protected function validateDoctorCompanyAndBranch(Doctor $doctor, ?int $branchId = null): void
     {
         $companyId = Tenant::id();
 
@@ -97,6 +97,13 @@ trait ValidatesAppointments
         if ($doctor->company_id !== $companyId) {
             throw ValidationException::withMessages([
                 'doctor_id' => ['Doctor does not belong to your company'],
+            ]);
+        }
+
+        // ✅ إذا كان هناك سياق فرع محدد (branchId)، تأكد من أن الطبيب يتبع هذا الفرع
+        if ($branchId && $doctor->branch_id && (int) $doctor->branch_id !== (int) $branchId) {
+            throw ValidationException::withMessages([
+                'doctor_id' => ['Doctor does not belong to the selected branch'],
             ]);
         }
     }
@@ -188,9 +195,9 @@ trait ValidatesAppointments
     }
 
     /**
-     * Get available slots for a doctor on a specific date
+     * Get available slots for a doctor on a specific date (branch-scoped)
      */
-    protected function getAvailableSlots(Doctor $doctor, string $date): array
+    protected function getAvailableSlots(Doctor $doctor, string $date, ?int $branchId = null): array
     {
         $workStart = $doctor->work_start ?? '09:00';
         $workEnd = $doctor->work_end ?? '21:00';
@@ -199,10 +206,17 @@ trait ValidatesAppointments
         $start = Carbon::parse("$date $workStart");
         $end = Carbon::parse("$date $workEnd");
 
-        $bookedSlots = \App\Models\Appointment::query()
+        // ✅ فلترة المواعيد المحجوزة حسب الفرع
+        $bookedQuery = \App\Models\Appointment::query()
             ->where('doctor_id', $doctor->id)
             ->whereDate('appointment_date', $date)
-            ->whereIn('status', ['scheduled', 'confirmed'])
+            ->whereIn('status', ['scheduled', 'confirmed']);
+
+        if ($branchId) {
+            $bookedQuery->where('branch_id', $branchId);
+        }
+
+        $bookedSlots = $bookedQuery
             ->pluck('appointment_time')
             ->map(fn($time) => Carbon::parse($time)->format('H:i'))
             ->toArray();
