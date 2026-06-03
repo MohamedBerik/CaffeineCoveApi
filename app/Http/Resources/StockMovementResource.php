@@ -12,7 +12,8 @@ class StockMovementResource extends JsonResource
             // Basic Info
             'id' => $this->id,
             'company_id' => $this->company_id,
-            'product_id' => $this->product_id,
+            'branch_id' => $this->branch_id,
+            'supply_id' => $this->supply_id,
 
             // Movement Details
             'type' => $this->type,
@@ -39,14 +40,14 @@ class StockMovementResource extends JsonResource
             'updated_at' => $this->updated_at ? $this->updated_at->toIso8601String() : null,
 
             // Relationships (when loaded)
-            'product' => $this->whenLoaded('product', function () {
+            'supply' => $this->whenLoaded('supply', function () {
                 return [
-                    'id' => $this->product->id,
-                    'title' => $this->product->title_en,
-                    'title_ar' => $this->product->title_ar,
-                    'current_stock' => $this->product->stock_quantity,
-                    'image_url' => $this->product->product_image
-                        ? asset('img/product/' . $this->product->product_image)
+                    'id' => $this->supply->id,
+                    'title' => $this->supply->title_en,
+                    'title_ar' => $this->supply->title_ar,
+                    'current_stock' => $this->supply->stock_quantity,
+                    'image_url' => $this->supply->supply_image
+                        ? asset('img/supply/' . $this->supply->supply_image)
                         : null,
                 ];
             }),

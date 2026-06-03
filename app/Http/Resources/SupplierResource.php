@@ -31,6 +31,7 @@ class SupplierResource extends JsonResource
             // Basic Info
             'id' => $this->id,
             'company_id' => $this->company_id,
+            'branch_id'  => $this->branch_id, // ✅ أضفه إن وجد في الجدول
             'name' => $this->name,
             'email' => $this->email,
             'phone' => $this->phone,

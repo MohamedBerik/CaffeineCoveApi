@@ -12,6 +12,7 @@ class PurchaseOrderResource extends JsonResource
             // Basic Info
             'id' => $this->id,
             'company_id' => $this->company_id,
+            'branch_id'  => $this->branch_id,
             'supplier_id' => $this->supplier_id,
             'number' => $this->number,
 

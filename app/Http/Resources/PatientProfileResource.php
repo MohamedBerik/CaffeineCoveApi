@@ -15,9 +15,11 @@ class PatientProfileResource extends JsonResource
         $ledger = $financial['ledger'] ?? [];
 
         return [
-            // --- بيانات المريض (كما هي) ---
+            // --- بيانات المريض (مع إضافة branch_id) ---
             'patient' => [
                 'id'            => $this['patient']->id,
+                'company_id'    => $this['patient']->company_id,
+                'branch_id'     => $this['patient']->branch_id, // ✅ تمت الإضافة
                 'name'          => $this['patient']->name,
                 'email'         => $this['patient']->email,
                 'phone'         => $this['patient']->phone,
@@ -38,7 +40,7 @@ class PatientProfileResource extends JsonResource
             'treatment_plans' => $this['treatment_plans'],
             'invoices'        => $this['invoices'],
 
-            // --- المقاييس المالية مُستخرَجة بشكل مسطح (متوافقة مع الواجهة القديمة) ---
+            // --- المقاييس المالية (كما هي) ---
             'customer_credit_balance'  => (float) ($creditBalance['net_credit'] ?? 0),
             'invoices_total'           => (float) ($invoicesSummary['total'] ?? 0),
             'invoices_direct_paid'     => (float) ($invoicesSummary['direct_paid'] ?? 0),
@@ -46,7 +48,7 @@ class PatientProfileResource extends JsonResource
             'invoices_paid'            => (float) ($invoicesSummary['paid'] ?? 0),
             'invoices_remaining'       => (float) ($invoicesSummary['remaining'] ?? 0),
 
-            // --- أرصدة وتفاصيل إضافية (متوافقة أيضًا) ---
+            // --- أرصدة وتفاصيل إضافية ---
             'credit_balance' => [
                 'credit_issued' => (float) ($creditBalance['credit_issued'] ?? 0),
                 'credit_used'   => (float) ($creditBalance['credit_used'] ?? 0),

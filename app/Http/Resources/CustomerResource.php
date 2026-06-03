@@ -12,6 +12,7 @@ class CustomerResource extends JsonResource
             // Basic Info
             'id' => $this->id,
             'company_id' => $this->company_id,
+            'branch_id'  => $this->branch_id,
             'patient_code' => $this->patient_code,
 
             // Personal Info

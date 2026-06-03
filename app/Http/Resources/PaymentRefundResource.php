@@ -11,6 +11,7 @@ class PaymentRefundResource extends JsonResource
         return [
             'id' => $this->id,
             'company_id' => $this->company_id,
+            'branch_id'  => $this->branch_id,
             'payment_id' => $this->payment_id,
 
             'amount' => (float) $this->amount,

@@ -12,6 +12,7 @@ class SupplierPaymentResource extends JsonResource
             // Basic Info
             'id' => $this->id,
             'company_id' => $this->company_id,
+            'branch_id'  => $this->branch_id, // ✅ أضفناه لدعم الفروع
             'supplier_id' => $this->supplier_id,
             'purchase_order_id' => $this->purchase_order_id,
 
