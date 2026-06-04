@@ -57,20 +57,20 @@ Broadcast::channel('company.{companyId}.dashboard', function ($user, $companyId)
 // });
 
 // ✅ قناة خاصة للـ Insights
-Broadcast::channel('company.{companyId}.insights', function ($user, $companyId) {
-    if ($user->is_super_admin) {
-        return true;
-    }
-    return (int) $user->company_id === (int) $companyId;
-});
+// Broadcast::channel('company.{companyId}.insights', function ($user, $companyId) {
+//     if ($user->is_super_admin) {
+//         return true;
+//     }
+//     return (int) $user->company_id === (int) $companyId;
+// });
 
 // ✅ قناة خاصة للإشعارات (Notifications)
-Broadcast::channel('company.{companyId}.notifications', function ($user, $companyId) {
-    if ($user->is_super_admin) {
-        return true;
-    }
-    return (int) $user->company_id === (int) $companyId;
-});
+// Broadcast::channel('company.{companyId}.notifications', function ($user, $companyId) {
+//     if ($user->is_super_admin) {
+//         return true;
+//     }
+//     return (int) $user->company_id === (int) $companyId;
+// });
 
 // ✅ قناة خاصة للمواعيد (للمرضى)
 Broadcast::channel('appointments.{patientId}', function ($user, $patientId) {
