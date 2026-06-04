@@ -23,40 +23,38 @@ Broadcast::channel('company.{companyId}.dashboard', function ($user, $companyId)
 
 
 // 🚀 [الجديدة] قناة خاصة لتنبيهات الفروع المحددة (تم إضافتها لحل خطأ الـ 500 للفرع)
-Broadcast::channel('company.{companyId}.branch.{branchId}.alerts', function ($user, $companyId, $branchId) {
-    if ($user->is_super_admin) {
-        return true;
-    }
+// Broadcast::channel('company.{companyId}.branch.{branchId}.alerts', function ($user, $companyId, $branchId) {
+//     if ($user->is_super_admin) {
+//         return true;
+//     }
 
-    // التأكد من تطابق الشركة أولاً
-    if ((int) $user->company_id !== (int) $companyId) {
-        return false;
-    }
+//     // التأكد من تطابق الشركة أولاً
+//     if ((int) $user->company_id !== (int) $companyId) {
+//         return false;
+//     }
 
-    // الأدمن يملك صلاحية دخول كل فروع شركته
-    if ($user->role === 'admin') {
-        return true;
-    }
+//     // الأدمن يملك صلاحية دخول كل فروع شركته
+//     if ($user->role === 'admin') {
+//         return true;
+//     }
 
-    // الموظف العادي: يجب أن يتطابق فرعه الحالي مع فرع القناة
-    return !is_null($user->branch_id) && (int) $user->branch_id === (int) $branchId;
-});
-
+//     // الموظف العادي: يجب أن يتطابق فرعه الحالي مع فرع القناة
+//     return !is_null($user->branch_id) && (int) $user->branch_id === (int) $branchId;
+// });
 
 // ✅ قناة خاصة للتنبيهات العامة للشركة (عند اختيار All Branches)
-Broadcast::channel('company.{companyId}.alerts', function ($user, $companyId) {
-    if ($user->is_super_admin) {
-        return true;
-    }
+// Broadcast::channel('company.{companyId}.alerts', function ($user, $companyId) {
+//     if ($user->is_super_admin) {
+//         return true;
+//     }
 
-    if ((int) $user->company_id !== (int) $companyId) {
-        return false;
-    }
+//     if ((int) $user->company_id !== (int) $companyId) {
+//         return false;
+//     }
 
-    // يسمح للأدمن بمتابعة قنوات الشركة العامة
-    return $user->role === 'admin';
-});
-
+//     // يسمح للأدمن بمتابعة قنوات الشركة العامة
+//     return $user->role === 'admin';
+// });
 
 // ✅ قناة خاصة للـ Insights
 Broadcast::channel('company.{companyId}.insights', function ($user, $companyId) {
@@ -99,18 +97,19 @@ Broadcast::channel('doctor.{doctorId}', function ($user, $doctorId) {
     return $doctor && (int) $doctor->id === (int) $doctorId;
 });
 
-Broadcast::channel(
-    'company.{companyId}.activity-logs',
-    function ($user, $companyId) {
+// قناة سجلات النشاط
+// Broadcast::channel(
+//     'company.{companyId}.activity-logs',
+//     function ($user, $companyId) {
 
-        if ($user->is_super_admin) {
-            return true;
-        }
+//         if ($user->is_super_admin) {
+//             return true;
+//         }
 
-        if ((int)$user->company_id !== (int)$companyId) {
-            return false;
-        }
+//         if ((int)$user->company_id !== (int)$companyId) {
+//             return false;
+//         }
 
-        return $user->role === 'admin';
-    }
-);
+//         return $user->role === 'admin';
+//     }
+// );
