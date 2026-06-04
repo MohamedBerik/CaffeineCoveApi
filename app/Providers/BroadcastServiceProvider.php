@@ -84,7 +84,6 @@ class BroadcastServiceProvider extends ServiceProvider
             return $user->branch_id && (int) $user->branch_id === (int) $branchId;
         });
 
-        // داخل دالة registerTenantChannelRules()
         Broadcast::channel('company.{companyId}.activity-logs', function ($user, $companyId) {
             if ($user->isSuperAdmin()) return true;
             return (int) $user->company_id === (int) $companyId;
