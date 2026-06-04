@@ -11,6 +11,14 @@ class ActivityLogger
 {
     /**
      * Log an activity
+     *
+     * @param int|null $companyId
+     * @param Authenticatable|null $user
+     * @param string $action
+     * @param string $subjectType
+     * @param int|null $subjectId
+     * @param array $properties
+     * @param int|null $branchId ✅ أضفناه لدعم الفروع
      */
     public static function log(
         ?int $companyId,
@@ -18,12 +26,18 @@ class ActivityLogger
         string $action,
         string $subjectType,
         ?int $subjectId = null,
-        array $properties = []
+        array $properties = [],
+        ?int $branchId = null
     ): ?ActivityLog {
         $companyId = $companyId ?? Tenant::id();
 
         if (!$companyId) {
             return null;
+        }
+
+        // ✅ محاولة جلب branch_id من الطلب إذا لم يمرر صراحةً
+        if ($branchId === null) {
+            $branchId = request()->header('X-Branch-Id') ?? null;
         }
 
         // ✅ إضافة meta data تلقائيًا
@@ -32,10 +46,12 @@ class ActivityLogger
             'user_agent' => request()->userAgent(),
             'url' => request()->fullUrl(),
             'method' => request()->method(),
+            'branch_id' => $branchId, // ✅ تسجيل الفرع في meta
         ];
 
         $log = ActivityLog::create([
             'company_id'   => $companyId,
+            'branch_id'    => $branchId, // ✅ إدراج الفرع
             'user_id'      => $user?->id,
             'action'       => $action,
             'subject_type' => $subjectType,
@@ -58,10 +74,11 @@ class ActivityLogger
         return self::log(
             $model->company_id ?? null,
             $user ?? auth()->user(),
-            class_basename($model) . '.created', // 'Order.created'
+            class_basename($model) . '.created',
             get_class($model),
             $model->id,
-            ['attributes' => $model->toArray()]
+            ['attributes' => $model->toArray()],
+            $model->branch_id ?? null // ✅ يمرر branch_id من النموذج
         );
     }
 
@@ -91,7 +108,8 @@ class ActivityLogger
                 'old' => array_intersect_key($model->getOriginal(), $changes),
                 'new' => $changes,
                 'changed_fields' => $changedFields,
-            ]
+            ],
+            $model->branch_id ?? null // ✅ فرع النموذج
         );
     }
 
@@ -106,7 +124,8 @@ class ActivityLogger
             'deleted',
             get_class($model),
             $model->id,
-            ['attributes' => $model->toArray()]
+            ['attributes' => $model->toArray()],
+            $model->branch_id ?? null // ✅ فرع النموذج
         );
     }
 
