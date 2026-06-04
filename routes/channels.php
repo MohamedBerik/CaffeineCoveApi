@@ -14,12 +14,12 @@ Broadcast::channel('App.Models.User.{id}', function ($user, $id) {
 });
 
 // ✅ قناة خاصة للداشبورد (تتطلب صلاحية)
-Broadcast::channel('company.{companyId}.dashboard', function ($user, $companyId) {
-    if ($user->is_super_admin) {
-        return true;
-    }
-    return (int) $user->company_id === (int) $companyId;
-});
+// Broadcast::channel('company.{companyId}.dashboard', function ($user, $companyId) {
+//     if ($user->is_super_admin) {
+//         return true;
+//     }
+//     return (int) $user->company_id === (int) $companyId;
+// });
 
 
 // 🚀 [الجديدة] قناة خاصة لتنبيهات الفروع المحددة (تم إضافتها لحل خطأ الـ 500 للفرع)
@@ -73,29 +73,29 @@ Broadcast::channel('company.{companyId}.dashboard', function ($user, $companyId)
 // });
 
 // ✅ قناة خاصة للمواعيد (للمرضى)
-Broadcast::channel('appointments.{patientId}', function ($user, $patientId) {
-    if ($user->is_super_admin || $user->role === 'admin') {
-        return true;
-    }
+// Broadcast::channel('appointments.{patientId}', function ($user, $patientId) {
+//     if ($user->is_super_admin || $user->role === 'admin') {
+//         return true;
+//     }
 
-    $patient = \App\Models\Customer::where('email', $user->email)->first();
-    return $patient && (int) $patient->id === (int) $patientId;
-});
+//     $patient = \App\Models\Customer::where('email', $user->email)->first();
+//     return $patient && (int) $patient->id === (int) $patientId;
+// });
 
 // ✅ قناة خاصة بالدكتور
-Broadcast::channel('doctor.{doctorId}', function ($user, $doctorId) {
-    if ($user->is_super_admin) {
-        return true;
-    }
+// Broadcast::channel('doctor.{doctorId}', function ($user, $doctorId) {
+//     if ($user->is_super_admin) {
+//         return true;
+//     }
 
-    if ($user->role === 'admin') {
-        $doctor = \App\Models\Doctor::find($doctorId);
-        return $doctor && (int) $doctor->company_id === (int) $user->company_id;
-    }
+//     if ($user->role === 'admin') {
+//         $doctor = \App\Models\Doctor::find($doctorId);
+//         return $doctor && (int) $doctor->company_id === (int) $user->company_id;
+//     }
 
-    $doctor = \App\Models\Doctor::where('email', $user->email)->first();
-    return $doctor && (int) $doctor->id === (int) $doctorId;
-});
+//     $doctor = \App\Models\Doctor::where('email', $user->email)->first();
+//     return $doctor && (int) $doctor->id === (int) $doctorId;
+// });
 
 // قناة سجلات النشاط
 // Broadcast::channel(
