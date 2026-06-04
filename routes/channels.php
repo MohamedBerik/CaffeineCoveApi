@@ -98,3 +98,19 @@ Broadcast::channel('doctor.{doctorId}', function ($user, $doctorId) {
     $doctor = \App\Models\Doctor::where('email', $user->email)->first();
     return $doctor && (int) $doctor->id === (int) $doctorId;
 });
+
+Broadcast::channel(
+    'company.{companyId}.activity-logs',
+    function ($user, $companyId) {
+
+        if ($user->is_super_admin) {
+            return true;
+        }
+
+        if ((int)$user->company_id !== (int)$companyId) {
+            return false;
+        }
+
+        return $user->role === 'admin';
+    }
+);

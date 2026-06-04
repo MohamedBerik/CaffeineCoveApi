@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\ActivityLog;
 use App\Services\Tenant;
 use Illuminate\Contracts\Auth\Authenticatable;
+use App\Events\ActivityLogCreated;
 
 class ActivityLogger
 {
@@ -33,7 +34,7 @@ class ActivityLogger
             'method' => request()->method(),
         ];
 
-        return ActivityLog::create([
+        $log = ActivityLog::create([
             'company_id'   => $companyId,
             'user_id'      => $user?->id,
             'action'       => $action,
@@ -41,6 +42,12 @@ class ActivityLogger
             'subject_id'   => $subjectId,
             'properties'   => $properties,
         ]);
+
+        $log->loadMissing('user');
+
+        event(new ActivityLogCreated($log));
+
+        return $log;
     }
 
     /**
