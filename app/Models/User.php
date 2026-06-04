@@ -69,25 +69,10 @@ class User extends Authenticatable
         return $this->hasOne(Doctor::class, 'user_id');
     }
 
-    // public function roles()
-    // {
-    //     return $this->belongsToMany(
-    //         Role::class,
-    //         'role_user',
-    //         'user_id',
-    //         'role_id'
-    //     );
-    // }
-
     public function createdAppointments()
     {
         return $this->hasMany(Appointment::class, 'created_by');
     }
-
-    // public function doctorAppointments()
-    // {
-    //     return $this->hasMany(Appointment::class, 'doctor_id');
-    // }
 
     public function createdOrders()
     {

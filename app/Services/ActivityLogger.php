@@ -11,14 +11,6 @@ class ActivityLogger
 {
     /**
      * Log an activity
-     *
-     * @param int|null $companyId
-     * @param Authenticatable|null $user
-     * @param string $action
-     * @param string $subjectType
-     * @param int|null $subjectId
-     * @param array $properties
-     * @param int|null $branchId ✅ أضفناه لدعم الفروع
      */
     public static function log(
         ?int $companyId,
@@ -35,10 +27,11 @@ class ActivityLogger
             return null;
         }
 
-        // ✅ محاولة جلب branch_id من الطلب إذا لم يمرر صراحةً
-        if ($branchId === null) {
-            $branchId = request()->header('X-Branch-Id') ?? null;
-        }
+        // ✅ المصادر الصحيحة للـ branch_id (بدون الاعتماد على X-Branch-Id)
+        $branchId = $branchId
+            ?? $user?->branch_id
+            ?? Tenant::branchId()
+            ?? null;
 
         // ✅ إضافة meta data تلقائيًا
         $properties['meta'] = [
@@ -46,12 +39,12 @@ class ActivityLogger
             'user_agent' => request()->userAgent(),
             'url' => request()->fullUrl(),
             'method' => request()->method(),
-            'branch_id' => $branchId, // ✅ تسجيل الفرع في meta
+            'branch_id' => $branchId,
         ];
 
         $log = ActivityLog::create([
             'company_id'   => $companyId,
-            'branch_id'    => $branchId, // ✅ إدراج الفرع
+            'branch_id'    => $branchId,
             'user_id'      => $user?->id,
             'action'       => $action,
             'subject_type' => $subjectType,
@@ -66,9 +59,6 @@ class ActivityLogger
         return $log;
     }
 
-    /**
-     * Log a model created event
-     */
     public static function logCreated($model, ?Authenticatable $user = null): ?ActivityLog
     {
         return self::log(
@@ -78,22 +68,17 @@ class ActivityLogger
             get_class($model),
             $model->id,
             ['attributes' => $model->toArray()],
-            $model->branch_id ?? null // ✅ يمرر branch_id من النموذج
+            $model->branch_id ?? null
         );
     }
 
-    /**
-     * Log a model updated event
-     */
     public static function logUpdated($model, array $changes = [], ?Authenticatable $user = null): ?ActivityLog
     {
         $changedFields = array_keys($changes);
-
         if (empty($changes)) {
             $changes = $model->getChanges();
             unset($changes['updated_at']);
         }
-
         if (empty($changes)) {
             return null;
         }
@@ -109,13 +94,10 @@ class ActivityLogger
                 'new' => $changes,
                 'changed_fields' => $changedFields,
             ],
-            $model->branch_id ?? null // ✅ فرع النموذج
+            $model->branch_id ?? null
         );
     }
 
-    /**
-     * Log a model deleted event
-     */
     public static function logDeleted($model, ?Authenticatable $user = null): ?ActivityLog
     {
         return self::log(
@@ -125,13 +107,10 @@ class ActivityLogger
             get_class($model),
             $model->id,
             ['attributes' => $model->toArray()],
-            $model->branch_id ?? null // ✅ فرع النموذج
+            $model->branch_id ?? null
         );
     }
 
-    /**
-     * Log a custom action
-     */
     public static function logAction(
         string $action,
         ?string $subjectType = null,
@@ -139,58 +118,55 @@ class ActivityLogger
         array $properties = [],
         ?Authenticatable $user = null
     ): ?ActivityLog {
+        $currentUser = $user ?? auth()->user();
+
         return self::log(
             Tenant::id(),
-            $user ?? auth()->user(),
+            $currentUser,
             $action,
             $subjectType ?? 'system',
             $subjectId,
-            $properties
+            $properties,
+            $currentUser?->branch_id   // ✅ تمرير الفرع
         );
     }
 
-    /**
-     * Log a security event
-     */
     public static function logSecurity(
         string $action,
         array $properties = [],
         ?Authenticatable $user = null
     ): ?ActivityLog {
+        $currentUser = $user ?? auth()->user();
+
         return self::log(
             Tenant::id(),
-            $user ?? auth()->user(),
+            $currentUser,
             'security.' . $action,
             'security',
             null,
-            $properties
+            $properties,
+            $currentUser?->branch_id   // ✅
         );
     }
 
-    /**
-     * Log an error event
-     */
     public static function logError(
         string $message,
         array $context = [],
         ?Authenticatable $user = null
     ): ?ActivityLog {
+        $currentUser = $user ?? auth()->user();
+
         return self::log(
             Tenant::id(),
-            $user ?? auth()->user(),
+            $currentUser,
             'error',
             'system',
             null,
-            [
-                'message' => $message,
-                'context' => $context,
-            ]
+            ['message' => $message, 'context' => $context],
+            $currentUser?->branch_id   // ✅
         );
     }
 
-    /**
-     * Log a login event
-     */
     public static function logLogin(Authenticatable $user, bool $success = true, array $meta = []): ?ActivityLog
     {
         return self::log(
@@ -199,16 +175,10 @@ class ActivityLogger
             $success ? 'login.success' : 'login.failed',
             get_class($user),
             $user->id,
-            array_merge([
-                'ip' => request()->ip(),
-                'user_agent' => request()->userAgent(),
-            ], $meta)
+            array_merge(['ip' => request()->ip(), 'user_agent' => request()->userAgent()], $meta)
         );
     }
 
-    /**
-     * Log a logout event
-     */
     public static function logLogout(Authenticatable $user): ?ActivityLog
     {
         return self::log(
@@ -217,9 +187,7 @@ class ActivityLogger
             'logout',
             get_class($user),
             $user->id,
-            [
-                'ip' => request()->ip(),
-            ]
+            ['ip' => request()->ip()]
         );
     }
 }

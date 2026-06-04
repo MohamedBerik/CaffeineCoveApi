@@ -12,7 +12,7 @@ class ActivityLogCreated implements ShouldBroadcastNow
 {
     use Dispatchable, SerializesModels;
 
-    public ActivityLog $log;
+    public $log;
 
     public function __construct(ActivityLog $log)
     {
@@ -21,11 +21,20 @@ class ActivityLogCreated implements ShouldBroadcastNow
 
     public function broadcastOn(): array
     {
-        return [
+        $channels = [
             new PrivateChannel(
                 'company.' . $this->log->company_id . '.activity-logs'
-            )
+            ),
         ];
+
+        // ✅ إذا كان هناك فرع، نضيف قناة الفرع أيضًا
+        if ($this->log->branch_id) {
+            $channels[] = new PrivateChannel(
+                'company.' . $this->log->company_id . '.branch.' . $this->log->branch_id . '.activity-logs'
+            );
+        }
+
+        return $channels;
     }
 
     public function broadcastAs(): string
@@ -37,16 +46,14 @@ class ActivityLogCreated implements ShouldBroadcastNow
     {
         return [
             'id' => $this->log->id,
-            'company_id' => $this->log->company_id,
-            'branch_id' => $this->log->branch_id,
-            'user_id' => $this->log->user_id,
             'action' => $this->log->action,
+            'user_id' => $this->log->user_id,
+            'user_name' => $this->log->user?->name ?? 'System',
             'subject_type' => $this->log->subject_type,
             'subject_id' => $this->log->subject_id,
+            'branch_id' => $this->log->branch_id,
             'properties' => $this->log->properties,
             'created_at' => $this->log->created_at?->toISOString(),
-            'user_name' => $this->log->user?->name,
-            'user_email' => $this->log->user?->email,
         ];
     }
 }

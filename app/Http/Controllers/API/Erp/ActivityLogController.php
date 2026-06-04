@@ -21,22 +21,36 @@ class ActivityLogController extends Controller
         $limit = (int) $request->get('limit', 20);
         $user = auth()->user();
 
+        // ... بداية الدالة
         try {
             $query = ActivityLog::with('user:id,name,email');
 
-            // ✅ لو Super Admin وعايز يشوف كل الشركات
-            if ($user->is_super_admin) {
-                // لو طلب كل الشركات (Global Mode) أو company_id محدد
+            if (!$user->is_super_admin) {
+                if ($user->role !== 'admin') {
+                    // ✅ موظف عادي: يُعرض فرعه فقط (لا يمكنه تغيير الفرع)
+                    $query->where('branch_id', $user->branch_id);
+                } else {
+                    // ✅ أدمن: يمكنه اختيار فرع معين أو مشاهدة الكل
+                    if ($request->filled('branch_id')) {
+                        $query->where('branch_id', $request->branch_id);
+                    }
+                }
+            } else {
+                // ✅ سوبر أدمن: يمكنه رؤية الكل مع إمكانية تصفية حسب الفرع
+                if ($request->filled('branch_id')) {
+                    $query->where('branch_id', $request->branch_id);
+                }
+
+                // وضع الشركات المتعددة (دون تغيير)
                 if ($request->has('all_companies') || $request->filled('company_id')) {
                     $query = ActivityLog::withoutGlobalScope(CompanyScope::class);
-
-                    // فلترة اختيارية بـ company_id
                     if ($request->filled('company_id')) {
                         $query->where('company_id', $request->company_id);
                     }
                 }
             }
 
+            // ... باقي عوامل التصفية (subject_type, action, إلخ)
             $logs = $query
                 ->when($request->subject_type, fn($q) => $q->where('subject_type', $request->subject_type))
                 ->when($request->action, fn($q) => $q->where('action', $request->action))
@@ -62,7 +76,8 @@ class ActivityLogController extends Controller
                     'user_email' => $log->user?->email,
                     'subject_type' => $log->subject_type,
                     'subject_id' => $log->subject_id,
-                    'company_id' => $log->company_id, // ✅ أضف company_id
+                    'company_id' => $log->company_id,
+                    'branch_id' => $log->branch_id, // ✅ أضفنا branch_id في الاستجابة
                     'properties' => $log->properties,
                     'created_at' => $log->created_at?->toISOString(),
                 ]),

@@ -84,6 +84,17 @@ class BroadcastServiceProvider extends ServiceProvider
             return $user->branch_id && (int) $user->branch_id === (int) $branchId;
         });
 
-        // يمكن إضافة قنوات إضافية بنفس النمط
+        // داخل دالة registerTenantChannelRules()
+        Broadcast::channel('company.{companyId}.activity-logs', function ($user, $companyId) {
+            if ($user->isSuperAdmin()) return true;
+            return (int) $user->company_id === (int) $companyId;
+        });
+
+        Broadcast::channel('company.{companyId}.branch.{branchId}.activity-logs', function ($user, $companyId, $branchId) {
+            if ($user->isSuperAdmin()) return true;
+            if ((int) $user->company_id !== (int) $companyId) return false;
+            if ($user->role === 'admin') return true;
+            return $user->branch_id && (int) $user->branch_id === (int) $branchId;
+        });
     }
 }
