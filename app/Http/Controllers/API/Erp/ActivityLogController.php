@@ -31,13 +31,19 @@ class ActivityLogController extends Controller
                     $query->where('branch_id', $user->branch_id);
                 } else {
                     // ✅ أدمن: يمكنه اختيار فرع معين أو مشاهدة الكل
-                    if ($request->filled('branch_id')) {
+                    if (
+                        $request->filled('branch_id')
+                        && $request->branch_id !== 'all'
+                    ) {
                         $query->where('branch_id', $request->branch_id);
                     }
                 }
             } else {
                 // ✅ سوبر أدمن: يمكنه رؤية الكل مع إمكانية تصفية حسب الفرع
-                if ($request->filled('branch_id')) {
+                if (
+                    $request->filled('branch_id')
+                    && $request->branch_id !== 'all'
+                ) {
                     $query->where('branch_id', $request->branch_id);
                 }
 
