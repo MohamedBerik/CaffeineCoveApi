@@ -132,6 +132,7 @@ class Customer extends Model
             if (auth()->check()) {
                 ActivityLog::create([
                     'company_id' => $customer->company_id,
+                    'branch_id' => $customer->branch_id,
                     'user_id' => auth()->id(),
                     'action' => 'customer.created',
                     'subject_type' => Customer::class,
@@ -153,6 +154,7 @@ class Customer extends Model
                 if (!empty($changes)) {
                     ActivityLog::create([
                         'company_id' => $customer->company_id,
+                        'branch_id' => $customer->branch_id,
                         'user_id' => auth()->id(),
                         'action' => 'customer.updated',
                         'subject_type' => Customer::class,
@@ -169,6 +171,7 @@ class Customer extends Model
             if (auth()->check()) {
                 ActivityLog::create([
                     'company_id' => $customer->company_id,
+                    'branch_id' => $customer->branch_id,
                     'user_id' => auth()->id(),
                     'action' => 'customer.deleted',
                     'subject_type' => Customer::class,

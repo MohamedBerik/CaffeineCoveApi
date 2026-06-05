@@ -112,26 +112,6 @@ class TreatmentPlanItem extends Model
     }
 
     // ============ Accessors ============
-
-    // public function getRemainingSessionsAttribute(): int
-    // {
-    //     $planned = (int) ($this->planned_sessions ?? 1);
-    //     $completed = (int) ($this->completed_sessions ?? 0);
-    //     return max($planned - $completed, 0);
-    // }
-
-    // public function getIsCompletedAttribute(): bool
-    // {
-    //     return $this->status === self::STATUS_COMPLETED || $this->remaining_sessions === 0;
-    // }
-
-    // public function getProgressPercentageAttribute(): float
-    // {
-    //     $planned = max(1, (int) ($this->planned_sessions ?? 1));
-    //     $completed = (int) ($this->completed_sessions ?? 0);
-    //     return min(100, ($completed / $planned) * 100);
-    // }
-
     public function getTotalPriceAttribute(): float
     {
         return $this->price * ($this->planned_sessions ?? 1);

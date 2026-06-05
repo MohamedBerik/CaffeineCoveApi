@@ -322,6 +322,7 @@ class Appointment extends Model
             if (auth()->check()) {
                 ActivityLog::create([
                     'company_id' => $appointment->company_id,
+                    'branch_id' => $appointment->branch_id,
                     'user_id' => auth()->id(),
                     'action' => 'appointment.created',
                     'subject_type' => Appointment::class,
@@ -345,6 +346,7 @@ class Appointment extends Model
                 if (!empty($changes)) {
                     ActivityLog::create([
                         'company_id' => $appointment->company_id,
+                        'branch_id' => $appointment->branch_id,
                         'user_id' => auth()->id(),
                         'action' => 'appointment.updated',
                         'subject_type' => Appointment::class,
@@ -362,6 +364,7 @@ class Appointment extends Model
             if (auth()->check()) {
                 ActivityLog::create([
                     'company_id' => $appointment->company_id,
+                    'branch_id' => $appointment->branch_id,
                     'user_id' => auth()->id(),
                     'action' => 'appointment.deleted',
                     'subject_type' => Appointment::class,

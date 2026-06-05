@@ -157,6 +157,7 @@ class Product extends Model
 
         StockMovement::create([
             'company_id' => $this->company_id,
+            'branch_id' => $this->branch_id,
             'product_id' => $this->id,
             'type' => StockMovement::TYPE_IN,
             'quantity' => $quantity,
@@ -174,6 +175,7 @@ class Product extends Model
 
         StockMovement::create([
             'company_id' => $this->company_id,
+            'branch_id' => $this->branch_id,
             'product_id' => $this->id,
             'type' => StockMovement::TYPE_OUT,
             'quantity' => $quantity,

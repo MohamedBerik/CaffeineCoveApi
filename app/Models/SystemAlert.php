@@ -230,6 +230,7 @@ class SystemAlert extends Model
         static::created(function ($alert) {
             ActivityLog::create([
                 'company_id' => $alert->company_id,
+                'branch_id' => $alert->branch_id,
                 'user_id' => auth()->id(),
                 'action' => 'alert.created',
                 'subject_type' => SystemAlert::class,
@@ -252,6 +253,7 @@ class SystemAlert extends Model
                 if (!empty($changes)) {
                     ActivityLog::create([
                         'company_id' => $alert->company_id,
+                        'branch_id' => $alert->branch_id,
                         'user_id' => auth()->id(),
                         'action' => 'alert.updated',
                         'subject_type' => SystemAlert::class,

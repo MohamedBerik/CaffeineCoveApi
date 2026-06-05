@@ -254,6 +254,7 @@ class User extends Authenticatable
             // (اختياري) الاحتفاظ بسجل النشاط القديم
             ActivityLog::create([
                 'company_id' => $user->company_id,
+                'branch_id' => $user->branch_id,
                 'user_id' => auth()->id(),
                 'action' => 'user.created',
                 'subject_type' => User::class,

@@ -178,6 +178,7 @@ class TreatmentPlan extends Model
         static::created(function ($plan) {
             ActivityLog::create([
                 'company_id' => $plan->company_id,
+                'branch_id' => $plan->branch_id,
                 'user_id' => auth()->id(),
                 'action' => 'treatment_plan.created',
                 'subject_type' => TreatmentPlan::class,

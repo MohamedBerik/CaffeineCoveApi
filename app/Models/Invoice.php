@@ -228,6 +228,7 @@ class Invoice extends Model
             if (auth()->check()) {
                 ActivityLog::create([
                     'company_id' => $invoice->company_id,
+                    'branch_id' => $invoice->branch_id,
                     'user_id' => auth()->id(),
                     'action' => 'invoice.created',
                     'subject_type' => Invoice::class,
@@ -249,6 +250,7 @@ class Invoice extends Model
                 if (!empty($changes)) {
                     ActivityLog::create([
                         'company_id' => $invoice->company_id,
+                        'branch_id' => $invoice->branch_id,
                         'user_id' => auth()->id(),
                         'action' => 'invoice.updated',
                         'subject_type' => Invoice::class,

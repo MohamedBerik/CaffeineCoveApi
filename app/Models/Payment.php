@@ -157,6 +157,7 @@ class Payment extends Model
             $userId = auth()->id() ?? null;
             ActivityLog::create([
                 'company_id' => $payment->company_id,
+                'branch_id' => $payment->branch_id,
                 'user_id' => $userId,
                 'action' => 'payment.created',
                 'subject_type' => Payment::class,
@@ -177,6 +178,7 @@ class Payment extends Model
                 if (!empty($changes)) {
                     ActivityLog::create([
                         'company_id' => $payment->company_id,
+                        'branch_id' => $payment->branch_id,
                         'user_id' => auth()->id(),
                         'action' => 'payment.updated',
                         'subject_type' => Payment::class,
@@ -193,6 +195,7 @@ class Payment extends Model
             if (auth()->check()) {
                 ActivityLog::create([
                     'company_id' => $payment->company_id,
+                    'branch_id' => $payment->branch_id,
                     'user_id' => auth()->id(),
                     'action' => 'payment.deleted',
                     'subject_type' => Payment::class,
