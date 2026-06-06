@@ -9,23 +9,6 @@ use App\Events\ActivityLogCreated;
 
 class ActivityLogger
 {
-
-    /**
-     * تحديد التصنيف الافتراضي بناءً على نوع الإجراء
-     */
-    protected static function inferCategory(string $action, ?string $subjectType = null): string
-    {
-        if (str_starts_with($action, 'subscription.') || str_starts_with($action, 'billing.')) {
-            return 'billing';
-        }
-        if (str_starts_with($action, 'admin.') || str_starts_with($action, 'security.')) {
-            return 'admin';
-        }
-        if ($subjectType === 'system' || str_starts_with($action, 'system.')) {
-            return 'system';
-        }
-        return 'user'; // افتراضي
-    }
     /**
      * Log an activity
      */
@@ -36,11 +19,9 @@ class ActivityLogger
         string $subjectType,
         ?int $subjectId = null,
         array $properties = [],
-        ?int $branchId = null,
-        ?string $category = null // ✅
+        ?int $branchId = null
     ): ?ActivityLog {
         $companyId = $companyId ?? Tenant::id();
-        $category = $category ?? self::inferCategory($action, $subjectType);
 
         if (!$companyId) {
             return null;
@@ -66,7 +47,6 @@ class ActivityLogger
             'branch_id'    => $branchId,
             'user_id'      => $user?->id,
             'action'       => $action,
-            'category'     => $category,
             'subject_type' => $subjectType,
             'subject_id'   => $subjectId,
             'properties'   => $properties,
@@ -88,8 +68,7 @@ class ActivityLogger
             get_class($model),
             $model->id,
             ['attributes' => $model->toArray()],
-            $model->branch_id ?? null,
-            category: self::inferCategory(class_basename($model) . '.created', get_class($model))
+            $model->branch_id ?? null
         );
     }
 
@@ -166,9 +145,7 @@ class ActivityLogger
             'security',
             null,
             $properties,
-            $currentUser?->branch_id,
-            category: 'admin' // تجاوز التصنيف
-
+            $currentUser?->branch_id   // ✅
         );
     }
 

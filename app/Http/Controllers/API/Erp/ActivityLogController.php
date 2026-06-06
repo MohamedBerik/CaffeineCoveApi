@@ -60,7 +60,6 @@ class ActivityLogController extends Controller
             $logs = $query
                 ->when($request->subject_type, fn($q) => $q->where('subject_type', $request->subject_type))
                 ->when($request->action, fn($q) => $q->where('action', $request->action))
-                ->when($request->category, fn($q) => $q->where('category', $request->category))
                 ->when($request->user_id, fn($q) => $q->where('user_id', $request->user_id))
                 ->when($request->from, fn($q) => $q->whereDate('created_at', '>=', $request->from))
                 ->when($request->to, fn($q) => $q->whereDate('created_at', '<=', $request->to))
@@ -78,7 +77,6 @@ class ActivityLogController extends Controller
                 'data' => $logs->getCollection()->map(fn($log) => [
                     'id' => $log->id,
                     'action' => $log->action,
-                    'category' => $log->category,
                     'user_id' => $log->user_id,
                     'user_name' => $log->user?->name,
                     'user_email' => $log->user?->email,

@@ -52,7 +52,6 @@ class ActivityLogCreated implements ShouldBroadcastNow
             'id' => $this->log->id,
             'company_id' => $this->log->company_id,
             'action' => $this->log->action,
-            'category' => $this->log->category,
             'user_id' => $this->log->user_id,
             'user_name' => $this->log->user?->name ?? 'System',
             'subject_type' => $this->log->subject_type,
