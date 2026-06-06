@@ -32,7 +32,13 @@ class DashboardUpdated implements ShouldBroadcast
     public function broadcastOn(): array
     {
         return [
-            new PrivateChannel('company.' . $this->companyId . '.dashboard')
+            new PrivateChannel(
+                'company.' .
+                    $this->companyId .
+                    '.branch.' .
+                    $this->data['branch_id'] .
+                    '.dashboard'
+            )
         ];
     }
 

@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use App\Models\Concerns\BelongsToCompanyTrait;
+use App\Services\ActivityLogger;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Support\Facades\DB;
 
@@ -225,21 +226,19 @@ class Invoice extends Model
     protected static function booted()
     {
         static::created(function ($invoice) {
-            if (auth()->check()) {
-                ActivityLog::create([
-                    'company_id' => $invoice->company_id,
-                    'branch_id' => $invoice->branch_id,
-                    'user_id' => auth()->id(),
-                    'action' => 'invoice.created',
-                    'subject_type' => Invoice::class,
-                    'subject_id' => $invoice->id,
-                    'properties' => [
-                        'number' => $invoice->number,
-                        'customer_id' => $invoice->customer_id,
-                        'total' => $invoice->total,
-                    ]
-                ]);
-            }
+            ActivityLogger::log(
+                $invoice->company_id,
+                auth()->user(),
+                'invoice.created',
+                Invoice::class,
+                $invoice->id,
+                [
+                    'number' => $invoice->number,
+                    'customer_id' => $invoice->customer_id,
+                    'total' => $invoice->total,
+                ],
+                $invoice->branch_id
+            );
         });
 
         static::updated(function ($invoice) {
@@ -248,18 +247,36 @@ class Invoice extends Model
                 unset($changes['updated_at']);
 
                 if (!empty($changes)) {
-                    ActivityLog::create([
-                        'company_id' => $invoice->company_id,
-                        'branch_id' => $invoice->branch_id,
-                        'user_id' => auth()->id(),
-                        'action' => 'invoice.updated',
-                        'subject_type' => Invoice::class,
-                        'subject_id' => $invoice->id,
-                        'properties' => [
+                    ActivityLogger::log(
+                        $invoice->company_id,
+                        auth()->user(),
+                        'invoice.updated',
+                        Invoice::class,
+                        $invoice->id,
+                        [
                             'changes' => $changes,
-                        ]
-                    ]);
+                        ],
+                        $invoice->branch_id
+                    );
                 }
+            }
+        });
+
+        // اختياري: إضافة حدث delete ليكون متكاملاً مع Payment
+        static::deleted(function ($invoice) {
+            if (auth()->check()) {
+                ActivityLogger::log(
+                    $invoice->company_id,
+                    auth()->user(),
+                    'invoice.deleted',
+                    Invoice::class,
+                    $invoice->id,
+                    [
+                        'number' => $invoice->number,
+                        'total' => $invoice->total,
+                    ],
+                    $invoice->branch_id
+                );
             }
         });
     }
