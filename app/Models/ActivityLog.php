@@ -16,6 +16,7 @@ class ActivityLog extends Model
         'branch_id',
         'user_id',
         'action',
+        'category',
         'subject_type',
         'subject_id',
         'properties'
