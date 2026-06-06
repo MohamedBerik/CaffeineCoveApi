@@ -7,6 +7,7 @@ use Illuminate\Broadcasting\PrivateChannel;
 use Illuminate\Contracts\Broadcasting\ShouldBroadcastNow;
 use Illuminate\Foundation\Events\Dispatchable;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Facades\Log;
 
 class ActivityLogCreated implements ShouldBroadcastNow
 {
@@ -21,6 +22,11 @@ class ActivityLogCreated implements ShouldBroadcastNow
 
     public function broadcastOn(): array
     {
+        Log::info('Broadcasting ActivityLogCreated', [
+            'company_id' => $this->log->company_id,
+            'branch_id' => $this->log->branch_id,
+        ]);
+
         $channels = [
             new PrivateChannel(
                 'company.' . $this->log->company_id . '.activity-logs'

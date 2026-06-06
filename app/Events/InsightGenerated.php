@@ -13,16 +13,20 @@ class InsightGenerated implements ShouldBroadcast
 
     public int $companyId;
     public array $insight;
+    public int $branchId;
 
     /**
      * Create a new event instance.
      */
-    public function __construct(int $companyId, array $insight)
-    {
+    public function __construct(
+        int $companyId,
+        int $branchId,
+        array $insight
+    ) {
         $this->companyId = $companyId;
+        $this->branchId = $branchId;
         $this->insight = $insight;
     }
-
     /**
      * Get the channels the event should broadcast on.
      * ✅ استخدام PrivateChannel للأمان (يتطلب صلاحية)
@@ -30,7 +34,13 @@ class InsightGenerated implements ShouldBroadcast
     public function broadcastOn(): array
     {
         return [
-            new PrivateChannel('company.' . $this->companyId . '.insights')
+            new PrivateChannel(
+                'company.' .
+                    $this->companyId .
+                    '.branch.' .
+                    $this->branchId .
+                    '.insights'
+            )
         ];
     }
 
