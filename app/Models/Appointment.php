@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use App\Models\Concerns\BelongsToCompanyTrait;
+use App\Services\ActivityLogger;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 
@@ -319,23 +320,21 @@ class Appointment extends Model
     protected static function booted()
     {
         static::created(function ($appointment) {
-            if (auth()->check()) {
-                ActivityLog::create([
-                    'company_id' => $appointment->company_id,
-                    'branch_id' => $appointment->branch_id,
-                    'user_id' => auth()->id(),
-                    'action' => 'appointment.created',
-                    'subject_type' => Appointment::class,
-                    'subject_id' => $appointment->id,
-                    'properties' => [
-                        'patient_id' => $appointment->patient_id,
-                        'doctor_id' => $appointment->doctor_id,
-                        'appointment_date' => $appointment->appointment_date,
-                        'appointment_time' => $appointment->appointment_time,
-                        'status' => $appointment->status,
-                    ]
-                ]);
-            }
+            ActivityLogger::log(
+                $appointment->company_id,
+                auth()->user(),
+                'appointment.created',
+                Appointment::class,
+                $appointment->id,
+                [
+                    'patient_id' => $appointment->patient_id,
+                    'doctor_id' => $appointment->doctor_id,
+                    'appointment_date' => $appointment->appointment_date,
+                    'appointment_time' => $appointment->appointment_time,
+                    'status' => $appointment->status,
+                ],
+                $appointment->branch_id
+            );
         });
 
         static::updated(function ($appointment) {
@@ -344,36 +343,36 @@ class Appointment extends Model
                 unset($changes['updated_at']);
 
                 if (!empty($changes)) {
-                    ActivityLog::create([
-                        'company_id' => $appointment->company_id,
-                        'branch_id' => $appointment->branch_id,
-                        'user_id' => auth()->id(),
-                        'action' => 'appointment.updated',
-                        'subject_type' => Appointment::class,
-                        'subject_id' => $appointment->id,
-                        'properties' => [
+                    ActivityLogger::log(
+                        $appointment->company_id,
+                        auth()->user(),
+                        'appointment.updated',
+                        Appointment::class,
+                        $appointment->id,
+                        [
                             'changes' => $changes,
                             'old' => array_intersect_key($appointment->getOriginal(), $changes),
-                        ]
-                    ]);
+                        ],
+                        $appointment->branch_id
+                    );
                 }
             }
         });
 
         static::deleted(function ($appointment) {
             if (auth()->check()) {
-                ActivityLog::create([
-                    'company_id' => $appointment->company_id,
-                    'branch_id' => $appointment->branch_id,
-                    'user_id' => auth()->id(),
-                    'action' => 'appointment.deleted',
-                    'subject_type' => Appointment::class,
-                    'subject_id' => $appointment->id,
-                    'properties' => [
+                ActivityLogger::log(
+                    $appointment->company_id,
+                    auth()->user(),
+                    'appointment.deleted',
+                    Appointment::class,
+                    $appointment->id,
+                    [
                         'patient_id' => $appointment->patient_id,
                         'doctor_id' => $appointment->doctor_id,
-                    ]
-                ]);
+                    ],
+                    $appointment->branch_id
+                );
             }
         });
     }
