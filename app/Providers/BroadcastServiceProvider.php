@@ -95,5 +95,9 @@ class BroadcastServiceProvider extends ServiceProvider
             if ($user->role === 'admin') return true;
             return $user->branch_id && (int) $user->branch_id === (int) $branchId;
         });
+
+        Broadcast::channel('saas.activity-logs', function ($user) {
+            return $user->isSuperAdmin();
+        });
     }
 }

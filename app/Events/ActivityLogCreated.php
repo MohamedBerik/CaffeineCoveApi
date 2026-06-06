@@ -22,21 +22,19 @@ class ActivityLogCreated implements ShouldBroadcastNow
 
     public function broadcastOn(): array
     {
-        Log::info('Broadcasting ActivityLogCreated', [
-            'company_id' => $this->log->company_id,
-            'branch_id' => $this->log->branch_id,
-        ]);
-
         $channels = [
+            new PrivateChannel('saas.activity-logs'),
+
             new PrivateChannel(
                 'company.' . $this->log->company_id . '.activity-logs'
             ),
         ];
 
-        // ✅ إذا كان هناك فرع، نضيف قناة الفرع أيضًا
         if ($this->log->branch_id) {
             $channels[] = new PrivateChannel(
-                'company.' . $this->log->company_id . '.branch.' . $this->log->branch_id . '.activity-logs'
+                'company.' . $this->log->company_id .
+                    '.branch.' . $this->log->branch_id .
+                    '.activity-logs'
             );
         }
 
@@ -52,6 +50,7 @@ class ActivityLogCreated implements ShouldBroadcastNow
     {
         return [
             'id' => $this->log->id,
+            'company_id' => $this->log->company_id,
             'action' => $this->log->action,
             'user_id' => $this->log->user_id,
             'user_name' => $this->log->user?->name ?? 'System',
