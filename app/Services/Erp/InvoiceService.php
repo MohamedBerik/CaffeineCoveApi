@@ -118,12 +118,12 @@ class InvoiceService
 
         $totalCashReceived = (float) $payments->sum(fn($p) => (float) $p->amount);
 
-        if ($invoice->status === 'paid') {
-            event(new DashboardUpdated($companyId, 'invoice_paid', [
-                'paid_invoices_count' => 1,
-                'unpaid_invoices_count' => -1,
-            ]));
-        }
+        // if ($invoice->status === 'paid') {
+        //     event(new DashboardUpdated($companyId, 'invoice_paid', [
+        //         'paid_invoices_count' => 1,
+        //         'unpaid_invoices_count' => -1,
+        //     ]));
+        // }
 
         return [
             'id' => $invoice->id,

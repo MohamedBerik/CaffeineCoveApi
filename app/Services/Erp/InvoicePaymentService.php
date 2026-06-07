@@ -178,7 +178,11 @@ class InvoicePaymentService
             event(new DashboardUpdated(
                 $companyId,
                 'payment_created',
-                ['today_revenue' => $applied, 'month_revenue' => $applied]
+                [
+                    'branch_id' => $branchId,
+                    'today_revenue' => $applied,
+                    'month_revenue' => $applied,
+                ]
             ));
 
             $insight = app(InsightService::class)->revenueInsight($companyId);
