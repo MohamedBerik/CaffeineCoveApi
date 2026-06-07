@@ -185,9 +185,24 @@ class InvoicePaymentService
                 ]
             ));
 
+            if ($status === 'paid') {
+                event(new DashboardUpdated(
+                    $companyId,
+                    'invoice_paid',
+                    [
+                        'branch_id' => $branchId,
+                        'invoice_id' => $invoice->id,
+                    ]
+                ));
+            }
+
             $insight = app(InsightService::class)->revenueInsight($companyId);
             if ($insight) {
-                event(new InsightGenerated($companyId, $insight));
+                event(new InsightGenerated(
+                    $companyId,
+                    $branchId,
+                    $insight
+                ));
             }
 
             return response()->json([
