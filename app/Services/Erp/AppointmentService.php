@@ -31,6 +31,9 @@ class AppointmentService
 {
     use ValidatesAppointments, HandlesAppointmentReminders;
 
+    // اسم المنتج الموحد للعلاج
+    protected const TREATMENT_PRODUCT_TITLE = 'Treatment';
+
     public function list(Request $request)
     {
         $user = $request->user();
@@ -47,7 +50,8 @@ class AppointmentService
             if ($doctor) {
                 $query->where('appointments.doctor_id', $doctor->id);
             } else {
-                return null;
+                // ✅ إرجاع استعلام فارغ مع الحفاظ على نفس النطاق (بدون Global Scope)
+                return $query->whereRaw('1=0')->paginate();
             }
         }
 
@@ -480,11 +484,15 @@ class AppointmentService
 
         $existingTreatmentInvoice = Invoice::query()
             ->where('appointment_id', $appointment->id)
-            ->whereHas('order', fn($q) => $q->where('title_en', 'Treatment'))
+            ->whereHas('order', fn($q) => $q->where('title_en', self::TREATMENT_PRODUCT_TITLE))
             ->lockForUpdate()
             ->first();
 
         if ($existingTreatmentInvoice) {
+            // ✅ رفض الفاتورة إذا كانت ملغية
+            if ($existingTreatmentInvoice->status === 'cancelled') {
+                throw ValidationException::withMessages(['appointment' => ['The linked treatment invoice has been cancelled.']]);
+            }
             return [
                 'invoice_id'             => $existingTreatmentInvoice->id,
                 'order_id'               => $existingTreatmentInvoice->order_id,
@@ -502,20 +510,20 @@ class AppointmentService
         }
 
         $treatmentServiceProduct = \App\Models\Product::where('company_id', $companyId)
-            ->where('title_en', 'Treatment')
+            ->where('title_en', self::TREATMENT_PRODUCT_TITLE)
             ->when($branchId, fn($q) => $q->where('branch_id', $branchId))
             ->first();
 
         if (!$treatmentServiceProduct) {
-            throw ValidationException::withMessages(['product' => ['Appointment Service product is required for treatment invoicing.']]);
+            throw ValidationException::withMessages(['product' => [self::TREATMENT_PRODUCT_TITLE . ' product is required for treatment invoicing.']]);
         }
 
         $order = \App\Models\Order::create([
             'company_id'  => $companyId,
             'branch_id'   => $branchId,
             'customer_id' => $appointment->patient_id,
-            'title_en'    => 'Appointment Service',
-            'title_ar'    => 'خدمة موعد',
+            'title_en'    => self::TREATMENT_PRODUCT_TITLE,
+            'title_ar'    => 'علاج',
             'status'      => 'confirmed',
             'total'       => $price,
             'created_by'  => $request->user()->id,
@@ -530,7 +538,7 @@ class AppointmentService
             'total'      => $price,
         ]);
 
-        $number  = InvoiceNumberService::generate($companyId);
+        $number  = app(InvoiceNumberService::class)->generate($companyId);
         $invoice = \App\Models\Invoice::create([
             'company_id'        => $companyId,
             'branch_id'         => $branchId,
@@ -553,21 +561,18 @@ class AppointmentService
             'total'      => $price,
         ]);
 
-        if (!CustomerLedgerEntry::query()->where('invoice_id', $invoice->id)->where('type', 'invoice')->exists()) {
-            CustomerLedgerEntry::create([
-                'company_id'  => $companyId,
-                'branch_id'  => $branchId,   // ✅ أضف هذا السطر
+        CustomerLedgerEntry::firstOrCreate(
+            ['invoice_id' => $invoice->id, 'type' => 'invoice'],
+            [
+                'company_id' => $companyId,
+                'branch_id'  => $branchId,
                 'customer_id' => $invoice->customer_id,
-                'invoice_id'  => $invoice->id,
-                'payment_id'  => null,
-                'refund_id'   => null,
-                'type'        => 'invoice',
                 'debit'       => $invoice->total,
                 'credit'      => 0,
                 'entry_date'  => $invoice->issued_at ?? now(),
                 'description' => 'Invoice issued #' . $invoice->number,
-            ]);
-        }
+            ]
+        );
 
         $this->autoApplyCustomerCredit($invoice, $request->user(), $branchId);
         $invoice->refresh();
@@ -610,6 +615,7 @@ class AppointmentService
             } else {
                 DentalRecord::create([
                     'company_id'             => $companyId,
+                    'branch_id'              => $branchId,
                     'customer_id'            => $appointment->patient_id,
                     'appointment_id'         => $appointment->id,
                     'doctor_id'              => $appointment->doctor_id,
@@ -696,9 +702,17 @@ class AppointmentService
             'scheduled_today_count' => -1,
         ]));
 
-        $insight = app(InsightService::class)->missedAppointmentsInsight($companyId);
+        $branchId = Tenant::branchId() ?? $request->user()->branch_id;
+
+        $insight = app(InsightService::class)
+            ->missedAppointmentsInsight($companyId);
+
         if ($insight) {
-            event(new InsightGenerated($companyId, $insight));
+            event(new InsightGenerated(
+                $companyId,
+                $branchId,
+                $insight
+            ));
         }
 
         ActivityLogger::log($companyId, $request->user(), 'appointment.no_show', Appointment::class, $appointment->id, [
@@ -722,7 +736,7 @@ class AppointmentService
         $appointment = Appointment::query()->findOrFail($id);
 
         if ($appointment->status === 'completed') {
-            return response()->json(['msg' => 'Completed appointments cannot be rescheduled.', 'status' => 422], 422);
+            throw ValidationException::withMessages(['appointment' => ['Completed appointments cannot be rescheduled.']]);
         }
 
         $data = $request->validate([
@@ -742,14 +756,14 @@ class AppointmentService
         return DB::transaction(function () use ($request, $companyId, $appointment, $newDoctorId, $newDate, $newTime, $blockedStatuses, $doctor) {
             $from = Appointment::query()->lockForUpdate()->findOrFail($appointment->id);
             if ($from->status === 'completed') {
-                return response()->json(['msg' => 'Completed appointments cannot be rescheduled.', 'status' => 422], 422);
+                throw ValidationException::withMessages(['appointment' => ['Completed appointments cannot be rescheduled.']]);
             }
 
             $fromDate = Carbon::parse($from->appointment_date)->toDateString();
             $fromTime = $from->appointment_time ? substr((string) $from->appointment_time, 0, 5) : null;
 
             if ((int) $from->doctor_id === (int) $newDoctorId && $fromDate === $newDate && $fromTime === $newTime) {
-                return response()->json(['msg' => 'Appointment already in the requested slot', 'status' => 200, 'data' => $from->fresh()->load(['patient:id,name,email,company_id', 'doctor:id,name,company_id,work_start,work_end,slot_minutes'])], 200);
+                return $from->fresh()->load(['patient:id,name,email,company_id', 'doctor:id,name,company_id,work_start,work_end,slot_minutes']);
             }
 
             $to = Appointment::query()
@@ -865,12 +879,28 @@ class AppointmentService
         $companyId = $appointment->company_id;
         $branchId = Tenant::branchId() ?? $request->user()->branch_id;
 
-        $exists = Invoice::query()
+        // ✅ البحث عن فاتورة استشارة فقط (ليس لها treatment_plan_id)
+        $invoice = Invoice::withoutGlobalScope(\App\Models\Concerns\BranchScope::class)
             ->where('appointment_id', $appointment->id)
-            ->exists();
+            ->whereNull('treatment_plan_id') // ✅ يضمن أننا لا نتعامل مع فواتير العلاج
+            ->firstOrCreate(
+                ['appointment_id' => $appointment->id],
+                [
+                    'company_id' => $companyId,
+                    'branch_id'  => $branchId,
+                    'number'     => app(InvoiceNumberService::class)->generate($companyId),
+                    'order_id'   => null,
+                    'customer_id' => $appointment->patient_id,
+                    'total'      => 0,
+                    'status'     => 'unpaid',
+                    'issued_at'  => now(),
+                    // ✅ 'treatment_plan_id' سيكون null لأنه استشارة
+                ]
+            );
 
-        if ($exists) return;
-
+        if ($invoice->wasRecentlyCreated === false || $invoice->total > 0) {
+            return;
+        }
         $product = Product::where('company_id', $companyId)
             ->where('title_en', 'Consultation')
             ->when($branchId, fn($q) => $q->where('branch_id', $branchId))
@@ -900,16 +930,9 @@ class AppointmentService
             'total' => $price,
         ]);
 
-        $invoice = Invoice::create([
-            'company_id' => $companyId,
-            'branch_id'  => $branchId,
-            'number' => app(InvoiceNumberService::class)->generate($companyId),
+        $invoice->update([
             'order_id' => $order->id,
-            'appointment_id' => $appointment->id,
-            'customer_id' => $appointment->patient_id,
             'total' => $price,
-            'status' => 'unpaid',
-            'issued_at' => now(),
         ]);
 
         InvoiceItem::create([
@@ -921,17 +944,18 @@ class AppointmentService
             'total' => $price,
         ]);
 
-        CustomerLedgerEntry::create([
-            'company_id' => $companyId,
-            'branch_id'  => $branchId,   // ✅ أضف هذا السطر
-            'customer_id' => $invoice->customer_id,
-            'invoice_id' => $invoice->id,
-            'type' => 'invoice',
-            'debit' => $invoice->total,
-            'credit' => 0,
-            'entry_date' => now(),
-            'description' => 'Consultation invoice #' . $invoice->number,
-        ]);
+        CustomerLedgerEntry::firstOrCreate(
+            ['invoice_id' => $invoice->id, 'type' => 'invoice'],
+            [
+                'company_id' => $companyId,
+                'branch_id'  => $branchId,
+                'customer_id' => $invoice->customer_id,
+                'debit'       => $invoice->total,
+                'credit'      => 0,
+                'entry_date'  => now(),
+                'description' => 'Consultation invoice #' . $invoice->number,
+            ]
+        );
 
         $this->autoApplyCustomerCredit($invoice, $request->user(), $branchId);
     }
@@ -985,6 +1009,7 @@ class AppointmentService
 
         DB::table('customer_credits')->insert([
             'company_id'  => $companyId,
+            'branch_id' => $branchId,
             'customer_id' => $invoice->customer_id,
             'invoice_id'  => $invoice->id,
             'payment_id'  => null,
@@ -997,22 +1022,27 @@ class AppointmentService
             'updated_at'  => now(),
         ]);
 
-        CustomerLedgerEntry::create([
-            'company_id'  => $companyId,
-            'branch_id'   => $branchId,   // ✅ أضف هذا السطر
-            'customer_id' => $invoice->customer_id,
-            'invoice_id'  => $invoice->id,
-            'payment_id'  => null,
-            'refund_id'   => null,
-            'type'        => 'credit_apply',
-            'debit'       => 0,
-            'credit'      => $creditToApply,
-            'entry_date'  => now(),
-            'description' => 'Customer credit auto-applied to invoice #' . $invoice->number,
-        ]);
+        CustomerLedgerEntry::firstOrCreate(
+            ['invoice_id' => $invoice->id, 'type' => 'credit_apply', 'credit' => $creditToApply],
+            [
+                'company_id'  => $companyId,
+                'branch_id'   => $branchId,
+                'customer_id' => $invoice->customer_id,
+                'payment_id'  => null,
+                'refund_id'   => null,
+                'debit'       => 0,
+                'credit'      => $creditToApply,
+                'entry_date'  => now(),
+                'description' => 'Customer credit auto-applied to invoice #' . $invoice->number,
+            ]
+        );
 
-        $arAccount = \App\Models\Account::where('code', '1100')->first();
-        $creditAccount = \App\Models\Account::where('code', '2100')->first();
+        $arAccount = \App\Models\Account::where('company_id', $companyId)
+            ->where('code', '1000')
+            ->first();
+        $creditAccount = \App\Models\Account::where('company_id', $companyId)
+            ->where('code', '2100')
+            ->first();
 
         if ($arAccount && $creditAccount) {
             \App\Services\AccountingService::createEntry(
