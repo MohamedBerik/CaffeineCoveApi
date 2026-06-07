@@ -253,7 +253,11 @@ class InsightService
             }
         }
 
-        if ($growing && $revenues[2] > 0) {
+        if (
+            $growing &&
+            $revenues[2] > 0 &&
+            $revenues[0] > 0
+        ) {
             $growthPercent = (($revenues[2] - $revenues[0]) / $revenues[0]) * 100;
 
             return [
@@ -373,7 +377,10 @@ class InsightService
                 ->where('doctor_id', $topDoctor->doctor_id)
                 ->count();
 
-            $completionRate = ($topDoctor->completed_count / $totalAppointments) * 100;
+            $completionRate =
+                $totalAppointments > 0
+                ? ($topDoctor->completed_count / $totalAppointments) * 100
+                : 0;
 
             return [
                 'type' => 'insight',
