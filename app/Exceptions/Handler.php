@@ -55,10 +55,22 @@ class Handler extends ExceptionHandler
         // استجابة عامة للـ API (للأخطاء غير المتوقعة الأخرى)
         if ($request->expectsJson() || $request->is('api/*')) {
             $statusCode = 500;
+
             if (method_exists($e, 'getStatusCode')) {
-                $statusCode = $e->getStatusCode();
-            } elseif (method_exists($e, 'getCode') && $e->getCode() > 0) {
-                $statusCode = $e->getCode();
+                $candidate = (int) $e->getStatusCode();
+
+                if ($candidate >= 100 && $candidate <= 599) {
+                    $statusCode = $candidate;
+                }
+            }
+
+            if ($e instanceof \Illuminate\Database\QueryException) {
+
+                Log::error($e);
+
+                return response()->json([
+                    'message' => 'Database error',
+                ], 500);
             }
 
             return response()->json([
