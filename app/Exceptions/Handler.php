@@ -66,13 +66,11 @@ class Handler extends ExceptionHandler
 
             if ($e instanceof \Illuminate\Database\QueryException) {
 
-                Log::error($e);
-
                 return response()->json([
-                    'message' => 'Database error',
+                    'message' => $e->getMessage(),
+                    'sql_code' => $e->getCode(),
                 ], 500);
             }
-
             return response()->json([
                 'message' => $e->getMessage(),
                 'exception' => get_class($e),
