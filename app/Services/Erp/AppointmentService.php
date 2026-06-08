@@ -306,7 +306,7 @@ class AppointmentService
 
         $this->validateAppointmentDateTime($doctor, $date, $time);
 
-        return DB::transaction(function () use ($request, $companyId, $data, $date, $time, $doctorId, $doctorName, $appointmentType) {
+        return DB::transaction(function () use ($request, $companyId, $data, $date, $time, $doctorId, $doctorName, $appointmentType, $doctor) {
             $existing = Appointment::query()
                 ->where('doctor_id', $doctorId)
                 ->whereDate('appointment_date', $date)
