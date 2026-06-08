@@ -40,8 +40,10 @@ class BroadcastServiceProvider extends ServiceProvider
                 return $doctor && $doctor->company_id === $user->company_id;
             }
             if ($user->role === 'doctor') {
-                $doctor = \App\Models\Doctor::where('email', $user->email)->first();
-                return $doctor && (int) $doctor->id === (int) $doctorId;
+
+                return \App\Models\Doctor::where('id', $doctorId)
+                    ->where('user_id', $user->id)
+                    ->exists();
             }
             return false;
         });

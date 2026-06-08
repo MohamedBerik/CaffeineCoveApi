@@ -4,6 +4,7 @@ namespace App\Services\Erp;
 
 use App\Events\DashboardUpdated;
 use App\Events\InsightGenerated;
+use App\Events\UserNotificationCreated;
 use App\Models\Appointment;
 use App\Models\CustomerLedgerEntry;
 use App\Models\DentalRecord;
@@ -180,6 +181,16 @@ class AppointmentService
             }
 
             $this->createConsultationInvoiceIfMissing($appointment, $request);
+
+            event(
+                new UserNotificationCreated(
+                    $request->user()->id,
+                    [
+                        'title' => 'Test Notification',
+                        'appointment_id' => $appointment->id,
+                    ]
+                )
+            );
 
             ActivityLogger::log($companyId, $request->user(), 'appointment.created', Appointment::class, $appointment->id, [
                 'doctor_id' => $appointment->doctor_id,
