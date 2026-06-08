@@ -234,12 +234,14 @@ Route::prefix('erp')
         // ==================== TREATMENT PLANS (ترتيب مصحح) ====================
         Route::middleware('permission:treatment_plans.view')->group(function () {
             Route::get('/treatment-plans', [TreatmentPlanController::class, 'index']);
-            Route::get('/treatment-plans/{itemId}/items', [TreatmentPlanController::class, 'items']); // أولاً
+            Route::get('/treatment-plans/{id}/summary', [TreatmentPlanController::class, 'summary']);
+            Route::get('/treatment-plans/{id}/cash-summary', [TreatmentPlanController::class, 'cashSummary']);
+            Route::get('/treatment-plans/{planId}/items', [TreatmentPlanController::class, 'items']);
             Route::get('/treatment-plans/{id}', [TreatmentPlanController::class, 'show']);
         });
         Route::middleware('permission:treatment_plans.create')->group(function () {
             Route::post('/treatment-plans', [TreatmentPlanController::class, 'store']);
-            Route::post('/treatment-plans/{itemId}/items', [TreatmentPlanController::class, 'addItem']);
+            Route::post('/treatment-plans/{planId}/items', [TreatmentPlanController::class, 'addItem']);
         });
         Route::middleware('permission:treatment_plans.manage')->group(function () {
             Route::put('/treatment-plans/{id}', [TreatmentPlanController::class, 'update']);
