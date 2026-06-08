@@ -69,10 +69,7 @@ class Handler extends ExceptionHandler
                 Log::error($e);
 
                 return response()->json([
-                    'message'   => $e->getMessage(),
-                    'sql_code'  => $e->getCode(),
-                    'file'      => $e->getFile(),
-                    'line'      => $e->getLine(),
+                    'message' => 'Database error',
                 ], 500);
             }
 
