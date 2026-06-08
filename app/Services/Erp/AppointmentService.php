@@ -889,7 +889,7 @@ class AppointmentService
                     'company_id' => $companyId,
                     'branch_id'  => $branchId,
                     'number'     => app(InvoiceNumberService::class)->generate($companyId),
-                    'order_id'   => null,
+                    'order_id'   => 1,
                     'customer_id' => $appointment->patient_id,
                     'total'      => 0,
                     'status'     => 'unpaid',
