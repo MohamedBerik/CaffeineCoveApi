@@ -460,3 +460,20 @@ Route::middleware(['auth:sanctum'])->group(function () {
             ->get();
     });
 });
+
+Route::get('/test-user-notification', function () {
+
+    event(
+        new \App\Events\UserNotificationCreated(
+            auth()->id(),
+            [
+                'title' => 'Realtime Test',
+                'message' => 'Broadcast is working'
+            ]
+        )
+    );
+
+    return response()->json([
+        'success' => true
+    ]);
+});
