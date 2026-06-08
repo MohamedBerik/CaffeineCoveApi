@@ -877,78 +877,84 @@ class AppointmentService
     private function createConsultationInvoiceIfMissing($appointment, $request)
     {
         $companyId = $appointment->company_id;
-        $branchId = Tenant::branchId() ?? $request->user()->branch_id;
+        $branchId  = Tenant::branchId() ?? $request->user()->branch_id;
 
-        // ✅ البحث عن فاتورة استشارة فقط (ليس لها treatment_plan_id)
-        $invoice = Invoice::withoutGlobalScope(\App\Models\Concerns\BranchScope::class)
+        // لو الفاتورة موجودة بالفعل لا نكرر الإنشاء
+        $existingInvoice = Invoice::withoutGlobalScope(\App\Models\Concerns\BranchScope::class)
             ->where('appointment_id', $appointment->id)
-            ->whereNull('treatment_plan_id') // ✅ يضمن أننا لا نتعامل مع فواتير العلاج
-            ->firstOrCreate(
-                ['appointment_id' => $appointment->id],
-                [
-                    'company_id' => $companyId,
-                    'branch_id'  => $branchId,
-                    'number'     => app(InvoiceNumberService::class)->generate($companyId),
-                    'order_id'   => 1,
-                    'customer_id' => $appointment->patient_id,
-                    'total'      => 0,
-                    'status'     => 'unpaid',
-                    'issued_at'  => now(),
-                    // ✅ 'treatment_plan_id' سيكون null لأنه استشارة
-                ]
-            );
+            ->whereNull('treatment_plan_id')
+            ->first();
 
-        if ($invoice->wasRecentlyCreated === false || $invoice->total > 0) {
+        if ($existingInvoice) {
             return;
         }
+
         $product = Product::where('company_id', $companyId)
             ->where('title_en', 'Consultation')
             ->when($branchId, fn($q) => $q->where('branch_id', $branchId))
             ->first();
 
-        if (!$product) return;
+        if (!$product) {
+            return;
+        }
 
         $price = (float) ($product->unit_price ?? 0);
-        if ($price <= 0) return;
 
+        if ($price <= 0) {
+            return;
+        }
+
+        // إنشاء Order أولاً
         $order = Order::create([
-            'company_id' => $companyId,
-            'branch_id'  => $branchId,
+            'company_id'  => $companyId,
+            'branch_id'   => $branchId,
             'customer_id' => $appointment->patient_id,
-            'title_en' => 'Consultation Visit',
-            'status' => 'confirmed',
-            'total' => $price,
-            'created_by' => $request->user()->id,
+            'title_en'    => 'Consultation Visit',
+            'title_ar'    => 'كشف',
+            'status'      => 'confirmed',
+            'total'       => $price,
+            'created_by'  => $request->user()->id,
         ]);
 
         OrderItem::create([
             'company_id' => $companyId,
-            'order_id' => $order->id,
+            'order_id'   => $order->id,
             'product_id' => $product->id,
-            'quantity' => 1,
+            'quantity'   => 1,
             'unit_price' => $price,
-            'total' => $price,
+            'total'      => $price,
         ]);
 
-        $invoice->update([
-            'order_id' => $order->id,
-            'total' => $price,
+        // إنشاء Invoice بعد وجود Order
+        $invoice = Invoice::create([
+            'company_id'     => $companyId,
+            'branch_id'      => $branchId,
+            'number'         => app(InvoiceNumberService::class)->generate($companyId),
+            'order_id'       => $order->id,
+            'appointment_id' => $appointment->id,
+            'customer_id'    => $appointment->patient_id,
+            'total'          => $price,
+            'status'         => 'unpaid',
+            'issued_at'      => now(),
         ]);
 
         InvoiceItem::create([
             'company_id' => $companyId,
             'invoice_id' => $invoice->id,
             'product_id' => $product->id,
-            'quantity' => 1,
+            'quantity'   => 1,
             'unit_price' => $price,
-            'total' => $price,
+            'total'      => $price,
         ]);
 
         CustomerLedgerEntry::firstOrCreate(
-            ['invoice_id' => $invoice->id, 'type' => 'invoice'],
             [
-                'company_id' => $companyId,
-                'branch_id'  => $branchId,
+                'invoice_id' => $invoice->id,
+                'type'       => 'invoice',
+            ],
+            [
+                'company_id'  => $companyId,
+                'branch_id'   => $branchId,
                 'customer_id' => $invoice->customer_id,
                 'debit'       => $invoice->total,
                 'credit'      => 0,
@@ -957,7 +963,11 @@ class AppointmentService
             ]
         );
 
-        $this->autoApplyCustomerCredit($invoice, $request->user(), $branchId);
+        $this->autoApplyCustomerCredit(
+            $invoice,
+            $request->user(),
+            $branchId
+        );
     }
 
     private function autoApplyCustomerCredit(Invoice $invoice, $user, $branchId): void
