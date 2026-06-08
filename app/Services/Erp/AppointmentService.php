@@ -182,16 +182,6 @@ class AppointmentService
 
             $this->createConsultationInvoiceIfMissing($appointment, $request);
 
-            event(
-                new UserNotificationCreated(
-                    $request->user()->id,
-                    [
-                        'title' => 'Test Notification',
-                        'appointment_id' => $appointment->id,
-                    ]
-                )
-            );
-
             ActivityLogger::log($companyId, $request->user(), 'appointment.created', Appointment::class, $appointment->id, [
                 'doctor_id' => $appointment->doctor_id,
                 'patient_id' => $appointment->patient_id,
@@ -378,6 +368,19 @@ class AppointmentService
                 'scheduled_today_count'    => 1,
             ]));
 
+            if ($doctor->user_id) {
+                event(new UserNotificationCreated(
+                    $doctor->user_id,
+                    [
+                        'type' => 'appointment_created',
+                        'title' => 'New Appointment',
+                        'appointment_id' => $appointment->id,
+                        'patient_name' => $appointment->patient?->name,
+                        'appointment_date' => $appointment->appointment_date,
+                        'appointment_time' => $appointment->appointment_time,
+                    ]
+                ));
+            }
             return $appointment;
         });
     }
@@ -677,6 +680,18 @@ class AppointmentService
             'cancelled_today_count'  => 1,
             'scheduled_today_count' => -1,
         ]));
+
+        if ($appointment->doctor && $appointment->doctor->user_id) {
+            event(new UserNotificationCreated(
+                $appointment->doctor->user_id,
+                [
+                    'type' => 'appointment_cancelled',
+                    'title' => 'Appointment Cancelled',
+                    'appointment_id' => $appointment->id,
+                    'patient_name' => $appointment->patient?->name,
+                ]
+            ));
+        }
 
         ActivityLogger::log($companyId, $request->user(), 'appointment.cancelled', Appointment::class, $appointment->id, [
             'old_status' => $oldStatus,
