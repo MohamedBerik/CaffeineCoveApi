@@ -19,6 +19,13 @@ class AlertController extends Controller
      */
     public function index(Request $request)
     {
+        \Log::info('Alerts Debug', [
+            'tenant_id' => Tenant::id(),
+            'user_id' => auth()->id(),
+            'count_with_scope' => SystemAlert::count(),
+            'count_without_scope' => SystemAlert::withoutGlobalScopes()->count(),
+        ]);
+
         $query = SystemAlert::query();
 
         // Filter

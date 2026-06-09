@@ -19,6 +19,7 @@ use App\Models\TreatmentPlan;
 use App\Services\ActivityLogger;
 use App\Services\InsightService;
 use App\Services\InvoiceNumberService;
+use App\Services\NotificationService;
 use App\Services\Tenant;
 use App\Traits\ValidatesAppointments;
 use App\Traits\HandlesAppointmentReminders;
@@ -369,19 +370,18 @@ class AppointmentService
             ]));
 
             if ($doctor->user_id) {
-                event(new UserNotificationCreated(
-                    $doctor->user_id,   // ✅ التصحيح
+                NotificationService::send(
+                    $doctor->user_id,
+                    'New Appointment',
+                    'A new appointment has been assigned to you.',
                     [
-                        'id' => uniqid(),
-                        'type' => 'info',
-                        'priority' => 'medium',
-                        'title' => 'New Appointment',
-                        'message' => 'A new appointment has been assigned to you',
                         'appointment_id' => $appointment->id,
-                        'read' => false,
-                        'created_at' => now()->toISOString(),
-                    ]
-                ));
+                    ],
+                    'info',
+                    'medium',
+                    $appointment->company_id,
+                    $appointment->branch_id
+                );
             }
             return $appointment;
         });
