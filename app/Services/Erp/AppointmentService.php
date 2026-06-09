@@ -370,14 +370,16 @@ class AppointmentService
 
             if ($doctor->user_id) {
                 event(new UserNotificationCreated(
-                    $doctor->user_id,
+                    $doctor->user_id,   // ✅ التصحيح
                     [
-                        'type' => 'appointment_created',
+                        'id' => uniqid(),
+                        'type' => 'info',
+                        'priority' => 'medium',
                         'title' => 'New Appointment',
+                        'message' => 'A new appointment has been assigned to you',
                         'appointment_id' => $appointment->id,
-                        'patient_name' => $appointment->patient?->name,
-                        'appointment_date' => $appointment->appointment_date,
-                        'appointment_time' => $appointment->appointment_time,
+                        'read' => false,
+                        'created_at' => now()->toISOString(),
                     ]
                 ));
             }
@@ -685,10 +687,14 @@ class AppointmentService
             event(new UserNotificationCreated(
                 $appointment->doctor->user_id,
                 [
-                    'type' => 'appointment_cancelled',
+                    'id' => uniqid(),
+                    'type' => 'info',
+                    'priority' => 'medium',
                     'title' => 'Appointment Cancelled',
+                    'message' => 'An appointment has been cancelled',
                     'appointment_id' => $appointment->id,
-                    'patient_name' => $appointment->patient?->name,
+                    'read' => false,
+                    'created_at' => now()->toISOString(),
                 ]
             ));
         }
