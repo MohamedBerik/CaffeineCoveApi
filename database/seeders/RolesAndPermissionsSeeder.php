@@ -62,6 +62,7 @@ class RolesAndPermissionsSeeder extends Seeder
             'branches.view',
             'branches.manage',
             'contact_messages.manage',
+            'notifications.view',
         ];
 
         foreach ($permissions as $perm) {
@@ -116,6 +117,7 @@ class RolesAndPermissionsSeeder extends Seeder
             'supplies.manage',
             'branches.view',
             'branches.manage',
+            'notifications.view',
         ]);
 
         // Doctor role
@@ -129,6 +131,7 @@ class RolesAndPermissionsSeeder extends Seeder
             'dental_records.create',
             'radiology.view',
             'radiology.manage',
+            'notifications.view',
         ]);
 
         // Receptionist role
@@ -151,6 +154,7 @@ class RolesAndPermissionsSeeder extends Seeder
             'dental_records.create',
             'dental_records.view',
             'inventory.view',
+            'notifications.view',
         ]);
     }
 }

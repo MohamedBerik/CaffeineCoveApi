@@ -140,7 +140,7 @@ Route::prefix('erp')
             Route::delete('/branches/{id}', [BranchController::class, 'destroy']);
         });
 
-        Route::middleware('permission:finance.view')->group(function () {
+        Route::middleware('permission:notifications.view')->group(function () {
             Route::get('/alerts', [AlertController::class, 'index']);
             Route::get('/alerts/unread-count', [AlertController::class, 'unreadCount']);
             Route::post('/alerts/{id}/ack', [AlertController::class, 'acknowledge']);
