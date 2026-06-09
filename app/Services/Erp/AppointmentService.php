@@ -4,7 +4,6 @@ namespace App\Services\Erp;
 
 use App\Events\DashboardUpdated;
 use App\Events\InsightGenerated;
-use App\Events\UserNotificationCreated;
 use App\Models\Appointment;
 use App\Models\CustomerLedgerEntry;
 use App\Models\DentalRecord;
@@ -19,7 +18,6 @@ use App\Models\TreatmentPlan;
 use App\Services\ActivityLogger;
 use App\Services\InsightService;
 use App\Services\InvoiceNumberService;
-use App\Services\NotificationService;
 use App\Services\Tenant;
 use App\Traits\ValidatesAppointments;
 use App\Traits\HandlesAppointmentReminders;
@@ -370,17 +368,17 @@ class AppointmentService
             ]));
 
             if ($doctor->user_id) {
-                NotificationService::send(
-                    $doctor->user_id,
-                    'New Appointment',
-                    'A new appointment has been assigned to you.',
-                    [
+                app(\App\Services\SystemAlertService::class)->create(
+                    companyId: $appointment->company_id,
+                    message: 'New appointment assigned to Dr. ' . $doctor->name,
+                    priority: 'medium',
+                    type: 'info',
+                    code: 'NEW_APPOINTMENT',
+                    userId: $doctor->user_id,
+                    metadata: [
                         'appointment_id' => $appointment->id,
-                    ],
-                    'info',
-                    'medium',
-                    $appointment->company_id,
-                    $appointment->branch_id
+                        'patient_id' => $appointment->patient_id,
+                    ]
                 );
             }
             return $appointment;
@@ -684,19 +682,18 @@ class AppointmentService
         ]));
 
         if ($appointment->doctor && $appointment->doctor->user_id) {
-            event(new UserNotificationCreated(
-                $appointment->doctor->user_id,
-                [
-                    'id' => uniqid(),
-                    'type' => 'info',
-                    'priority' => 'medium',
-                    'title' => 'Appointment Cancelled',
-                    'message' => 'An appointment has been cancelled',
+            app(\App\Services\SystemAlertService::class)->create(
+                companyId: $appointment->company_id,
+                message: 'Appointment #' . $appointment->id . ' has been cancelled',
+                priority: 'medium',
+                type: 'info',
+                code: 'APPOINTMENT_CANCELLED',
+                userId: $appointment->doctor->user_id,
+                metadata: [
                     'appointment_id' => $appointment->id,
-                    'read' => false,
-                    'created_at' => now()->toISOString(),
+                    'patient_id' => $appointment->patient_id,
                 ]
-            ));
+            );
         }
 
         ActivityLogger::log($companyId, $request->user(), 'appointment.cancelled', Appointment::class, $appointment->id, [
