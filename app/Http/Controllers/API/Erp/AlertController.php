@@ -13,23 +13,25 @@ class AlertController extends Controller
     // {
     //     $this->authorizeResource(SystemAlert::class, 'alert');
     // }
-
     /**
-     * جلب الإشعارات
+     * جلب الإشعارات المفروزة بالفروع
      */
     public function index(Request $request)
     {
-        \Log::info('ALERT TENANT DEBUG', [
-            'tenant_id' => Tenant::id(),
-            'tenant_has' => Tenant::hasTenant(),
-            'tenant_branch' => Tenant::branchId(),
-            'header_branch' => request()->header('X-Branch-ID'),
-            'company_user' => auth()->user()?->company_id,
-        ]);
+        // تحديد الفرع الحالي المستهدف (إما من الـ Header أو من الـ Query Parameter)
+        $branchId = $request->header('X-Branch-ID') ?? $request->query('branch_id');
 
         $query = SystemAlert::query();
 
-        // Filter
+        // 🛡️ تطبيق عزل الفروع الذكي
+        if ($branchId && $branchId !== 'all') {
+            $query->where(function ($q) use ($branchId) {
+                $q->where('branch_id', $branchId)
+                    ->orWhereNull('branch_id'); // الإشعارات العامة الموجهة لكل الشركة
+            });
+        }
+
+        // Filters
         if ($request->filter === 'unread') {
             $query->whereNull('acknowledged_at');
         }
@@ -39,9 +41,7 @@ class AlertController extends Controller
         }
 
         // Pagination
-        $alerts = $query
-            ->latest('triggered_at')
-            ->paginate(20);
+        $alerts = $query->latest('triggered_at')->paginate(20);
 
         return response()->json([
             'data' => collect($alerts->items())->map(function ($alert) {
@@ -51,7 +51,7 @@ class AlertController extends Controller
                     'priority' => $alert->priority,
                     'type' => $alert->type,
                     'code' => $alert->code,
-                    'time' => $alert->triggered_at?->toISOString(), // ✅ String format
+                    'time' => $alert->triggered_at?->toISOString(),
                     'read' => $alert->acknowledged_at !== null,
                 ];
             }),
@@ -64,15 +64,23 @@ class AlertController extends Controller
     }
 
     /**
-     * جلب عدد الإشعارات غير المقروءة
+     * جلب عدد الإشعارات غير المقروءة لفرع محدد
      */
-    public function unreadCount()
+    public function unreadCount(Request $request)
     {
-        $count = SystemAlert::query()
-            ->whereNull('acknowledged_at')
-            ->count();
+        $branchId = $request->header('X-Branch-ID') ?? $request->query('branch_id');
 
-        return response()->json(['count' => $count]);
+        $query = SystemAlert::query()->whereNull('acknowledged_at');
+
+        // 🛡️ تطبيق عزل العداد للفروع
+        if ($branchId && $branchId !== 'all') {
+            $query->where(function ($q) use ($branchId) {
+                $q->where('branch_id', $branchId)
+                    ->orWhereNull('branch_id');
+            });
+        }
+
+        return response()->json(['count' => $query->count()]);
     }
 
     /**
@@ -81,24 +89,25 @@ class AlertController extends Controller
     public function acknowledge($id)
     {
         $alert = SystemAlert::query()->findOrFail($id);
-
-        $alert->update([
-            'acknowledged_at' => now()
-        ]);
+        $alert->update(['acknowledged_at' => now()]);
 
         return response()->json(['status' => 'ok']);
     }
 
     /**
-     * تحديد كل الإشعارات كمقروءة
+     * تحديد إشعارات الفرع الحالي فقط كمقروءة
      */
-    public function markAllRead()
+    public function markAllRead(Request $request)
     {
-        SystemAlert::query()
-            ->whereNull('acknowledged_at')
-            ->update([
-                'acknowledged_at' => now()
-            ]);
+        $branchId = $request->header('X-Branch-ID') ?? $request->query('branch_id');
+
+        $query = SystemAlert::query()->whereNull('acknowledged_at');
+
+        if ($branchId && $branchId !== 'all') {
+            $query->where('branch_id', $branchId);
+        }
+
+        $query->update(['acknowledged_at' => now()]);
 
         return response()->json(['status' => 'ok']);
     }
