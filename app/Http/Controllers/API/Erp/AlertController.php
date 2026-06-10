@@ -19,12 +19,8 @@ class AlertController extends Controller
      */
     public function index(Request $request)
     {
-        \Log::info('ALERT TENANT DEBUG', [
-            'tenant_id' => Tenant::id(),
-            'tenant_has' => Tenant::hasTenant(),
-            'tenant_branch' => Tenant::branchId(),
-            'header_branch' => request()->header('X-Branch-ID'),
-            'company_user' => auth()->user()?->company_id,
+        \Log::info('ALERT MODEL SCOPES', [
+            'scopes' => array_keys((new \App\Models\SystemAlert)->getGlobalScopes())
         ]);
 
         $query = SystemAlert::query();
