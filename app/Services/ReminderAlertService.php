@@ -256,7 +256,11 @@ class ReminderAlertService
                 ->whereDate('last_reminder_at', today())
                 ->count(),
             'active_alerts' => SystemAlert::query()
-                ->where('code', 'like', '%reminder%')
+                ->whereIn('code', [
+                    self::TYPE_FAILED,
+                    self::TYPE_RETRY,
+                    self::TYPE_STUCK,
+                ])
                 ->whereNull('resolved_at')
                 ->count(),
         ];
