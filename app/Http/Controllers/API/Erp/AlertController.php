@@ -19,17 +19,16 @@ class AlertController extends Controller
      */
     public function index(Request $request)
     {
+        \Log::info('ALERT TENANT DEBUG', [
+            'tenant_id' => Tenant::id(),
+            'tenant_has' => Tenant::hasTenant(),
+            'tenant_branch' => Tenant::branchId(),
+            'header_branch' => request()->header('X-Branch-ID'),
+            'company_user' => auth()->user()?->company_id,
+        ]);
 
-        $user = auth()->user();
         $query = SystemAlert::query();
 
-        // ✅ إذا كان مستخدم عادي (ليس Super Admin وليس Admin العيادة)
-        if (!$user->is_super_admin && $user->role !== 'admin') {
-            $branchId = $user->branch_id;
-            if ($branchId) {
-                $query->where('branch_id', $branchId);
-            }
-        }
         // Filter
         if ($request->filter === 'unread') {
             $query->whereNull('acknowledged_at');
