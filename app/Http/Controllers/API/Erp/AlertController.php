@@ -19,15 +19,17 @@ class AlertController extends Controller
      */
     public function index(Request $request)
     {
-        \Log::info('Alerts Debug', [
-            'tenant_id' => Tenant::id(),
-            'user_id' => auth()->id(),
-            'count_with_scope' => SystemAlert::count(),
-            'count_without_scope' => SystemAlert::withoutGlobalScopes()->count(),
-        ]);
 
+        $user = auth()->user();
         $query = SystemAlert::query();
 
+        // ✅ إذا كان مستخدم عادي (ليس Super Admin وليس Admin العيادة)
+        if (!$user->is_super_admin && $user->role !== 'admin') {
+            $branchId = $user->branch_id;
+            if ($branchId) {
+                $query->where('branch_id', $branchId);
+            }
+        }
         // Filter
         if ($request->filter === 'unread') {
             $query->whereNull('acknowledged_at');
