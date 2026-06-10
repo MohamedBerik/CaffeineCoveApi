@@ -14,6 +14,7 @@ use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\Payment;
 use App\Models\Product;
+use App\Models\SystemAlert;
 use App\Models\TreatmentPlan;
 use App\Services\ActivityLogger;
 use App\Services\InsightService;
@@ -367,20 +368,21 @@ class AppointmentService
                 'scheduled_today_count'    => 1,
             ]));
 
-            if ($doctor->user_id) {
-                app(\App\Services\SystemAlertService::class)->create(
-                    companyId: $appointment->company_id,
-                    message: 'New appointment assigned to Dr. ' . $doctor->name,
-                    priority: 'medium',
-                    type: 'info',
-                    code: 'NEW_APPOINTMENT',
-                    userId: $doctor->user_id,
-                    metadata: [
-                        'appointment_id' => $appointment->id,
-                        'patient_id' => $appointment->patient_id,
-                    ]
-                );
-            }
+            SystemAlert::create([
+                'company_id' => $appointment->company_id,
+                'branch_id'  => $appointment->branch_id,
+                'code'       => 'NEW_APPOINTMENT',
+                'type'       => SystemAlert::TYPE_APPOINTMENT,
+                'priority'   => SystemAlert::PRIORITY_MEDIUM,
+                'message'    => 'New appointment assigned to Dr. ' . $doctor->name,
+                'meta'       => [
+                    'appointment_id' => $appointment->id,
+                    'patient_id' => $appointment->patient_id,
+                    'doctor_id' => $doctor->id,
+                    'user_id' => $doctor->user_id,
+                ],
+                'triggered_at' => now(),
+            ]);
             return $appointment;
         });
     }
@@ -682,20 +684,22 @@ class AppointmentService
         ]));
 
         if ($appointment->doctor && $appointment->doctor->user_id) {
-            app(\App\Services\SystemAlertService::class)->create(
-                companyId: $appointment->company_id,
-                message: 'Appointment #' . $appointment->id . ' has been cancelled',
-                priority: 'medium',
-                type: 'info',
-                code: 'APPOINTMENT_CANCELLED',
-                userId: $appointment->doctor->user_id,
-                metadata: [
+            SystemAlert::create([
+                'company_id' => $appointment->company_id,
+                'branch_id'  => $appointment->branch_id,
+                'code'       => 'APPOINTMENT_CANCELLED',
+                'type'       => SystemAlert::TYPE_APPOINTMENT,
+                'priority'   => SystemAlert::PRIORITY_MEDIUM,
+                'message'    => 'Appointment cancelled for Dr. ' . $appointment->doctor->name,
+                'meta'       => [
                     'appointment_id' => $appointment->id,
                     'patient_id' => $appointment->patient_id,
-                ]
-            );
+                    'doctor_id' => $appointment->doctor->id,
+                    'user_id' => $appointment->doctor->user_id,
+                ],
+                'triggered_at' => now(),
+            ]);
         }
-
         ActivityLogger::log($companyId, $request->user(), 'appointment.cancelled', Appointment::class, $appointment->id, [
             'old_status' => $oldStatus,
             'new_status' => 'cancelled',
