@@ -21,7 +21,8 @@ class BranchScope implements Scope
         'treatment_plans',
         'dental_records',
         'users',
-        'radiologies', // أضف أي جداول أخرى عيادية تملك عمود branch_id هنا
+        'radiologies',
+        'system_alerts',
     ];
 
     public function apply(Builder $builder, Model $model)
