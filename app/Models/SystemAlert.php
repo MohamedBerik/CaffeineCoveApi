@@ -191,20 +191,16 @@ class SystemAlert extends Model
 
     // ============ Static Helpers ============
 
-    // ============ Static Helpers المحدثة ============
-
     public static function createAlert(
         int $companyId,
         string $message,
         string $type = self::TYPE_SYSTEM,
         string $priority = self::PRIORITY_MEDIUM,
         array $meta = [],
-        ?string $code = null,
-        ?int $branchId = null // 🚀 أضفنا الـ branchId هنا كبارامتر اختياري
+        ?string $code = null
     ): self {
         return static::create([
             'company_id' => $companyId,
-            'branch_id' => $branchId, // 🚀 حفظ الفرع في قاعدة البيانات
             'code' => $code,
             'type' => $type,
             'priority' => $priority,
