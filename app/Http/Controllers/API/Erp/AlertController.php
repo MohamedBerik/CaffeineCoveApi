@@ -19,13 +19,13 @@ class AlertController extends Controller
      */
     public function index(Request $request)
     {
-        \Log::info('ALERT_CONTROLLER_DEBUG', [
-            'header_branch' => request()->header('X-Branch-ID'),
-            'tenant_branch' => Tenant::branchId(),
-            'container_branch' => app()->has('tenant_branch_id')
-                ? app('tenant_branch_id')
-                : null,
-        ]);
+        // \Log::info('ALERT_CONTROLLER_DEBUG', [
+        //     'header_branch' => request()->header('X-Branch-ID'),
+        //     'tenant_branch' => Tenant::branchId(),
+        //     'container_branch' => app()->has('tenant_branch_id')
+        //         ? app('tenant_branch_id')
+        //         : null,
+        // ]);
 
         $query = SystemAlert::query();
 
