@@ -19,9 +19,10 @@ class AlertController extends Controller
      */
     public function index(Request $request)
     {
-        \Log::info('ALERT MODEL SCOPES', [
-            'scopes' => array_keys((new \App\Models\SystemAlert)->getGlobalScopes())
-        ]);
+        dd(
+            SystemAlert::query()->toSql(),
+            SystemAlert::query()->getBindings()
+        );
 
         $query = SystemAlert::query();
 
