@@ -27,14 +27,6 @@ class BranchScope implements Scope
 
     public function apply(Builder $builder, Model $model)
     {
-        \Log::info('BRANCH_SCOPE_DEBUG', [
-            'model' => get_class($model),
-            'table' => $model->getTable(),
-            'tenant_branch' => Tenant::branchId(),
-            'container_branch' => app()->has('tenant_branch_id')
-                ? app('tenant_branch_id')
-                : null,
-        ]);
         $branchId = app()->has('tenant_branch_id')
             ? app('tenant_branch_id')
             : Tenant::branchId();
