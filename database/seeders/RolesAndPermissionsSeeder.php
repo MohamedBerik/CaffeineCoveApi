@@ -156,7 +156,6 @@ class RolesAndPermissionsSeeder extends Seeder
             'inventory.view',
             'notifications.view',
             'finance.view',
-
         ]);
     }
 }
