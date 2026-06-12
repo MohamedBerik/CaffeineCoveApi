@@ -155,6 +155,8 @@ class RolesAndPermissionsSeeder extends Seeder
             'dental_records.view',
             'inventory.view',
             'notifications.view',
+            'finance.view',
+
         ]);
     }
 }
