@@ -9,27 +9,25 @@ use Illuminate\Http\Request;
 
 class AlertController extends Controller
 {
-    // public function __construct()
-    // {
-    //     $this->authorizeResource(SystemAlert::class, 'alert');
-    // }
-
     /**
-     * جلب الإشعارات
+     * جلب الإشعارات المفلترة ديناميكياً حسب الفرع
      */
     public function index(Request $request)
     {
-        // \Log::info('ALERT_CONTROLLER_DEBUG', [
-        //     'header_branch' => request()->header('X-Branch-ID'),
-        //     'tenant_branch' => Tenant::branchId(),
-        //     'container_branch' => app()->has('tenant_branch_id')
-        //         ? app('tenant_branch_id')
-        //         : null,
-        // ]);
-
         $query = SystemAlert::query();
 
-        // Filter
+        // 🚀 [التعديل الذهبي]: التصفية الصريحة حسب الفرع لمنع كاش وعشوائية الميدياوير أثناء التنقل الفوري
+        // نقرأ أولاً من الـ query parameter، ثم الهيدر، ثم الـ container كخط دفاع أخير
+        $branchId = $request->query('branch_id')
+            ?: $request->header('X-Branch-ID')
+            ?: (app()->has('tenant_branch_id') ? app('tenant_branch_id') : null);
+
+        // إذا كان الفرع محدداً وليس "all"، نطبق الفلترة فوراً
+        if ($branchId && $branchId !== 'all') {
+            $query->where('branch_id', $branchId);
+        }
+
+        // Filter حسب الحالة
         if ($request->filter === 'unread') {
             $query->whereNull('acknowledged_at');
         }
@@ -51,7 +49,7 @@ class AlertController extends Controller
                     'priority' => $alert->priority,
                     'type' => $alert->type,
                     'code' => $alert->code,
-                    'time' => $alert->triggered_at?->toISOString(), // ✅ String format
+                    'time' => $alert->triggered_at?->toISOString(),
                     'read' => $alert->acknowledged_at !== null,
                 ];
             }),
@@ -64,13 +62,22 @@ class AlertController extends Controller
     }
 
     /**
-     * جلب عدد الإشعارات غير المقروءة
+     * جلب عدد الإشعارات غير المقروءة لفرع محدد
      */
-    public function unreadCount()
+    public function unreadCount(Request $request)
     {
-        $count = SystemAlert::query()
-            ->whereNull('acknowledged_at')
-            ->count();
+        $query = SystemAlert::query()->whereNull('acknowledged_at');
+
+        // 🚀 تأمين عداد الإشعارات أيضاً عند التبديل اللحظي للفروع
+        $branchId = $request->query('branch_id')
+            ?: $request->header('X-Branch-ID')
+            ?: (app()->has('tenant_branch_id') ? app('tenant_branch_id') : null);
+
+        if ($branchId && $branchId !== 'all') {
+            $query->where('branch_id', $branchId);
+        }
+
+        $count = $query->count();
 
         return response()->json(['count' => $count]);
     }
@@ -92,13 +99,19 @@ class AlertController extends Controller
     /**
      * تحديد كل الإشعارات كمقروءة
      */
-    public function markAllRead()
+    public function markAllRead(Request $request)
     {
-        SystemAlert::query()
-            ->whereNull('acknowledged_at')
-            ->update([
-                'acknowledged_at' => now()
-            ]);
+        $query = SystemAlert::query()->whereNull('acknowledged_at');
+
+        // تأمين الـ mark all read لتعمل على مستوى الفرع النشط فقط إذا مرر بالطلب
+        $branchId = $request->query('branch_id') ?: $request->header('X-Branch-ID');
+        if ($branchId && $branchId !== 'all') {
+            $query->where('branch_id', $branchId);
+        }
+
+        $query->update([
+            'acknowledged_at' => now()
+        ]);
 
         return response()->json(['status' => 'ok']);
     }
