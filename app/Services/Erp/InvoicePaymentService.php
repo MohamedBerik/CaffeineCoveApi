@@ -4,6 +4,7 @@ namespace App\Services\Erp;
 
 use App\Events\DashboardUpdated;
 use App\Events\InsightGenerated;
+use App\Events\UserNotificationCreated;
 use App\Models\Account;
 use App\Models\CustomerLedgerEntry;
 use App\Models\Invoice;
@@ -204,6 +205,19 @@ class InvoicePaymentService
                     $insight
                 ));
             }
+
+            event(
+                new UserNotificationCreated(
+                    $request->user()->id,
+                    [
+                        'id' => $payment->id,
+                        'message' => 'Payment recorded successfully',
+                        'priority' => 'medium',
+                        'type' => 'payment_created',
+                        'created_at' => now()->toISOString(),
+                    ]
+                )
+            );
 
             return response()->json([
                 'msg'            => 'Payment recorded successfully',
