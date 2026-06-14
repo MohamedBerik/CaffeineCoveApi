@@ -101,5 +101,17 @@ class BroadcastServiceProvider extends ServiceProvider
         Broadcast::channel('saas.activity-logs', function ($user) {
             return $user->isSuperAdmin();
         });
+
+        Broadcast::channel(
+            'role.{role}',
+            function ($user, $role) {
+
+                if ($user->isSuperAdmin()) {
+                    return true;
+                }
+
+                return $user->role === $role;
+            }
+        );
     }
 }
