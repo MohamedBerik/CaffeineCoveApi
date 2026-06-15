@@ -11,6 +11,8 @@ class LogFailedLogin
 {
     public function handle(FailedLogin $event)
     {
+        throw new \Exception('I AM INSIDE LOGFAILEDLOGIN');
+
         try {
             Log::info('FAILED LOGIN LISTENER REACHED', [
                 'subject_id' => 0,
