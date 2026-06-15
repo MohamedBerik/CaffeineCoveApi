@@ -12,18 +12,21 @@ class LogFailedLogin
     public function handle(FailedLogin $event)
     {
         try {
+            // 🔍 محاولة جلب المستخدم لمعرفة الـ ID الحقيقي له إن وجد
+            $user = \App\Models\User::withoutGlobalScopes()
+                ->where('email', $event->email)
+                ->first();
 
             ActivityLog::withoutGlobalScopes()->create([
                 'company_id'   => Tenant::id() ?? 1,
                 'branch_id'    => null,
-                'user_id'      => null,
+                'user_id'      => null, // يترك فارغاً لأنه لم يسجل دخول بنجاح
 
                 'action'       => 'auth.failed_login',
-
                 'subject_type' => 'User',
 
-                // مهم جداً
-                'subject_id'   => 0,
+                // 🌟 الحل: إذا وجدنا المستخدم نضع معرفه، وإذا لم نجده نضع -1 (لتجنب فخ الصفر والـ null)
+                'subject_id'   => $user ? $user->id : -1,
 
                 'properties'   => [
                     'email'        => $event->email,
@@ -33,16 +36,12 @@ class LogFailedLogin
                 ],
             ]);
         } catch (\Exception $e) {
-
-            Log::error(
-                'Cannot log failed login: ' .
-                    $e->getMessage()
-            );
+            Log::error('Cannot log failed login: ' . $e->getMessage());
         }
 
         Log::warning('Failed login attempt', [
-            'email' => $event->email,
-            'ip' => $event->ip,
+            'email'  => $event->email,
+            'ip'     => $event->ip,
             'reason' => $event->reason,
         ]);
     }
