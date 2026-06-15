@@ -11,45 +11,46 @@ class LogFailedLogin
 {
     public function handle(FailedLogin $event)
     {
-        throw new \Exception('I AM INSIDE LOGFAILEDLOGIN');
-
         try {
             Log::info('FAILED LOGIN LISTENER REACHED', [
-                'subject_id' => 0,
+                'email' => $event->email,
                 'tenant' => Tenant::id(),
             ]);
+
+            // 🔍 جلب المستخدم لمعرفة الـ ID الحقيقي له
+            $user = \App\Models\User::withoutGlobalScopes()
+                ->where('email', $event->email)
+                ->first();
 
             ActivityLog::withoutGlobalScopes()->create([
                 'company_id'   => Tenant::id() ?? 1,
                 'branch_id'    => null,
                 'user_id'      => null,
-
                 'action'       => 'auth.failed_login',
-
                 'subject_type' => 'User',
 
-                // مهم جداً
-                'subject_id'   => 0,
+                // 🌟 استخدام -1 لتفادي فخ الـ null والـ Zero تماماً
+                'subject_id'   => $user ? $user->id : -1,
 
                 'properties'   => [
                     'email'        => $event->email,
                     'ip'           => $event->ip,
                     'reason'       => $event->reason,
-                    'attempted_at' => now(),
+                    'attempted_at' => now()->toIso8601String(),
                 ],
             ]);
         } catch (\Exception $e) {
-
-            Log::error(
-                'Cannot log failed login: ' .
-                    $e->getMessage()
-            );
+            // ✅ الصح: سجل الخطأ الأصلي في صمت جوه ملف الـ laravel.log بدون ما توقع السيستم
+            Log::error('❌ FAILED_LOGIN_LISTENER_CRASHED: ' . $e->getMessage(), [
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+                'trace' => $e->getTraceAsString() // هيجيبلك المشكلة من جدرها
+            ]);
         }
 
-        Log::warning('Failed login attempt', [
+        // لوج تحذيري خارجي
+        Log::warning('Failed login attempt logged', [
             'email' => $event->email,
-            'ip' => $event->ip,
-            'reason' => $event->reason,
         ]);
     }
 }
