@@ -11,11 +11,11 @@ class LogFailedLogin
 {
     public function handle(FailedLogin $event)
     {
-        Log::info('FAILED LOGIN LISTENER REACHED', [
-            'subject_id' => 0,
-            'tenant' => Tenant::id(),
-        ]);
         try {
+            Log::info('FAILED LOGIN LISTENER REACHED', [
+                'subject_id' => 0,
+                'tenant' => Tenant::id(),
+            ]);
 
             ActivityLog::withoutGlobalScopes()->create([
                 'company_id'   => Tenant::id() ?? 1,
