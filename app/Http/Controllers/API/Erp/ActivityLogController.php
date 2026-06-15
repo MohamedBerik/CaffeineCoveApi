@@ -57,6 +57,7 @@ class ActivityLogController extends Controller
             }
 
             // ... باقي عوامل التصفية (subject_type, action, إلخ)
+            // ... باقي عوامل التصفية (subject_type, action, إلخ)
             $logs = $query
                 ->when($request->subject_type, fn($q) => $q->where('subject_type', $request->subject_type))
                 ->when($request->action, fn($q) => $q->where('action', $request->action))
@@ -67,6 +68,8 @@ class ActivityLogController extends Controller
                     $q->where(function ($sq) use ($request) {
                         $sq->where('action', 'like', "%{$request->search}%")
                             ->orWhere('subject_type', 'like', "%{$request->search}%")
+                            // 🌟 إضافة: البحث داخل الـ JSON Properties (عن الإيميل المحاول أو الـ IP) ليكون البحث ذكياً
+                            ->orWhere('properties', 'like', "%{$request->search}%")
                             ->orWhereHas('user', fn($u) => $u->where('name', 'like', "%{$request->search}%"));
                     });
                 })
@@ -80,10 +83,14 @@ class ActivityLogController extends Controller
                     'user_id' => $log->user_id,
                     'user_name' => $log->user?->name,
                     'user_email' => $log->user?->email,
+
+                    // 🌟 السطر السحري: استدعاء الـ Accessor اللي ضيفته في الموديل هيرجع الإيميل لو failed_login
+                    'email_attempted' => $log->email_attempted,
+
                     'subject_type' => $log->subject_type,
                     'subject_id' => $log->subject_id,
                     'company_id' => $log->company_id,
-                    'branch_id' => $log->branch_id, // ✅ أضفنا branch_id في الاستجابة
+                    'branch_id' => $log->branch_id,
                     'properties' => $log->properties,
                     'created_at' => $log->created_at?->toISOString(),
                 ]),

@@ -40,4 +40,19 @@ class ActivityLog extends Model
     {
         return $this->morphTo();
     }
+
+    // جوه كلاس ActivityLog
+
+    public function getEmailAttemptedAttribute()
+    {
+        if ($this->action !== 'auth.failed_login') {
+            return null;
+        }
+
+        $properties = is_string($this->properties)
+            ? json_decode($this->properties, true)
+            : $this->properties;
+
+        return $properties['email'] ?? 'Unknown';
+    }
 }
