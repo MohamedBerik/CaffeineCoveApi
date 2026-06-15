@@ -84,7 +84,8 @@ class Handler extends ExceptionHandler
 
         if (
             !($e instanceof \Illuminate\Validation\ValidationException) &&
-            !($e instanceof \Illuminate\Auth\AuthenticationException)
+            !($e instanceof \Illuminate\Auth\AuthenticationException) &&
+            !($e instanceof \Illuminate\Auth\Access\AuthorizationException)
         ) {
             event(
                 new \App\Events\SystemExceptionOccurred(

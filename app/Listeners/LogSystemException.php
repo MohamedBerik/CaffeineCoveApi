@@ -15,7 +15,7 @@ class LogSystemException
             'user_id' => null,
             'action' => 'system.exception',
             'subject_type' => 'System',
-            'subject_id' => null,
+            'subject_id' => 0,
             'properties' => [
                 'message' => $event->message,
                 'exception' => $event->exception,
