@@ -82,6 +82,20 @@ class Handler extends ExceptionHandler
             ], $statusCode);
         }
 
+        if (
+            !($e instanceof \Illuminate\Validation\ValidationException) &&
+            !($e instanceof \Illuminate\Auth\AuthenticationException)
+        ) {
+            event(
+                new \App\Events\SystemExceptionOccurred(
+                    $e->getMessage(),
+                    get_class($e),
+                    $e->getFile(),
+                    $e->getLine()
+                )
+            );
+        }
+
         return parent::render($request, $e);
     }
 

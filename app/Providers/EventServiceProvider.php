@@ -45,6 +45,9 @@ class EventServiceProvider extends ServiceProvider
         \App\Events\AdminOverride::class => [
             \App\Listeners\LogAdminOverride::class,
         ],
+        \App\Events\SystemExceptionOccurred::class => [
+            \App\Listeners\LogSystemException::class,
+        ],
     ];
 
     /**
