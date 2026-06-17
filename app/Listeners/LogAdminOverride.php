@@ -11,29 +11,31 @@ class LogAdminOverride
 {
     public function handle(AdminOverride $event)
     {
-        ActivityLog::withoutGlobalScopes()->create([
-            'company_id' => Tenant::id() ?? 1,
-            'branch_id' => null,
-            'user_id' => $event->adminId,
+        try {
 
-            'action' => 'admin.override.' . $event->action,
+            ActivityLog::withoutGlobalScopes()->create([
+                'company_id' => Tenant::id() ?? 1,
+                'branch_id' => null,
+                'user_id' => $event->adminId,
 
-            'subject_type' => 'System',
+                'action' => 'admin.override.' . $event->action,
 
-            'subject_id' => $event->targetId ?? 0,
+                'subject_type' => 'System',
+                'subject_id' => $event->targetId ?? 0,
 
-            'properties' => array_merge(
-                $event->context,
-                [
-                    'overridden_at' => now()->toIso8601String(),
-                ]
-            ),
-        ]);
-
-        Log::info('Admin override', [
-            'admin_id' => $event->adminId,
-            'action' => $event->action,
-            'target_id' => $event->targetId,
-        ]);
+                'properties' => array_merge(
+                    $event->context,
+                    [
+                        'admin_id' => $event->adminId,
+                        'overridden_at' => now()->toIso8601String(),
+                    ]
+                ),
+            ]);
+        } catch (\Exception $e) {
+            Log::error(
+                'Cannot log admin override: ' .
+                    $e->getMessage()
+            );
+        }
     }
 }
