@@ -23,14 +23,14 @@ class LogFailedLogin
                 ->first();
 
             ActivityLog::withoutGlobalScopes()->create([
-                'company_id'   => Tenant::id() ?? 1,
+                'company_id' => $user?->company_id ?? Tenant::id(),
                 'branch_id'    => null,
                 'user_id'      => null,
                 'action'       => 'auth.failed_login',
                 'subject_type' => 'User',
 
                 // 🌟 استخدام -1 لتفادي فخ الـ null والـ Zero تماماً
-                'subject_id'   => $user ? $user->id : -1,
+                'subject_id'   => $user ? $user->id : 0,
 
                 'properties'   => [
                     'email'        => $event->email,
