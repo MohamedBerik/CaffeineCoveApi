@@ -477,3 +477,12 @@ Route::middleware(['auth:sanctum'])->group(function () {
         ]);
     });
 });
+
+Route::middleware([
+    'auth:sanctum',
+    'permission:finance.view'
+])->get('/test-finance', function () {
+    return response()->json([
+        'message' => 'Finance Area'
+    ]);
+});
