@@ -3,6 +3,7 @@
 
 namespace App\Http\Controllers\API;
 
+use App\Events\SuspiciousActivity;
 use App\Http\Controllers\Controller;
 use App\Models\User;
 use App\Models\Company;
@@ -14,6 +15,7 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use App\Mail\WelcomeMail;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\RateLimiter;
 
 class AuthController extends Controller
 {
@@ -94,11 +96,34 @@ class AuthController extends Controller
         });
 
         if (!$user || !Hash::check($request->password, $user->password)) {
-            event(new \App\Events\FailedLogin(
-                $request->email,
-                $request->ip(),
-                'Invalid credentials'
-            ));
+
+            $key = 'login:' . $request->email . '|' . $request->ip();
+
+            RateLimiter::hit($key, 300);
+
+            $attempts = RateLimiter::attempts($key);
+
+            event(
+                new \App\Events\FailedLogin(
+                    $request->email,
+                    $request->ip(),
+                    'Invalid credentials'
+                )
+            );
+
+            if ($attempts === 5) {
+                event(
+                    new SuspiciousActivity(
+                        null,
+                        'multiple_failed_login_attempts',
+                        [
+                            'email' => $request->email,
+                            'ip' => $request->ip(),
+                            'attempts' => $attempts,
+                        ]
+                    )
+                );
+            }
             return response()->json([
                 'message' => 'Invalid credentials'
             ], 401);
@@ -113,7 +138,9 @@ class AuthController extends Controller
             Tenant::setIsSuperAdmin(true);
         }
 
-        // ✅ فحص حالة الاشتراك (والسماح بتسجيل الدخول مع علامة)
+        $key = 'login:' . $request->email . '|' . $request->ip();
+        RateLimiter::clear($key);
+
         $requiresSubscription = false;
         $subscriptionMessage = '';
 
