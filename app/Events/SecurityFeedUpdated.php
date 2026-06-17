@@ -15,23 +15,31 @@ class SecurityFeedUpdated implements ShouldBroadcastNow
 
     public function __construct(array $payload)
     {
+        \Log::info('EVENT CONSTRUCTED');
+
         $this->payload = $payload;
     }
 
     public function broadcastOn(): array
     {
+        \Log::info('BROADCAST ON CALLED');
+
         return [
-            new Channel('security-feed')
+            new Channel('security-feed'),
         ];
     }
 
     public function broadcastAs(): string
     {
+        \Log::info('BROADCAST AS CALLED');
+
         return 'security.updated';
     }
 
     public function broadcastWith(): array
     {
+        \Log::info('BROADCAST WITH CALLED');
+
         return $this->payload;
     }
 }
