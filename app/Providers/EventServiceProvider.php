@@ -48,6 +48,9 @@ class EventServiceProvider extends ServiceProvider
         \App\Events\SystemExceptionOccurred::class => [
             \App\Listeners\LogSystemException::class,
         ],
+        \App\Events\UnauthorizedRouteAccess::class => [
+            \App\Listeners\LogUnauthorizedRouteAccess::class,
+        ],
     ];
 
     /**
