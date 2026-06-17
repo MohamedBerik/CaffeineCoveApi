@@ -205,7 +205,19 @@ class UserController extends Controller
         }
 
         $user->update($updateData);
-
+        event(
+            new \App\Events\AdminOverride(
+                auth()->id(),
+                'change_user_role',
+                $user->id,
+                [
+                    'target_user' => $user->email,
+                    'old_role' => $oldRole,
+                    'new_role' => $request->role,
+                    'ip' => request()->ip(),
+                ]
+            )
+        );
         return response()->json([
             "msg" => "Updated Successfully",
             "status" => 200,
