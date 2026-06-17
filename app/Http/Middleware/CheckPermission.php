@@ -43,6 +43,22 @@ class CheckPermission
         }
 
         if (!$hasPermission) {
+
+            event(
+                new \App\Events\UnauthorizedRouteAccess(
+                    $user->id,
+                    $request->path(),
+                    $request->method(),
+                    $request->ip(),
+                    [
+                        'user_email' => $user->email,
+                        'user_role' => $user->role,
+                        'required_permissions' => $permissions,
+                        'missing_permissions' => $missingPermissions,
+                    ]
+                )
+            );
+
             return response()->json([
                 'message' => 'Unauthorized. You don\'t have the required permission.',
                 'required_permissions' => $permissions,
