@@ -3,6 +3,7 @@
 namespace App\Listeners;
 
 use App\Events\AdminOverride;
+use App\Events\SecurityFeedUpdated;
 use App\Models\ActivityLog;
 use App\Services\Tenant;
 use Illuminate\Support\Facades\Log;
@@ -31,6 +32,17 @@ class LogAdminOverride
                     ]
                 ),
             ]);
+
+            event(
+                new SecurityFeedUpdated([
+                    'type' => 'admin_override',
+                    'title' => $event->action,
+                    'admin_id' => $event->adminId,
+                    'target_id' => $event->targetId,
+                    'context' => $event->context,
+                    'created_at' => now()->toIso8601String(),
+                ])
+            );
         } catch (\Exception $e) {
             Log::error(
                 'Cannot log admin override: ' .

@@ -2,6 +2,7 @@
 
 namespace App\Listeners;
 
+use App\Events\SecurityFeedUpdated;
 use App\Events\SuspiciousActivity;
 use App\Models\ActivityLog;
 use Illuminate\Support\Facades\Log;
@@ -24,6 +25,16 @@ class LogSuspiciousActivity
                 ]
             ),
         ]);
+
+        event(
+            new SecurityFeedUpdated([
+                'type' => 'suspicious',
+                'title' => $event->action,
+                'user_id' => $event->userId,
+                'context' => $event->context,
+                'created_at' => now()->toIso8601String(),
+            ])
+        );
 
         Log::warning('Suspicious activity detected', [
             'user_id' => $event->userId,

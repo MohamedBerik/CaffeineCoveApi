@@ -2,6 +2,7 @@
 
 namespace App\Listeners;
 
+use App\Events\SecurityFeedUpdated;
 use App\Events\SystemExceptionOccurred;
 use App\Models\ActivityLog;
 
@@ -23,5 +24,13 @@ class LogSystemException
                 'line' => $event->line,
             ]
         ]);
+
+        event(
+            new SecurityFeedUpdated([
+                'type' => 'system_exception',
+                'title' => $event->message,
+                'created_at' => now()->toIso8601String(),
+            ])
+        );
     }
 }

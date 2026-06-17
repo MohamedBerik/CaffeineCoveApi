@@ -6,6 +6,7 @@ use App\Events\FailedLogin;
 use App\Models\ActivityLog;
 use App\Services\Tenant;
 use Illuminate\Support\Facades\Log;
+use App\Events\SecurityFeedUpdated;
 
 class LogFailedLogin
 {
@@ -39,6 +40,16 @@ class LogFailedLogin
                     'attempted_at' => now()->toIso8601String(),
                 ],
             ]);
+
+            event(
+                new SecurityFeedUpdated([
+                    'type' => 'failed_login',
+                    'title' => 'Failed login attempt',
+                    'email' => $event->email,
+                    'ip' => $event->ip,
+                    'created_at' => now()->toIso8601String(),
+                ])
+            );
         } catch (\Exception $e) {
             // ✅ الصح: سجل الخطأ الأصلي في صمت جوه ملف الـ laravel.log بدون ما توقع السيستم
             Log::error('❌ FAILED_LOGIN_LISTENER_CRASHED: ' . $e->getMessage(), [
