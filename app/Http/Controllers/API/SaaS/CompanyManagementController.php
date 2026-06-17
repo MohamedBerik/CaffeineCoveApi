@@ -190,6 +190,17 @@ class CompanyManagementController extends Controller
         $company = Company::findOrFail($id);
         $company->update(['status' => 'suspended']);
 
+        event(
+            new \App\Events\AdminOverride(
+                auth()->id(),
+                'suspend_company',
+                $company->id,
+                [
+                    'company_name' => $company->name,
+                ]
+            )
+        );
+
         return response()->json([
             'msg' => 'Company suspended successfully',
             'status' => 200,
@@ -204,6 +215,17 @@ class CompanyManagementController extends Controller
     {
         $company = Company::findOrFail($id);
         $company->update(['status' => 'active']);
+
+        event(
+            new \App\Events\AdminOverride(
+                auth()->id(),
+                'activate_company',
+                $company->id,
+                [
+                    'company_name' => $company->name,
+                ]
+            )
+        );
 
         return response()->json([
             'msg' => 'Company activated successfully',
