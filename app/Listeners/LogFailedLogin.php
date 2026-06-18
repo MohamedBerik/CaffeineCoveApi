@@ -3,65 +3,51 @@
 namespace App\Listeners;
 
 use App\Events\FailedLogin;
-use App\Models\ActivityLog;
-use App\Services\Tenant;
-use Illuminate\Support\Facades\Log;
 use App\Events\SecurityFeedUpdated;
+use App\Models\SecurityEvent;
+use Illuminate\Support\Facades\Log;
 
 class LogFailedLogin
 {
     public function handle(FailedLogin $event)
     {
         try {
-            Log::info('FAILED LOGIN LISTENER REACHED', [
-                'email' => $event->email,
-                'tenant' => Tenant::id(),
-            ]);
-
-            // 🔍 جلب المستخدم لمعرفة الـ ID الحقيقي له
+            // محاولة العثور على المستخدم لتسجيل user_id الحقيقي
             $user = \App\Models\User::withoutGlobalScopes()
                 ->where('email', $event->email)
                 ->first();
 
-            ActivityLog::withoutGlobalScopes()->create([
-                'company_id' => $user?->company_id ?? Tenant::id(),
-                'branch_id'    => null,
-                'user_id'      => null,
-                'action'       => 'auth.failed_login',
-                'subject_type' => 'User',
-
-                // 🌟 استخدام -1 لتفادي فخ الـ null والـ Zero تماماً
-                'subject_id'   => $user ? $user->id : 0,
-
-                'properties'   => [
-                    'email'        => $event->email,
-                    'ip'           => $event->ip,
+            SecurityEvent::create([
+                'type'    => 'failed_login',
+                'title'   => 'Failed login attempt',
+                'user_id' => $user?->id,
+                'email'   => $event->email,
+                'ip'      => $event->ip,
+                'payload' => [
                     'reason'       => $event->reason,
                     'attempted_at' => now()->toIso8601String(),
                 ],
             ]);
 
-            event(
-                new SecurityFeedUpdated([
-                    'type' => 'failed_login',
-                    'title' => 'Failed login attempt',
-                    'email' => $event->email,
-                    'ip' => $event->ip,
-                    'created_at' => now()->toIso8601String(),
-                ])
-            );
+            // بث الحدث للواجهة عبر WebSocket
+            event(new SecurityFeedUpdated([
+                'type'       => 'failed_login',
+                'title'      => 'Failed login attempt',
+                'email'      => $event->email,
+                'ip'         => $event->ip,
+                'created_at' => now()->toIso8601String(),
+            ]));
         } catch (\Exception $e) {
-            // ✅ الصح: سجل الخطأ الأصلي في صمت جوه ملف الـ laravel.log بدون ما توقع السيستم
-            Log::error('❌ FAILED_LOGIN_LISTENER_CRASHED: ' . $e->getMessage(), [
-                'file' => $e->getFile(),
-                'line' => $e->getLine(),
-                'trace' => $e->getTraceAsString() // هيجيبلك المشكلة من جدرها
+            Log::error('Failed to log failed login: ' . $e->getMessage(), [
+                'email' => $event->email,
+                'file'  => $e->getFile(),
+                'line'  => $e->getLine(),
             ]);
         }
 
-        // لوج تحذيري خارجي
-        Log::warning('Failed login attempt logged', [
+        Log::warning('Failed login attempt', [
             'email' => $event->email,
+            'ip'    => $event->ip,
         ]);
     }
 }
