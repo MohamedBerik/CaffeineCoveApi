@@ -41,6 +41,7 @@ use App\Http\Controllers\API\Erp\PatientProfileController;
 use App\Http\Controllers\API\Erp\PatientTimelineController;
 use App\Http\Controllers\API\Erp\ProcedureController;
 use App\Http\Controllers\API\Erp\RadiologyController;
+use App\Http\Controllers\API\Erp\SecurityEventController;
 use App\Http\Controllers\API\Erp\SupplyController;
 // SaaS Controllers
 use App\Http\Controllers\API\SaaS\SaasDashboardController;
@@ -378,6 +379,11 @@ Route::prefix('erp')
             Route::post('/reservations/{id}/confirm', [ReservationController::class, 'confirm']);
             Route::post('/reservations/{id}/cancel', [ReservationController::class, 'cancel']);
             Route::delete('/reservations/{id}', [ReservationController::class, 'destroy']);
+        });
+
+        Route::middleware('permission:activity_logs.view')->group(function () {
+            Route::get('/security-events', [SecurityEventController::class, 'index']);
+            Route::get('/security-events/{id}', [SecurityEventController::class, 'show']);
         });
     });
 
