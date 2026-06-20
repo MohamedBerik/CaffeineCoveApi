@@ -64,6 +64,7 @@ class AlertController extends Controller
     /**
      * جلب عدد الإشعارات غير المقروءة لفرع محدد
      */
+
     public function unreadCount(Request $request)
     {
         $query = SystemAlert::query()->whereNull('acknowledged_at');
