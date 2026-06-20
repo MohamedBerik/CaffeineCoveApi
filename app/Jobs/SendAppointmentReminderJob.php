@@ -8,6 +8,7 @@ use App\Services\Whatsapp\TwilioWhatsappService;
 use App\Traits\HandlesAppointmentReminders;
 use App\Jobs\Concerns\ResetsTenantContext;
 use App\Services\Tenant;
+use App\Services\UserNotificationService;
 use Carbon\Carbon;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
@@ -85,7 +86,10 @@ class SendAppointmentReminderJob implements ShouldQueue, ShouldBeUnique
 
         DB::transaction(function () {
             $appointment = Appointment::query()
-                ->with('patient:id,phone,name')
+                ->with([
+                    'patient:id,phone,name',
+                    'doctor:id,user_id'
+                ])
                 ->lockForUpdate()
                 ->find($this->appointmentId);
 
@@ -188,6 +192,19 @@ class SendAppointmentReminderJob implements ShouldQueue, ShouldBeUnique
                     'stage' => $appointment->reminder_stage,
                     'sent_at' => now()->toDateTimeString(),
                 ]);
+                event(
+                    new \App\Events\AppointmentReminderSent(
+                        $appointment
+                    )
+                );
+                if ($appointment->doctor?->user_id) {
+                    \App\Services\UserNotificationService::send(
+                        $appointment->doctor->user_id,
+                        'appointment_reminder',
+                        'Reminder Sent',
+                        "Reminder sent to {$appointment->patient?->name}"
+                    );
+                }
             } catch (\Throwable $e) {
                 $this->handleFailure($appointment, 'send_failed');
 
@@ -205,7 +222,6 @@ class SendAppointmentReminderJob implements ShouldQueue, ShouldBeUnique
                     'error' => $e->getMessage(),
                     'attempt' => $this->attempts(),
                 ]);
-
                 // ✅ إعادة رمي الاستثناء لتفعيل آلية إعادة المحاولة في Laravel
                 throw $e;
             }
@@ -230,7 +246,22 @@ class SendAppointmentReminderJob implements ShouldQueue, ShouldBeUnique
                 'reason' => $reason,
                 'total_retries' => $retry,
             ]);
+            event(
+                new \App\Events\AppointmentReminderFailed(
+                    $appointment,
+                    $reason
+                )
+            );
+            $user = $this->resolveSystemUser($this->companyId);
 
+            if ($user) {
+                \App\Services\UserNotificationService::send(
+                    $user->id,
+                    'warning',
+                    'Reminder Delivery Failed',
+                    "Appointment #{$appointment->id} reminder failed after {$retry} attempts."
+                );
+            }
             return;
         }
 
@@ -277,7 +308,39 @@ class SendAppointmentReminderJob implements ShouldQueue, ShouldBeUnique
             'error' => $exception->getMessage(),
             'trace' => $exception->getTraceAsString(),
         ]);
+        event(
+            new \App\Events\AppointmentReminderCrashed(
+                $this->appointmentId,
+                $exception->getMessage()
+            )
+        );
+        $user = $this->resolveSystemUser($this->companyId);
 
+        if ($user) {
+            \App\Services\UserNotificationService::send(
+                $user->id,
+                'danger',
+                'Reminder Job Crashed',
+                "Reminder job for appointment #{$this->appointmentId} crashed: {$exception->getMessage()}"
+            );
+        }
+        try {
+            $admin = \App\Models\User::query()
+                ->where('company_id', $this->companyId)
+                ->where('role', 'admin')
+                ->first();
+
+            if ($admin) {
+                \App\Services\UserNotificationService::send(
+                    $admin->id,
+                    'job_failed',
+                    'Reminder Job Failed',
+                    "Reminder job failed for appointment #{$this->appointmentId}"
+                );
+            }
+        } catch (\Throwable $e) {
+            // لا نريد كسر failed handler
+        }
         // ✅ تحديث حالة الموعد لـ failed لو لسه موجود
         try {
             if ($this->companyId) {
