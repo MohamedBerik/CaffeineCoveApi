@@ -96,6 +96,19 @@ class AlertController extends Controller
         return response()->json(['status' => 'ok']);
     }
 
+    public function acknowledgeMany(Request $request)
+    {
+        $ids = $request->input('ids', []);
+        if (empty($ids)) {
+            return response()->json(['message' => 'No IDs provided'], 400);
+        }
+
+        \App\Models\SystemAlert::whereIn('id', $ids)
+            ->update(['acknowledged_at' => now()]);
+
+        return response()->json(['message' => 'Acknowledged']);
+    }
+
     /**
      * تحديد كل الإشعارات كمقروءة
      */

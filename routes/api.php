@@ -145,6 +145,7 @@ Route::prefix('erp')
             Route::get('/alerts', [AlertController::class, 'index']);
             Route::get('/alerts/unread-count', [AlertController::class, 'unreadCount']);
             Route::post('/alerts/{id}/ack', [AlertController::class, 'acknowledge']);
+            Route::post('/alerts/ack-many', [AlertController::class, 'acknowledgeMany']);
             Route::post('/alerts/mark-all-read', [AlertController::class, 'markAllRead']);
         });
 
