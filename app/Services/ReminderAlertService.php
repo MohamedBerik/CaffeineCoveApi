@@ -148,16 +148,24 @@ class ReminderAlertService
 
         $config = $this->getAlertConfig($type);
 
-        $alert = SystemAlert::create([
-            'company_id' => $companyId,
-            'branch_id'  => Tenant::branchId(),
-            'code'       => $type,
-            'type'       => $config['type'],
-            'priority'   => $config['priority'],
-            'message'    => $message,
-            'meta'       => $meta,
-            'triggered_at' => now(),
-        ]);
+        $admins = \App\Models\User::query()
+            ->where('company_id', $companyId)
+            ->where('role', 'admin')
+            ->get();
+
+        foreach ($admins as $admin) {
+            SystemAlert::create([
+                'company_id' => $companyId,
+                'branch_id' => Tenant::branchId(),
+                'user_id' => $admin->id,
+                'code' => $type,
+                'type' => $config['type'],
+                'priority' => $config['priority'],
+                'message' => $message,
+                'meta' => $meta,
+                'triggered_at' => now(),
+            ]);
+        }
 
         Log::warning('[REMINDER ALERT]', [
             'company_id' => $companyId,

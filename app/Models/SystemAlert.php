@@ -203,10 +203,12 @@ class SystemAlert extends Model
         string $type = self::TYPE_SYSTEM,
         string $priority = self::PRIORITY_MEDIUM,
         array $meta = [],
-        ?string $code = null
+        ?string $code = null,
+        ?int $userId = null
     ): self {
         return static::create([
             'company_id' => $companyId,
+            'user_id' => $userId,
             'code' => $code,
             'type' => $type,
             'priority' => $priority,

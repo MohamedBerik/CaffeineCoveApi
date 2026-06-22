@@ -15,6 +15,7 @@ class AlertController extends Controller
     public function index(Request $request)
     {
         $query = SystemAlert::query();
+        $query->where('user_id', auth()->id());
 
         // 🚀 [التعديل الذهبي]: التصفية الصريحة حسب الفرع لمنع كاش وعشوائية الميدياوير أثناء التنقل الفوري
         // نقرأ أولاً من الـ query parameter، ثم الهيدر، ثم الـ container كخط دفاع أخير
@@ -66,7 +67,9 @@ class AlertController extends Controller
      */
     public function unreadCount(Request $request)
     {
-        $query = SystemAlert::query()->whereNull('acknowledged_at');
+        $query = SystemAlert::query()
+            ->where('user_id', auth()->id())
+            ->whereNull('acknowledged_at');
 
         // 🚀 تأمين عداد الإشعارات أيضاً عند التبديل اللحظي للفروع
         $branchId = $request->query('branch_id')
@@ -87,7 +90,9 @@ class AlertController extends Controller
      */
     public function acknowledge($id)
     {
-        $alert = SystemAlert::query()->findOrFail($id);
+        $alert = SystemAlert::query()
+            ->where('user_id', auth()->id())
+            ->findOrFail($id);
 
         $alert->update([
             'acknowledged_at' => now()
@@ -103,7 +108,8 @@ class AlertController extends Controller
             return response()->json(['message' => 'No IDs provided'], 400);
         }
 
-        \App\Models\SystemAlert::whereIn('id', $ids)
+        \App\Models\SystemAlert::where('user_id', auth()->id())
+            ->whereIn('id', $ids)
             ->update(['acknowledged_at' => now()]);
 
         return response()->json(['message' => 'Acknowledged']);
@@ -114,7 +120,9 @@ class AlertController extends Controller
      */
     public function markAllRead(Request $request)
     {
-        $query = SystemAlert::query()->whereNull('acknowledged_at');
+        $query = SystemAlert::query()
+            ->where('user_id', auth()->id())
+            ->whereNull('acknowledged_at');
 
         // تأمين الـ mark all read لتعمل على مستوى الفرع النشط فقط إذا مرر بالطلب
         $branchId = $request->query('branch_id') ?: $request->header('X-Branch-ID');
