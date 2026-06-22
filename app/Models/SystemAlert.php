@@ -31,6 +31,7 @@ class SystemAlert extends Model
     protected $fillable = [
         'company_id',
         'branch_id',
+        'user_id',
         'code',
         'type',
         'priority',
@@ -57,6 +58,11 @@ class SystemAlert extends Model
     public function company()
     {
         return $this->belongsTo(Company::class);
+    }
+
+    public function user()
+    {
+        return $this->belongsTo(User::class);
     }
 
     // ============ Scopes ============

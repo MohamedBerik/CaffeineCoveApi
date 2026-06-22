@@ -22,27 +22,19 @@ class AlertCreated implements ShouldBroadcastNow
         $this->alert = $alert;
     }
 
-    /**
-     * Channel that receives the alert.
-     */
-    // public function broadcastOn(): array
-    // {
-    //     return [
-    //         new PrivateChannel(
-    //             'company.' . $this->alert->company_id . '.alerts'
-    //         )
-    //     ];
-    // }
-
     public function broadcastOn(): array
     {
-        $channels = [
-            new PrivateChannel(
-                'company.' . $this->alert->company_id . '.alerts'
-            )
-        ];
+        $channels = [];
 
-        if (!empty($this->alert->branch_id)) {
+        if ($this->alert->user_id) {
+            $channels[] = new PrivateChannel(
+                'user.' . $this->alert->user_id
+            );
+
+            return $channels;
+        }
+
+        if ($this->alert->branch_id) {
             $channels[] = new PrivateChannel(
                 'company.' .
                     $this->alert->company_id .
