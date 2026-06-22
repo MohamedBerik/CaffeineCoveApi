@@ -15,7 +15,12 @@ class AlertController extends Controller
     public function index(Request $request)
     {
         $query = SystemAlert::query();
-        $query->where('user_id', auth()->id());
+        $user = $request->user();
+
+        $query->where(function ($q) use ($user) {
+            $q->whereNull('user_id')
+                ->orWhere('user_id', $user->id);
+        });
 
         // 🚀 [التعديل الذهبي]: التصفية الصريحة حسب الفرع لمنع كاش وعشوائية الميدياوير أثناء التنقل الفوري
         // نقرأ أولاً من الـ query parameter، ثم الهيدر، ثم الـ container كخط دفاع أخير
@@ -68,8 +73,13 @@ class AlertController extends Controller
     public function unreadCount(Request $request)
     {
         $query = SystemAlert::query()
-            ->where('user_id', auth()->id())
-            ->whereNull('acknowledged_at');
+            ->whereNull('acknowledged_at')
+            ->where(function ($q) use ($request) {
+                $user = $request->user();
+
+                $q->whereNull('user_id')
+                    ->orWhere('user_id', $user->id);
+            });
 
         // 🚀 تأمين عداد الإشعارات أيضاً عند التبديل اللحظي للفروع
         $branchId = $request->query('branch_id')
@@ -90,8 +100,13 @@ class AlertController extends Controller
      */
     public function acknowledge($id)
     {
+        $user = request()->user();
+
         $alert = SystemAlert::query()
-            ->where('user_id', auth()->id())
+            ->where(function ($q) use ($user) {
+                $q->whereNull('user_id')
+                    ->orWhere('user_id', $user->id);
+            })
             ->findOrFail($id);
 
         $alert->update([
@@ -120,9 +135,14 @@ class AlertController extends Controller
      */
     public function markAllRead(Request $request)
     {
+        $user = $request->user();
+
         $query = SystemAlert::query()
-            ->where('user_id', auth()->id())
-            ->whereNull('acknowledged_at');
+            ->whereNull('acknowledged_at')
+            ->where(function ($q) use ($user) {
+                $q->whereNull('user_id')
+                    ->orWhere('user_id', $user->id);
+            });
 
         // تأمين الـ mark all read لتعمل على مستوى الفرع النشط فقط إذا مرر بالطلب
         $branchId = $request->query('branch_id') ?: $request->header('X-Branch-ID');
