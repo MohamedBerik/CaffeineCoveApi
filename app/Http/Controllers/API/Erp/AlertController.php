@@ -30,7 +30,10 @@ class AlertController extends Controller
 
         // إذا كان الفرع محدداً وليس "all"، نطبق الفلترة فوراً
         if ($branchId && $branchId !== 'all') {
-            $query->where('branch_id', $branchId);
+            $query->where(function ($q) use ($branchId) {
+                $q->where('branch_id', $branchId)
+                    ->orWhereNull('branch_id');
+            });
         }
 
         // Filter حسب الحالة
@@ -87,7 +90,10 @@ class AlertController extends Controller
             ?: (app()->has('tenant_branch_id') ? app('tenant_branch_id') : null);
 
         if ($branchId && $branchId !== 'all') {
-            $query->where('branch_id', $branchId);
+            $query->where(function ($q) use ($branchId) {
+                $q->where('branch_id', $branchId)
+                    ->orWhereNull('branch_id');
+            });
         }
 
         $count = $query->count();
@@ -123,9 +129,15 @@ class AlertController extends Controller
             return response()->json(['message' => 'No IDs provided'], 400);
         }
 
-        \App\Models\SystemAlert::where('user_id', auth()->id())
+        \App\Models\SystemAlert::query()
             ->whereIn('id', $ids)
-            ->update(['acknowledged_at' => now()]);
+            ->where(function ($q) {
+                $q->whereNull('user_id')
+                    ->orWhere('user_id', auth()->id());
+            })
+            ->update([
+                'acknowledged_at' => now()
+            ]);
 
         return response()->json(['message' => 'Acknowledged']);
     }
@@ -147,7 +159,10 @@ class AlertController extends Controller
         // تأمين الـ mark all read لتعمل على مستوى الفرع النشط فقط إذا مرر بالطلب
         $branchId = $request->query('branch_id') ?: $request->header('X-Branch-ID');
         if ($branchId && $branchId !== 'all') {
-            $query->where('branch_id', $branchId);
+            $query->where(function ($q) use ($branchId) {
+                $q->where('branch_id', $branchId)
+                    ->orWhereNull('branch_id');
+            });
         }
 
         $query->update([

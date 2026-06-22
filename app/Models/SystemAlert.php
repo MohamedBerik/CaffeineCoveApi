@@ -6,6 +6,7 @@ use App\Events\AlertCreated;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use App\Models\Concerns\BelongsToCompanyTrait;
+use App\Services\Tenant;
 
 class SystemAlert extends Model
 {
@@ -64,6 +65,11 @@ class SystemAlert extends Model
     public function user()
     {
         return $this->belongsTo(User::class);
+    }
+
+    public function branch()
+    {
+        return $this->belongsTo(Branch::class);
     }
 
     // ============ Scopes ============
@@ -209,6 +215,7 @@ class SystemAlert extends Model
     ): self {
         return static::create([
             'company_id' => $companyId,
+            'branch_id' => Tenant::branchId(),
             'user_id' => $userId,
             'code' => $code,
             'type' => $type,
