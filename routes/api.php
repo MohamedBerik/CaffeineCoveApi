@@ -43,6 +43,7 @@ use App\Http\Controllers\API\Erp\ProcedureController;
 use App\Http\Controllers\API\Erp\RadiologyController;
 use App\Http\Controllers\API\Erp\SecurityEventController;
 use App\Http\Controllers\API\Erp\SupplyController;
+use App\Http\Controllers\API\Erp\UserAlertPreferenceController;
 // SaaS Controllers
 use App\Http\Controllers\API\SaaS\SaasDashboardController;
 use App\Http\Controllers\API\SaaS\SaasReportsController;
@@ -484,6 +485,21 @@ Route::middleware(['auth:sanctum'])->group(function () {
         ]);
     });
 });
+
+Route::middleware('auth:sanctum')
+    ->prefix('erp')
+    ->group(function () {
+
+        Route::get(
+            '/alerts/preferences',
+            [UserAlertPreferenceController::class, 'index']
+        );
+
+        Route::put(
+            '/alerts/preferences',
+            [UserAlertPreferenceController::class, 'update']
+        );
+    });
 
 Route::middleware([
     'auth:sanctum',
