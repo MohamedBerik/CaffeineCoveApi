@@ -387,10 +387,6 @@ Route::prefix('erp')
             Route::get('/security-events', [SecurityEventController::class, 'index']);
             Route::get('/security-events/{id}', [SecurityEventController::class, 'show']);
         });
-
-        Route::get('/alerts/preferences', [UserAlertPreferenceController::class, 'index']);
-
-        Route::put('/alerts/preferences',[UserAlertPreferenceController::class, 'update']);
     });
 
 /*
@@ -490,7 +486,7 @@ Route::middleware(['auth:sanctum'])->group(function () {
     });
 });
 
-// Route::middleware('auth:sanctum')
+Route::middleware('auth:sanctum')
     ->prefix('erp')
     ->group(function () {
 
