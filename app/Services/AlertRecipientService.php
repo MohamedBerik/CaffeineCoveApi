@@ -7,9 +7,6 @@ use Illuminate\Support\Collection;
 
 class AlertRecipientService
 {
-    /**
-     * مستخدم واحد
-     */
     public static function user(int $userId): Collection
     {
         return User::query()
@@ -17,9 +14,6 @@ class AlertRecipientService
             ->get();
     }
 
-    /**
-     * مجموعة مستخدمين
-     */
     public static function users(array $userIds): Collection
     {
         return User::query()
@@ -27,9 +21,6 @@ class AlertRecipientService
             ->get();
     }
 
-    /**
-     * كل Admins الشركة
-     */
     public static function admins(int $companyId): Collection
     {
         return User::query()
@@ -38,9 +29,6 @@ class AlertRecipientService
             ->get();
     }
 
-    /**
-     * حسب Role معين
-     */
     public static function role(
         int $companyId,
         string $role
@@ -51,9 +39,6 @@ class AlertRecipientService
             ->get();
     }
 
-    /**
-     * حسب عدة Roles
-     */
     public static function roles(
         int $companyId,
         array $roles
@@ -64,9 +49,6 @@ class AlertRecipientService
             ->get();
     }
 
-    /**
-     * كل مستخدمي فرع معين
-     */
     public static function branch(
         int $companyId,
         int $branchId
@@ -79,18 +61,26 @@ class AlertRecipientService
 
     public static function subscribed(
         int $companyId,
-        string $code,
-        array $roles = ['admin']
-    ) {
-        return User::query()
-            ->where('company_id', $companyId)
-            ->whereIn('role', $roles)
-            ->where(function ($q) use ($code) {
+        string $alertCode,
+        array $roles = []
+    ): Collection {
+        $query = User::query()
+            ->where('company_id', $companyId);
+
+        if (!empty($roles)) {
+            $query->whereIn('role', $roles);
+        }
+
+        return $query
+            ->where(function ($q) use ($alertCode) {
                 $q->whereDoesntHave('alertPreferences')
-                    ->orWhereHas('alertPreferences', function ($q) use ($code) {
-                        $q->where('alert_code', $code)
-                            ->where('enabled', true);
-                    });
+                    ->orWhereHas(
+                        'alertPreferences',
+                        function ($q) use ($alertCode) {
+                            $q->where('alert_code', $alertCode)
+                                ->where('enabled', true);
+                        }
+                    );
             })
             ->get();
     }

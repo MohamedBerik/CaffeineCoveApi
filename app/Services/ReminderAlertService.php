@@ -14,9 +14,9 @@ class ReminderAlertService
     /**
      * Alert type constants
      */
-    const TYPE_FAILED = 'failed';
-    const TYPE_RETRY = 'retry';
-    const TYPE_STUCK = 'stuck';
+    const TYPE_FAILED = 'reminder.failed';
+    const TYPE_RETRY = 'reminder.retry';
+    const TYPE_STUCK = 'reminder.stuck';
 
     /**
      * Thresholds
