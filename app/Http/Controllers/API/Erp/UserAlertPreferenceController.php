@@ -10,14 +10,21 @@ class UserAlertPreferenceController extends Controller
 {
     public function index(Request $request)
     {
-        $preferences = UserAlertPreference::query()
-            ->where('user_id', $request->user()->id)
-            ->get()
-            ->keyBy('alert_code');
+        try {
+            $preferences = UserAlertPreference::query()
+                ->where('user_id', $request->user()->id)
+                ->get();
 
-        return response()->json($preferences);
+            return response()->json($preferences);
+        } catch (\Throwable $e) {
+
+            return response()->json([
+                'message' => $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+            ], 500);
+        }
     }
-
     public function update(Request $request)
     {
         $request->validate([

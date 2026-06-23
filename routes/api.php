@@ -388,7 +388,7 @@ Route::prefix('erp')
             Route::get('/security-events/{id}', [SecurityEventController::class, 'show']);
         });
 
-         Route::get('/alerts/preferences', [UserAlertPreferenceController::class, 'index']);
+        Route::get('/alerts/preferences', [UserAlertPreferenceController::class, 'index']);
 
         Route::put('/alerts/preferences',[UserAlertPreferenceController::class, 'update']);
     });
