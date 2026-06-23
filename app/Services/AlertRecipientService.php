@@ -84,4 +84,38 @@ class AlertRecipientService
             })
             ->get();
     }
+
+    public static function recipients(
+        int $companyId,
+        ?int $branchId,
+        string $alertCode,
+        array $roles = []
+    ): Collection {
+        $query = User::query()
+            ->where('company_id', $companyId);
+
+        if ($branchId) {
+            $query->where(function ($q) use ($branchId) {
+                $q->where('role', 'admin')
+                    ->orWhere('branch_id', $branchId);
+            });
+        }
+
+        if (!empty($roles)) {
+            $query->where(function ($q) use ($roles) {
+                $q->where('role', 'admin')
+                    ->orWhereIn('role', $roles);
+            });
+        }
+
+        return $query
+            ->where(function ($q) use ($alertCode) {
+                $q->whereDoesntHave('alertPreferences')
+                    ->orWhereHas('alertPreferences', function ($q) use ($alertCode) {
+                        $q->where('alert_code', $alertCode)
+                            ->where('enabled', true);
+                    });
+            })
+            ->get();
+    }
 }
