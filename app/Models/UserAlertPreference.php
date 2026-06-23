@@ -9,7 +9,7 @@ use App\Models\Concerns\BelongsToCompanyTrait;
 class UserAlertPreference extends Model
 {
     use HasFactory;
-    use BelongsToCompanyTrait; // اختياري، حسب احتياجك للعزل
+    // use BelongsToCompanyTrait;
 
     protected $fillable = [
         'user_id',
