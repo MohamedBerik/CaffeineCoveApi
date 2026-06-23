@@ -76,4 +76,22 @@ class AlertRecipientService
             ->where('branch_id', $branchId)
             ->get();
     }
+
+    public static function subscribed(
+        int $companyId,
+        string $code,
+        array $roles = ['admin']
+    ) {
+        return User::query()
+            ->where('company_id', $companyId)
+            ->whereIn('role', $roles)
+            ->where(function ($q) use ($code) {
+                $q->whereDoesntHave('alertPreferences')
+                    ->orWhereHas('alertPreferences', function ($q) use ($code) {
+                        $q->where('alert_code', $code)
+                            ->where('enabled', true);
+                    });
+            })
+            ->get();
+    }
 }
