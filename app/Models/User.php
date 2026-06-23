@@ -89,7 +89,10 @@ class User extends Authenticatable
         return $this->hasMany(ActivityLog::class);
     }
 
-
+    public function alertPreferences()
+    {
+        return $this->hasMany(UserAlertPreference::class);
+    }
     // ============ Scopes ============
 
     public function scopeActive($query)

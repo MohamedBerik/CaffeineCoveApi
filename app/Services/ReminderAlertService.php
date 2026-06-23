@@ -148,7 +148,11 @@ class ReminderAlertService
 
         $config = $this->getAlertConfig($type);
 
-        $admins = AlertRecipientService::admins($companyId);
+        $admins = AlertRecipientService::subscribed(
+            $companyId,
+            $type,
+            ['admin']
+        );
 
         AlertService::send(
             recipients: $admins,
