@@ -24,34 +24,11 @@ class AlertCreated implements ShouldBroadcastNow
 
     public function broadcastOn(): array
     {
-        logger()->info('Alert broadcasting', [
-            'alert_id' => $this->alert->id,
-            'company_id' => $this->alert->company_id,
-            'branch_id' => $this->alert->branch_id,
-            'user_id' => $this->alert->user_id,
-        ]);
-
-        $channels = [];
-
-        if ($this->alert->user_id) {
-            $channels[] = new PrivateChannel(
+        return [
+            new PrivateChannel(
                 'user.' . $this->alert->user_id
-            );
-
-            return $channels;
-        }
-
-        if ($this->alert->branch_id) {
-            $channels[] = new PrivateChannel(
-                'company.'
-                    . $this->alert->company_id
-                    . '.branch.'
-                    . $this->alert->branch_id
-                    . '.alerts'
-            );
-        }
-
-        return $channels;
+            )
+        ];
     }
     /**
      * Event name used by Echo.

@@ -7,7 +7,7 @@ use App\Models\SystemAlert;
 use App\Services\Tenant;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Cache;
-use App\Events\AlertCreated;
+use App\Services\AlertPolicyService;
 
 class ReminderAlertService
 {
@@ -148,14 +148,17 @@ class ReminderAlertService
 
         $config = $this->getAlertConfig($type);
 
-        $admins = AlertRecipientService::subscribed(
-            $companyId,
-            $type,
-            ['admin']
+        $roles = AlertPolicyService::rolesFor($type);
+
+        $recipients = AlertRecipientService::recipients(
+            companyId: $companyId,
+            branchId: Tenant::branchId(),
+            alertCode: $type,
+            roles: $roles
         );
 
         AlertService::send(
-            recipients: $admins,
+            recipients: $recipients,
             companyId: $companyId,
             branchId: Tenant::branchId(),
             message: $message,

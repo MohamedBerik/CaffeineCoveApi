@@ -258,7 +258,7 @@ class SystemAlert extends Model
                 ]
             ]);
 
-            broadcast(new AlertCreated($alert))->toOthers();
+            broadcast(new AlertCreated($alert));
         });
 
         static::updated(function ($alert) {
