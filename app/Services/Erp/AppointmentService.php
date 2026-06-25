@@ -2,6 +2,7 @@
 
 namespace App\Services\Erp;
 
+use App\Constants\AlertCodes;
 use App\Events\DashboardUpdated;
 use App\Events\InsightGenerated;
 use App\Models\Appointment;
@@ -17,6 +18,8 @@ use App\Models\Product;
 use App\Models\SystemAlert;
 use App\Models\TreatmentPlan;
 use App\Services\ActivityLogger;
+use App\Services\AlertRecipientService;
+use App\Services\AlertService;
 use App\Services\InsightService;
 use App\Services\InvoiceNumberService;
 use App\Services\Tenant;
@@ -368,21 +371,27 @@ class AppointmentService
                 'scheduled_today_count'    => 1,
             ]));
 
-            SystemAlert::create([
-                'company_id' => $appointment->company_id,
-                'branch_id'  => $appointment->branch_id,
-                'code'       => 'NEW_APPOINTMENT',
-                'type'       => SystemAlert::TYPE_APPOINTMENT,
-                'priority'   => SystemAlert::PRIORITY_MEDIUM,
-                'message'    => 'New appointment assigned to Dr. ' . $doctor->name,
-                'meta'       => [
+            AlertService::send(
+                AlertRecipientService::user($doctor->user_id),
+
+                message: 'New appointment assigned to Dr. ' . $doctor->name,
+
+                type: SystemAlert::TYPE_APPOINTMENT,
+
+                priority: SystemAlert::PRIORITY_MEDIUM,
+
+                meta: [
                     'appointment_id' => $appointment->id,
-                    'patient_id' => $appointment->patient_id,
-                    'doctor_id' => $doctor->id,
-                    'user_id' => $doctor->user_id,
+                    'patient_id'     => $appointment->patient_id,
+                    'doctor_id'      => $doctor->id,
                 ],
-                'triggered_at' => now(),
-            ]);
+
+                code: AlertCodes::APPOINTMENT_CREATED,
+
+                companyId: $appointment->company_id,
+
+                branchId: $appointment->branch_id,
+            );
             return $appointment;
         });
     }
@@ -684,21 +693,24 @@ class AppointmentService
         ]));
 
         if ($appointment->doctor && $appointment->doctor->user_id) {
-            SystemAlert::create([
-                'company_id' => $appointment->company_id,
-                'branch_id'  => $appointment->branch_id,
-                'code'       => 'APPOINTMENT_CANCELLED',
-                'type'       => SystemAlert::TYPE_APPOINTMENT,
-                'priority'   => SystemAlert::PRIORITY_MEDIUM,
-                'message'    => 'Appointment cancelled for Dr. ' . $appointment->doctor->name,
-                'meta'       => [
-                    'appointment_id' => $appointment->id,
-                    'patient_id' => $appointment->patient_id,
-                    'doctor_id' => $appointment->doctor->id,
-                    'user_id' => $appointment->doctor->user_id,
-                ],
-                'triggered_at' => now(),
-            ]);
+            $doctor = $appointment->doctor;
+
+            if ($doctor && $doctor->user_id) {
+                AlertService::send(
+                    AlertRecipientService::user($doctor->user_id),
+                    message: 'Appointment cancelled',
+                    type: SystemAlert::TYPE_APPOINTMENT,
+                    priority: SystemAlert::PRIORITY_MEDIUM,
+                    meta: [
+                        'appointment_id' => $appointment->id,
+                        'patient_id'     => $appointment->patient_id,
+                        'doctor_id'      => $doctor->id,
+                    ],
+                    code: AlertCodes::APPOINTMENT_CANCELLED,   // ✅ كود صحيح
+                    companyId: $appointment->company_id,
+                    branchId: $appointment->branch_id,
+                );
+            }
         }
         ActivityLogger::log($companyId, $request->user(), 'appointment.cancelled', Appointment::class, $appointment->id, [
             'old_status' => $oldStatus,
