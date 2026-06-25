@@ -21,18 +21,45 @@ class AlertService
         foreach ($recipients as $user) {
 
             $alert = SystemAlert::create([
-                'company_id' => $companyId ?? $user->company_id,
-                'branch_id' => $branchId ?? $user->branch_id,
-                'user_id' => $user->id,
-                'code' => $code,
-                'type' => $type,
-                'priority' => $priority,
-                'message' => $message,
-                'meta' => $meta,
+                'company_id'   => $companyId ?? $user->company_id,
+                'branch_id'    => $branchId ?? $user->branch_id,
+                'user_id'      => $user->id,
+                'code'         => $code,
+                'type'         => $type,
+                'priority'     => $priority,
+                'message'      => $message,
+                'meta'         => $meta,
                 'triggered_at' => now(),
             ]);
 
             event(new AlertCreated($alert));
         }
+    }
+
+    public static function sendCode(
+        Collection $recipients,
+        string $code,
+        array $templateData = [],
+        array $meta = [],
+        ?int $companyId = null,
+        ?int $branchId = null
+    ): void {
+        $definition = AlertDefinitionService::definition($code);
+
+        $message = AlertTemplateService::render(
+            $code,
+            $templateData
+        );
+
+        self::send(
+            recipients: $recipients,
+            message: $message,
+            type: $definition['type'],
+            priority: $definition['priority'],
+            meta: $meta,
+            code: $code,
+            companyId: $companyId,
+            branchId: $branchId
+        );
     }
 }
