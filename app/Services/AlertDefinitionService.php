@@ -19,10 +19,7 @@ class AlertDefinitionService
                 'icon'     => '📦',
                 'title'    => 'Stock Low',
                 'message'  => 'Stock level is low for :product_name',
-                'channels' => [
-                    'in_app',
-                    'email'
-                ]
+                'channels' => ['in_app'],
             ],
             AlertCodes::STOCK_OUT => [
                 'priority' => SystemAlert::PRIORITY_CRITICAL,
@@ -31,10 +28,7 @@ class AlertDefinitionService
                 'icon'     => '🚫',
                 'title'    => 'Stock Out',
                 'message'  => 'Product :product_name is out of stock',
-                'channels' => [
-                    'in_app',
-                    'email'
-                ]
+                'channels' => ['in_app'],
             ],
 
             // Payments
@@ -45,10 +39,7 @@ class AlertDefinitionService
                 'icon'     => '💰',
                 'title'    => 'Payment Received',
                 'message'  => 'Payment of :amount received',
-                'channels' => [
-                    'in_app',
-                    'email'
-                ]
+                'channels' => ['in_app'],
             ],
             AlertCodes::PAYMENT_FAILED => [
                 'priority' => SystemAlert::PRIORITY_HIGH,
@@ -57,10 +48,7 @@ class AlertDefinitionService
                 'icon'     => '💳',
                 'title'    => 'Payment Failed',
                 'message'  => 'Payment of :amount failed',
-                'channels' => [
-                    'in_app',
-                    'email'
-                ]
+                'channels' => ['in_app'],
             ],
             AlertCodes::PAYMENT_OVERDUE => [
                 'priority' => SystemAlert::PRIORITY_MEDIUM,
@@ -69,10 +57,7 @@ class AlertDefinitionService
                 'icon'     => '⏰',
                 'title'    => 'Payment Overdue',
                 'message'  => 'Payment of :amount is overdue',
-                'channels' => [
-                    'in_app',
-                    'email'
-                ]
+                'channels' => ['in_app'],
             ],
             AlertCodes::PAYMENT_REFUND => [
                 'priority' => SystemAlert::PRIORITY_LOW,
@@ -81,10 +66,7 @@ class AlertDefinitionService
                 'icon'     => '↩️',
                 'title'    => 'Payment Refunded',
                 'message'  => 'Refund of :amount processed',
-                'channels' => [
-                    'in_app',
-                    'email'
-                ]
+                'channels' => ['in_app'],
             ],
 
             // Orders
@@ -95,10 +77,7 @@ class AlertDefinitionService
                 'icon'     => '🛒',
                 'title'    => 'Order Created',
                 'message'  => 'New order #:order_number created',
-                'channels' => [
-                    'in_app',
-                    'email'
-                ]
+                'channels' => ['in_app'],
             ],
             AlertCodes::ORDER_CONFIRMED => [
                 'priority' => SystemAlert::PRIORITY_LOW,
@@ -107,10 +86,7 @@ class AlertDefinitionService
                 'icon'     => '✅',
                 'title'    => 'Order Confirmed',
                 'message'  => 'Order #:order_number confirmed',
-                'channels' => [
-                    'in_app',
-                    'email'
-                ]
+                'channels' => ['in_app'],
             ],
             AlertCodes::ORDER_CANCELLED => [
                 'priority' => SystemAlert::PRIORITY_MEDIUM,
@@ -119,10 +95,7 @@ class AlertDefinitionService
                 'icon'     => '❌',
                 'title'    => 'Order Cancelled',
                 'message'  => 'Order #:order_number cancelled',
-                'channels' => [
-                    'in_app',
-                    'email'
-                ]
+                'channels' => ['in_app'],
             ],
 
             // Appointments
@@ -133,10 +106,7 @@ class AlertDefinitionService
                 'icon'     => '📅',
                 'title'    => 'Appointment Booked',
                 'message'  => 'New appointment booked for Dr. :doctor_name',
-                'channels' => [
-                    'in_app',
-                    'email'
-                ]
+                'channels' => ['in_app'],
             ],
             AlertCodes::APPOINTMENT_CREATED => [
                 'priority' => SystemAlert::PRIORITY_MEDIUM,
@@ -157,10 +127,7 @@ class AlertDefinitionService
                 'icon'     => '❌',
                 'title'    => 'Appointment Cancelled',
                 'message'  => 'Appointment cancelled',
-                'channels' => [
-                    'in_app',
-                    'email'
-                ]
+                'channels' => ['in_app'],
             ],
             AlertCodes::APPOINTMENT_REMINDER => [
                 'priority' => SystemAlert::PRIORITY_LOW,
@@ -169,10 +136,7 @@ class AlertDefinitionService
                 'icon'     => '⏰',
                 'title'    => 'Appointment Reminder',
                 'message'  => 'Appointment reminder',
-                'channels' => [
-                    'in_app',
-                    'email'
-                ]
+                'channels' => ['in_app'],
             ],
 
             // Patients
@@ -183,10 +147,7 @@ class AlertDefinitionService
                 'icon'     => '👤',
                 'title'    => 'New Patient',
                 'message'  => 'New patient :patient_name registered',
-                'channels' => [
-                    'in_app',
-                    'email'
-                ]
+                'channels' => ['in_app'],
             ],
             AlertCodes::PATIENT_RETURN => [
                 'priority' => SystemAlert::PRIORITY_LOW,
@@ -195,10 +156,7 @@ class AlertDefinitionService
                 'icon'     => '🔄',
                 'title'    => 'Patient Returned',
                 'message'  => 'Patient :patient_name returned',
-                'channels' => [
-                    'in_app',
-                    'email'
-                ]
+                'channels' => ['in_app'],
             ],
 
             // Treatments
@@ -209,10 +167,7 @@ class AlertDefinitionService
                 'icon'     => '🔧',
                 'title'    => 'Treatment Started',
                 'message'  => 'Treatment started for :patient_name',
-                'channels' => [
-                    'in_app',
-                    'email'
-                ]
+                'channels' => ['in_app'],
             ],
             AlertCodes::TREATMENT_COMPLETED => [
                 'priority' => SystemAlert::PRIORITY_LOW,
@@ -221,10 +176,7 @@ class AlertDefinitionService
                 'icon'     => '✅',
                 'title'    => 'Treatment Completed',
                 'message'  => 'Treatment completed for :patient_name',
-                'channels' => [
-                    'in_app',
-                    'email'
-                ]
+                'channels' => ['in_app'],
             ],
 
             // Reminder Monitoring
@@ -235,10 +187,7 @@ class AlertDefinitionService
                 'icon'     => '⚠️',
                 'title'    => 'Reminder Failed',
                 'message'  => ':count reminder(s) failed',
-                'channels' => [
-                    'in_app',
-                    'email'
-                ]
+                'channels' => ['in_app'],
             ],
             AlertCodes::REMINDER_RETRY => [
                 'priority' => SystemAlert::PRIORITY_MEDIUM,
@@ -247,10 +196,7 @@ class AlertDefinitionService
                 'icon'     => '🔄',
                 'title'    => 'Reminder Retry',
                 'message'  => ':count reminder(s) retrying',
-                'channels' => [
-                    'in_app',
-                    'email'
-                ]
+                'channels' => ['in_app'],
             ],
             AlertCodes::REMINDER_STUCK => [
                 'priority' => SystemAlert::PRIORITY_MEDIUM,
@@ -259,10 +205,7 @@ class AlertDefinitionService
                 'icon'     => '⏳',
                 'title'    => 'Reminder Stuck',
                 'message'  => ':count reminder(s) stuck in processing',
-                'channels' => [
-                    'in_app',
-                    'email'
-                ]
+                'channels' => ['in_app'],
             ],
 
             // Subscription
@@ -273,10 +216,7 @@ class AlertDefinitionService
                 'icon'     => '⌛',
                 'title'    => 'Trial Expiring',
                 'message'  => 'Your trial expires in :days day(s)',
-                'channels' => [
-                    'in_app',
-                    'email'
-                ]
+                'channels' => ['in_app'],
             ],
             AlertCodes::SUBSCRIPTION_EXPIRED => [
                 'priority' => SystemAlert::PRIORITY_CRITICAL,
@@ -285,10 +225,7 @@ class AlertDefinitionService
                 'icon'     => '🚫',
                 'title'    => 'Subscription Expired',
                 'message'  => 'Your subscription has expired',
-                'channels' => [
-                    'in_app',
-                    'email'
-                ]
+                'channels' => ['in_app'],
             ],
 
             // Security
@@ -299,10 +236,7 @@ class AlertDefinitionService
                 'icon'     => '🔐',
                 'title'    => 'Failed Login',
                 'message'  => 'Failed login attempt detected',
-                'channels' => [
-                    'in_app',
-                    'email'
-                ]
+                'channels' => ['in_app'],
             ],
             AlertCodes::SECURITY_SUSPICIOUS_ACTIVITY => [
                 'priority' => SystemAlert::PRIORITY_HIGH,
@@ -311,10 +245,7 @@ class AlertDefinitionService
                 'icon'     => '🚨',
                 'title'    => 'Suspicious Activity',
                 'message'  => 'Suspicious activity detected',
-                'channels' => [
-                    'in_app',
-                    'email'
-                ]
+                'channels' => ['in_app'],
             ],
 
             // أثناء التطوير نفضل رمي استثناء لاكتشاف الأخطاء الإملائية فوراً
