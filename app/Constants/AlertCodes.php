@@ -4,74 +4,113 @@ namespace App\Constants;
 
 class AlertCodes
 {
-    // المخزون
-    const LOW_STOCK = 'LOW_STOCK';
-    const OUT_OF_STOCK = 'OUT_OF_STOCK';
+    // =====================
+    // Inventory
+    // =====================
+    const STOCK_LOW = 'stock.low';
+    const STOCK_OUT = 'stock.out';
 
-    // المدفوعات
-    const PAYMENT_RECEIVED = 'PAYMENT_RECEIVED';
-    const PAYMENT_FAILED = 'PAYMENT_FAILED';
-    const PAYMENT_OVERDUE = 'PAYMENT_OVERDUE';
+    // =====================
+    // Payments
+    // =====================
+    const PAYMENT_RECEIVED = 'payment.received';
+    const PAYMENT_FAILED = 'payment.failed';
+    const PAYMENT_OVERDUE = 'payment.overdue';
+    const PAYMENT_REFUND = 'payment.refund';
 
-    // الطلبات
-    const NEW_ORDER = 'NEW_ORDER';
-    const ORDER_CONFIRMED = 'ORDER_CONFIRMED';
-    const ORDER_CANCELLED = 'ORDER_CANCELLED';
+    // =====================
+    // Orders
+    // =====================
+    const ORDER_CREATED = 'order.created';
+    const ORDER_CONFIRMED = 'order.confirmed';
+    const ORDER_CANCELLED = 'order.cancelled';
 
-    // المواعيد
-    const APPOINTMENT_BOOKED = 'APPOINTMENT_BOOKED';
-    const APPOINTMENT_CANCELLED = 'APPOINTMENT_CANCELLED';
-    const APPOINTMENT_REMINDER = 'APPOINTMENT_REMINDER';
+    // =====================
+    // Appointments
+    // =====================
+    const APPOINTMENT_BOOKED = 'appointment.booked';
+    const APPOINTMENT_CREATED = 'appointment.created';
+    const APPOINTMENT_CANCELLED = 'appointment.cancelled';
+    const APPOINTMENT_REMINDER = 'appointment.reminder';
 
-    // المرضى
-    const NEW_PATIENT = 'NEW_PATIENT';
-    const PATIENT_RETURN = 'PATIENT_RETURN';
+    // =====================
+    // Patients
+    // =====================
+    const PATIENT_NEW = 'patient.new';
+    const PATIENT_RETURN = 'patient.return';
 
-    // العلاجات
-    const TREATMENT_STARTED = 'TREATMENT_STARTED';
-    const TREATMENT_COMPLETED = 'TREATMENT_COMPLETED';
+    // =====================
+    // Treatments
+    // =====================
+    const TREATMENT_STARTED = 'treatment.started';
+    const TREATMENT_COMPLETED = 'treatment.completed';
 
-    // قائمة بالأيقونات المناسبة
-    public static function getIcon($code)
+    // =====================
+    // Reminder Monitoring
+    // =====================
+    const REMINDER_FAILED = 'reminder.failed';
+    const REMINDER_RETRY = 'reminder.retry';
+    const REMINDER_STUCK = 'reminder.stuck';
+
+    // =====================
+    // Subscription
+    // =====================
+    const TRIAL_EXPIRING = 'trial.expiring';
+    const SUBSCRIPTION_EXPIRED = 'subscription.expired';
+
+    // =====================
+    // Security
+    // =====================
+    const SECURITY_LOGIN_FAILED = 'security.login_failed';
+    const SECURITY_SUSPICIOUS_ACTIVITY = 'security.suspicious_activity';
+
+    /**
+     * Alert icons.
+     */
+    public static function getIcon(string $code): string
     {
         return [
-            self::LOW_STOCK => '📦',
-            self::OUT_OF_STOCK => '🚫',
+            // Inventory
+            self::STOCK_LOW => '📦',
+            self::STOCK_OUT => '🚫',
+
+            // Payments
             self::PAYMENT_RECEIVED => '💰',
             self::PAYMENT_FAILED => '💳',
             self::PAYMENT_OVERDUE => '⏰',
-            self::NEW_ORDER => '🛒',
+            self::PAYMENT_REFUND => '↩️',
+
+            // Orders
+            self::ORDER_CREATED => '🛒',
             self::ORDER_CONFIRMED => '✅',
             self::ORDER_CANCELLED => '❌',
+
+            // Appointments
             self::APPOINTMENT_BOOKED => '📅',
+            self::APPOINTMENT_CREATED => '📅',
             self::APPOINTMENT_CANCELLED => '❌',
             self::APPOINTMENT_REMINDER => '⏰',
-            self::NEW_PATIENT => '👤',
+
+            // Patients
+            self::PATIENT_NEW => '👤',
             self::PATIENT_RETURN => '🔄',
+
+            // Treatments
             self::TREATMENT_STARTED => '🔧',
             self::TREATMENT_COMPLETED => '✅',
-        ][$code] ?? '🔔';
-    }
 
-    // قائمة بالرسائل الافتراضية
-    public static function getDefaultMessage($code)
-    {
-        return [
-            self::LOW_STOCK => 'المخزون منخفض',
-            self::OUT_OF_STOCK => 'نفذ المخزون',
-            self::PAYMENT_RECEIVED => 'تم استلام دفعة',
-            self::PAYMENT_FAILED => 'فشلت عملية الدفع',
-            self::PAYMENT_OVERDUE => 'دفعة متأخرة',
-            self::NEW_ORDER => 'طلب جديد',
-            self::ORDER_CONFIRMED => 'تم تأكيد الطلب',
-            self::ORDER_CANCELLED => 'تم إلغاء الطلب',
-            self::APPOINTMENT_BOOKED => 'تم حجز موعد',
-            self::APPOINTMENT_CANCELLED => 'تم إلغاء موعد',
-            self::APPOINTMENT_REMINDER => 'تذكير بموعد',
-            self::NEW_PATIENT => 'مريض جديد',
-            self::PATIENT_RETURN => 'عودة مريض',
-            self::TREATMENT_STARTED => 'بدء علاج',
-            self::TREATMENT_COMPLETED => 'اكتمال علاج',
-        ][$code] ?? 'إشعار جديد';
+            // Reminder Monitoring
+            self::REMINDER_FAILED => '⚠️',
+            self::REMINDER_RETRY => '🔄',
+            self::REMINDER_STUCK => '⏳',
+
+            // Subscription
+            self::TRIAL_EXPIRING => '⌛',
+            self::SUBSCRIPTION_EXPIRED => '🚫',
+
+            // Security
+            self::SECURITY_LOGIN_FAILED => '🔐',
+            self::SECURITY_SUSPICIOUS_ACTIVITY => '🚨',
+        ][$code] ?? '🔔';
     }
 }
