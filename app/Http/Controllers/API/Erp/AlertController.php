@@ -10,6 +10,16 @@ use Illuminate\Http\Request;
 class AlertController extends Controller
 {
     /**
+     * استخراج branchId من الطلب بشكل موحد
+     */
+    protected function resolveBranchId(Request $request): mixed
+    {
+        return $request->query('branch_id')
+            ?: $request->header('X-Branch-ID')
+            ?: (app()->has('tenant_branch_id') ? app('tenant_branch_id') : null);
+    }
+
+    /**
      * جلب الإشعارات المفلترة ديناميكياً حسب الفرع
      */
     public function index(Request $request)
@@ -22,13 +32,8 @@ class AlertController extends Controller
                 ->orWhere('user_id', $user->id);
         });
 
-        // 🚀 [التعديل الذهبي]: التصفية الصريحة حسب الفرع لمنع كاش وعشوائية الميدياوير أثناء التنقل الفوري
-        // نقرأ أولاً من الـ query parameter، ثم الهيدر، ثم الـ container كخط دفاع أخير
-        $branchId = $request->query('branch_id')
-            ?: $request->header('X-Branch-ID')
-            ?: (app()->has('tenant_branch_id') ? app('tenant_branch_id') : null);
+        $branchId = $this->resolveBranchId($request);
 
-        // إذا كان الفرع محدداً وليس "all"، نطبق الفلترة فوراً
         if ($branchId && $branchId !== 'all') {
             $query->where(function ($q) use ($branchId) {
                 $q->where('branch_id', $branchId)
@@ -36,16 +41,17 @@ class AlertController extends Controller
             });
         }
 
-        // Filter حسب الحالة
         if ($request->filter === 'unread') {
             $query->whereNull('acknowledged_at');
         }
 
         if ($request->filter === 'high') {
-            $query->where('priority', 'high');
+            $query->whereIn('priority', [
+                SystemAlert::PRIORITY_HIGH,
+                SystemAlert::PRIORITY_CRITICAL,
+            ]);
         }
 
-        // Pagination
         $alerts = $query
             ->latest('triggered_at')
             ->paginate(20);
@@ -79,15 +85,11 @@ class AlertController extends Controller
             ->whereNull('acknowledged_at')
             ->where(function ($q) use ($request) {
                 $user = $request->user();
-
                 $q->whereNull('user_id')
                     ->orWhere('user_id', $user->id);
             });
 
-        // 🚀 تأمين عداد الإشعارات أيضاً عند التبديل اللحظي للفروع
-        $branchId = $request->query('branch_id')
-            ?: $request->header('X-Branch-ID')
-            ?: (app()->has('tenant_branch_id') ? app('tenant_branch_id') : null);
+        $branchId = $this->resolveBranchId($request);
 
         if ($branchId && $branchId !== 'all') {
             $query->where(function ($q) use ($branchId) {
@@ -102,18 +104,28 @@ class AlertController extends Controller
     }
 
     /**
-     * تحديد الإشعار كمقروء
+     * تحديد إشعار واحد كمقروء (مع فحص الفرع)
      */
     public function acknowledge($id)
     {
         $user = request()->user();
 
-        $alert = SystemAlert::query()
+        $query = SystemAlert::query()
             ->where(function ($q) use ($user) {
                 $q->whereNull('user_id')
                     ->orWhere('user_id', $user->id);
-            })
-            ->findOrFail($id);
+            });
+
+        $branchId = $this->resolveBranchId(request());
+
+        if ($branchId && $branchId !== 'all') {
+            $query->where(function ($q) use ($branchId) {
+                $q->where('branch_id', $branchId)
+                    ->orWhereNull('branch_id');
+            });
+        }
+
+        $alert = $query->findOrFail($id);
 
         $alert->update([
             'acknowledged_at' => now()
@@ -122,6 +134,9 @@ class AlertController extends Controller
         return response()->json(['status' => 'ok']);
     }
 
+    /**
+     * تحديد عدة إشعارات كمقروءة (مع عزل الفرع والشركة)
+     */
     public function acknowledgeMany(Request $request)
     {
         $ids = $request->input('ids', []);
@@ -129,21 +144,32 @@ class AlertController extends Controller
             return response()->json(['message' => 'No IDs provided'], 400);
         }
 
-        \App\Models\SystemAlert::query()
+        $query = SystemAlert::query()
+            ->where('company_id', Tenant::id())
             ->whereIn('id', $ids)
             ->where(function ($q) {
                 $q->whereNull('user_id')
                     ->orWhere('user_id', auth()->id());
-            })
-            ->update([
-                'acknowledged_at' => now()
-            ]);
+            });
+
+        $branchId = $this->resolveBranchId($request);
+
+        if ($branchId && $branchId !== 'all') {
+            $query->where(function ($q) use ($branchId) {
+                $q->where('branch_id', $branchId)
+                    ->orWhereNull('branch_id');
+            });
+        }
+
+        $query->update([
+            'acknowledged_at' => now()
+        ]);
 
         return response()->json(['message' => 'Acknowledged']);
     }
 
     /**
-     * تحديد كل الإشعارات كمقروءة
+     * تحديد كل الإشعارات كمقروءة (مع عزل الفرع)
      */
     public function markAllRead(Request $request)
     {
@@ -156,8 +182,8 @@ class AlertController extends Controller
                     ->orWhere('user_id', $user->id);
             });
 
-        // تأمين الـ mark all read لتعمل على مستوى الفرع النشط فقط إذا مرر بالطلب
-        $branchId = $request->query('branch_id') ?: $request->header('X-Branch-ID');
+        $branchId = $this->resolveBranchId($request);
+
         if ($branchId && $branchId !== 'all') {
             $query->where(function ($q) use ($branchId) {
                 $q->where('branch_id', $branchId)

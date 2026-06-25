@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Events\AlertCreated;
 use App\Models\SystemAlert;
 use Illuminate\Support\Collection;
 
@@ -18,7 +19,8 @@ class AlertService
         ?int $branchId = null
     ): void {
         foreach ($recipients as $user) {
-            SystemAlert::create([
+
+            $alert = SystemAlert::create([
                 'company_id' => $companyId ?? $user->company_id,
                 'branch_id' => $branchId ?? $user->branch_id,
                 'user_id' => $user->id,
@@ -29,6 +31,8 @@ class AlertService
                 'meta' => $meta,
                 'triggered_at' => now(),
             ]);
+
+            event(new AlertCreated($alert));
         }
     }
 }

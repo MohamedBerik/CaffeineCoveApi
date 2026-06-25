@@ -73,11 +73,18 @@ class AlertRecipientService
 
         return $query
             ->where(function ($q) use ($alertCode) {
-                $q->whereDoesntHave('alertPreferences')
+
+                $q->whereDoesntHave(
+                    'alertPreferences',
+                    function ($pref) use ($alertCode) {
+                        $pref->where('alert_code', $alertCode);
+                    }
+                )
+
                     ->orWhereHas(
                         'alertPreferences',
-                        function ($q) use ($alertCode) {
-                            $q->where('alert_code', $alertCode)
+                        function ($pref) use ($alertCode) {
+                            $pref->where('alert_code', $alertCode)
                                 ->where('enabled', true);
                         }
                     );

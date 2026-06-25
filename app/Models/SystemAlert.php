@@ -2,22 +2,15 @@
 
 namespace App\Models;
 
-use App\Events\AlertCreated;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use App\Models\Concerns\BelongsToCompanyTrait;
-use App\Services\Tenant;
 
 class SystemAlert extends Model
 {
     use HasFactory;
     use BelongsToCompanyTrait;
 
-    // ✅ Performance fix
-    // public static $hasCompanyColumn = true;
-    // public static $hasBranchColumn = true;
-
-    // ✅ الثوابت
     const TYPE_STOCK = 'stock';
     const TYPE_PAYMENT = 'payment';
     const TYPE_APPOINTMENT = 'appointment';
@@ -202,30 +195,6 @@ class SystemAlert extends Model
         return !$this->is_resolved;
     }
 
-    // ============ Static Helpers ============
-
-    public static function createAlert(
-        int $companyId,
-        string $message,
-        string $type = self::TYPE_SYSTEM,
-        string $priority = self::PRIORITY_MEDIUM,
-        array $meta = [],
-        ?string $code = null,
-        ?int $userId = null
-    ): self {
-        return static::create([
-            'company_id' => $companyId,
-            'branch_id' => Tenant::branchId(),
-            'user_id' => $userId,
-            'code' => $code,
-            'type' => $type,
-            'priority' => $priority,
-            'message' => $message,
-            'meta' => $meta,
-            'triggered_at' => now(),
-        ]);
-    }
-
     public static function markAllAsRead(int $companyId): void
     {
         static::where('company_id', $companyId)
@@ -247,7 +216,7 @@ class SystemAlert extends Model
             ActivityLog::create([
                 'company_id' => $alert->company_id,
                 'branch_id' => $alert->branch_id,
-                'user_id' => auth()->id(),
+                'user_id' => auth()->id(), // ✅ يسجل null إذا لم يكن هناك مستخدم
                 'action' => 'alert.created',
                 'subject_type' => SystemAlert::class,
                 'subject_id' => $alert->id,
@@ -257,26 +226,22 @@ class SystemAlert extends Model
                     'message' => $alert->message,
                 ]
             ]);
-
-            broadcast(new AlertCreated($alert));
         });
 
         static::updated(function ($alert) {
-            if (auth()->check()) {
-                $changes = $alert->getChanges();
-                unset($changes['updated_at']);
+            $changes = $alert->getChanges();
+            unset($changes['updated_at']);
 
-                if (!empty($changes)) {
-                    ActivityLog::create([
-                        'company_id' => $alert->company_id,
-                        'branch_id' => $alert->branch_id,
-                        'user_id' => auth()->id(),
-                        'action' => 'alert.updated',
-                        'subject_type' => SystemAlert::class,
-                        'subject_id' => $alert->id,
-                        'properties' => ['changes' => $changes]
-                    ]);
-                }
+            if (!empty($changes)) {
+                ActivityLog::create([
+                    'company_id' => $alert->company_id,
+                    'branch_id' => $alert->branch_id,
+                    'user_id' => auth()->id(), // ✅ يسجل null إذا لم يكن هناك مستخدم
+                    'action' => 'alert.updated',
+                    'subject_type' => SystemAlert::class,
+                    'subject_id' => $alert->id,
+                    'properties' => ['changes' => $changes]
+                ]);
             }
         });
     }

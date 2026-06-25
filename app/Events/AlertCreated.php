@@ -3,6 +3,7 @@
 namespace App\Events;
 
 use App\Models\SystemAlert;
+use App\Services\AlertDefinitionService;
 use Illuminate\Broadcasting\PrivateChannel;
 use Illuminate\Contracts\Broadcasting\ShouldBroadcastNow;
 use Illuminate\Foundation\Events\Dispatchable;
@@ -43,10 +44,19 @@ class AlertCreated implements ShouldBroadcastNow
      */
     public function broadcastWith(): array
     {
+        $definition = AlertDefinitionService::definition(
+            $this->alert->code
+        );
+
         return [
-            'id'       => $this->alert->id,
-            'message'  => $this->alert->message,
-            'priority' => $this->alert->priority,
+            'id'           => $this->alert->id,
+            'code'         => $this->alert->code,
+            'message'      => $this->alert->message,
+            'type'         => $this->alert->type,
+            'priority'     => $this->alert->priority,
+            'icon'         => $definition['icon'] ?? '🔔',
+            'meta'         => $this->alert->meta,
+            'triggered_at' => $this->alert->triggered_at,
         ];
     }
 }
