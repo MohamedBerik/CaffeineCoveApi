@@ -371,27 +371,22 @@ class AppointmentService
                 'scheduled_today_count'    => 1,
             ]));
 
-            AlertService::send(
-                AlertRecipientService::user($doctor->user_id),
-
-                message: 'New appointment assigned to Dr. ' . $doctor->name,
-
-                type: SystemAlert::TYPE_APPOINTMENT,
-
-                priority: SystemAlert::PRIORITY_MEDIUM,
-
-                meta: [
-                    'appointment_id' => $appointment->id,
-                    'patient_id'     => $appointment->patient_id,
-                    'doctor_id'      => $doctor->id,
-                ],
-
-                code: AlertCodes::APPOINTMENT_CREATED,
-
-                companyId: $appointment->company_id,
-
-                branchId: $appointment->branch_id,
-            );
+            if ($doctor->user_id) {
+                AlertService::send(
+                    AlertRecipientService::user($doctor->user_id),
+                    message: 'New appointment assigned to Dr. ' . $doctor->name,
+                    type: SystemAlert::TYPE_APPOINTMENT,
+                    priority: SystemAlert::PRIORITY_MEDIUM,
+                    meta: [
+                        'appointment_id' => $appointment->id,
+                        'patient_id'     => $appointment->patient_id,
+                        'doctor_id'      => $doctor->id,
+                    ],
+                    code: AlertCodes::APPOINTMENT_CREATED,
+                    companyId: $appointment->company_id,
+                    branchId: $appointment->branch_id,
+                );
+            }
             return $appointment;
         });
     }
