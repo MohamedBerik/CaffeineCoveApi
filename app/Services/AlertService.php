@@ -51,15 +51,24 @@ class AlertService
             $templateData
         );
 
-        self::send(
-            recipients: $recipients,
-            message: $message,
-            type: $definition['type'],
-            priority: $definition['priority'],
-            meta: $meta,
-            code: $code,
-            companyId: $companyId,
-            branchId: $branchId
-        );
+        // ✅ استخراج القنوات من التعريف (افتراضيًا in_app)
+        $channels = $definition['channels'] ?? ['in_app'];
+
+        foreach ($channels as $channel) {
+            $driver = AlertChannelFactory::make($channel);
+
+            foreach ($recipients as $recipient) {
+                $driver->send(
+                    $recipient,
+                    $message,
+                    [
+                        'code'     => $code,
+                        'type'     => $definition['type'],
+                        'priority' => $definition['priority'],
+                        ...$meta,
+                    ]
+                );
+            }
+        }
     }
 }
